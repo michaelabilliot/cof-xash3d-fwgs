@@ -1,0 +1,150 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+import os
+
+
+def options(opt):
+	grp = opt.add_option_group('ref_d3d9 options')
+	grp.add_option('--dxsdk', action='store', dest='DXSDK_DIR', default='',
+		help='path to the legacy DirectX SDK containing D3DX9; DXSDK_DIR is also accepted')
+
+
+def _dxsdk_candidates(conf):
+	candidates = []
+
+	if conf.options.DXSDK_DIR:
+		candidates.append(conf.options.DXSDK_DIR)
+
+	env_dir = os.environ.get('DXSDK_DIR')
+	if env_dir:
+		candidates.append(env_dir)
+
+	program_files_x86 = os.environ.get('ProgramFiles(x86)')
+	if program_files_x86:
+		candidates.append(os.path.join(program_files_x86,
+			'Microsoft DirectX SDK (June 2010)'))
+
+	candidates.append(r'C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)')
+
+	result = []
+	seen = set()
+	for root in candidates:
+		if not root:
+			continue
+		root = os.path.abspath(os.path.expandvars(root.rstrip('\\/')))
+		key = os.path.normcase(root)
+		if key in seen:
+			continue
+		seen.add(key)
+		result.append(root)
+	return result
+
+
+def _find_dxsdk(conf, arch):
+	for root in _dxsdk_candidates(conf):
+		include_dir = os.path.join(root, 'Include')
+		lib_dir = os.path.join(root, 'Lib', arch)
+		if not os.path.isfile(os.path.join(include_dir, 'd3dx9.h')):
+			continue
+		if not os.path.isfile(os.path.join(lib_dir, 'd3d9.lib')):
+			continue
+		if not os.path.isfile(os.path.join(lib_dir, 'd3dx9.lib')):
+			continue
+		return root, include_dir, lib_dir
+	return None, None, None
+
+
+def configure(conf):
+	if not conf.env.D3D9:
+		return
+
+	if conf.env.DEST_OS != 'win32':
+		conf.fatal('ref_d3d9 is currently supported only on Windows')
+
+	if conf.env.COMPILER_CC != 'msvc':
+		conf.fatal('ref_d3d9 currently requires MSVC')
+
+	arch = 'x64' if conf.env.DEST_SIZEOF_VOID_P == 8 else 'x86'
+	dxsdk, include_dir, lib_dir = _find_dxsdk(conf, arch)
+	if not dxsdk:
+		conf.fatal(
+			'DirectX SDK (June 2010) with D3DX9 was not found for %s. '
+			'Set DXSDK_DIR or pass --dxsdk=<path>.' % arch)
+
+	conf.env.INCLUDES_D3D9SDK = [include_dir]
+	conf.env.LIBPATH_D3D9SDK = [lib_dir]
+	conf.env.LIB_D3D9SDK = ['d3d9', 'd3dx9']
+
+	# Keep renderer-specific language/ABI flags local. Optimization comes from
+	# the root compiler_optimizations configuration just like the rest of Xash3D.
+	conf.env.D3D9_CXXFLAGS = ['/std:c++20', '/EHsc']
+
+	fragment = r'''
+#include <windows.h>
+#include <d3d9.h>
+#include <d3dx9.h>
+
+int main(void)
+{
+	IDirect3D9 *d3d = Direct3DCreate9(D3D_SDK_VERSION);
+	if (d3d)
+		d3d->Release();
+
+	static const char shader[] = "vs.1.1\nmov oPos, v0\n";
+	LPD3DXBUFFER code = 0;
+	LPD3DXBUFFER errors = 0;
+	D3DXAssembleShader(shader, sizeof(shader) - 1, 0, 0, 0, &code, &errors);
+	if (code)
+		code->Release();
+	if (errors)
+		errors->Release();
+	return 0;
+}
+'''
+
+	conf.check_cxx(
+		fragment=fragment,
+		msg='Checking Direct3D 9 / D3DX9 SDK',
+		includes=conf.env.INCLUDES_D3D9SDK,
+		libpath=conf.env.LIBPATH_D3D9SDK,
+		lib=conf.env.LIB_D3D9SDK,
+		uselib_store='D3D9SDK_CHECK',
+		cxxflags=conf.env.D3D9_CXXFLAGS,
+		mandatory=True)
+
+	conf.msg('DirectX SDK', dxsdk)
+	conf.msg('DirectX SDK libraries', arch)
+
+
+def build(bld):
+	if not bld.env.D3D9:
+		return
+
+	source = [
+		'r_context.cpp',
+		'dx_world.cpp',
+		'dx_lightmaps.cpp',
+		'dx_studio.cpp',
+		'dx_effects.cpp',
+		'dx_textures.cpp',
+		'dx_profiler.cpp',
+		'dx_studio_shader.cpp',
+	]
+
+	bld.shlib(
+		source=source,
+		target='ref_d3d9',
+		defines=['REF_DLL=1', 'WIN32_LEAN_AND_MEAN', 'NOMINMAX'],
+		use=[
+			'ref_common',
+			'engine_includes',
+			'sdk_includes',
+			'public',
+			'werror',
+			'yy_thunks',
+			'USER32',
+		],
+		uselib='D3D9SDK',
+		cxxflags=bld.env.D3D9_CXXFLAGS,
+		install_path=bld.env.LIBDIR)
