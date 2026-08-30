@@ -779,6 +779,74 @@ qboolean DX_UpdateTexture( int texnum, int cols, int rows, int width, int height
 	return true;
 }
 
+void DX_ProcessTexture( int texnum, float gamma, int topColor, int bottomColor )
+{
+	if( texnum <= 0 || static_cast<size_t>( texnum ) >= g_Textures.size( ) )
+		return;
+
+	dxtexture_t &texture = g_Textures[texnum];
+	uint imageFlags = 0;
+
+	if( gamma != -1.0f )
+	{
+		imageFlags = IMAGE_LIGHTGAMMA;
+	}
+	else if( topColor != -1 && bottomColor != -1 )
+	{
+		imageFlags = IMAGE_REMAP;
+	}
+	else
+	{
+		gEngfuncs.Con_Printf( "D3D9: bad texture processing operation for %s\n",
+			texture.name );
+		return;
+	}
+
+	if( !texture.original )
+	{
+		gEngfuncs.Con_Printf( "D3D9: no source data for texture %s\n",
+			texture.name );
+		return;
+	}
+
+	if( ImageCompressed( texture.original->type ) )
+	{
+		gEngfuncs.Con_Printf( "D3D9: can't process compressed texture %s\n",
+			texture.name );
+		return;
+	}
+
+	rgbdata_t *pic = gEngfuncs.FS_CopyImage( texture.original );
+	if( !pic )
+		return;
+
+	if( pic->type == PF_INDEXED_24 || pic->type == PF_INDEXED_32 )
+		SetBits( imageFlags, IMAGE_FORCE_RGBA );
+
+	gEngfuncs.Image_Process( &pic, topColor, bottomColor, imageFlags, 0.0f );
+
+	if( !pic || !DX_PrepareImageForD3DUpload( &texture, &pic ) )
+	{
+		if( pic )
+			gEngfuncs.FS_FreeImage( pic );
+		return;
+	}
+
+	if( DX_EnsureTextureStorage( texture, pic->width, pic->height ) )
+	{
+		const dx_alpha_storage_mode_t alphaMode =
+			DX_ChooseAlphaStorageMode( pic, texture.has_alpha != 0 );
+
+		if( DX_UploadRGBAImage( texture.tex, pic, alphaMode ) )
+		{
+			texture.srcWidth = pic->width;
+			texture.srcHeight = pic->height;
+		}
+	}
+
+	gEngfuncs.FS_FreeImage( pic );
+}
+
 static bool DX_CheckedAdd( size_t a, size_t b, size_t &out )
 {
 	if( a > std::numeric_limits<size_t>::max( ) - b )

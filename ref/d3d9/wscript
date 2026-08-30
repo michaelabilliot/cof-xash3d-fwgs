@@ -135,7 +135,7 @@ def build(bld):
 	bld.shlib(
 		source=source,
 		target='ref_d3d9',
-		defines=['REF_DLL=1', 'WIN32_LEAN_AND_MEAN', 'NOMINMAX'],
+		defines=['REF_DLL=1', 'NOMINMAX'],
 		use=[
 			'ref_common',
 			'engine_includes',

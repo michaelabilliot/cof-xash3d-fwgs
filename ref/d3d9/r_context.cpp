@@ -370,8 +370,6 @@ static constexpr int DX_SKYBOX_SIDES = 6;
 static int g_skyTextures[DX_SKYBOX_SIDES] = {};
 
 convar_t dx_remix = { (char *)"dx_remix", (char *)"0", 0 };
-convar_t dx_gamma = { (char *)"dx_gamma", (char *)"1.0", 0 };
-convar_t dx_brightness = { (char *)"dx_brightness", (char *)"1.0", 0 };
 
 convar_t dx_fog = { (char *)"dx_fog", (char *)"1", 0 };
 
@@ -445,8 +443,6 @@ convar_t dx_egon_beam_light_max_samples = { (char *)"dx_egon_beam_light_max_samp
 
 static bool g_contextCvarsRegistered = false;
 static bool g_showTextureCmdsRegistered = false;
-static float g_lastGamma = -1.0f;
-static float g_lastBrightness = -1.0f;
 static float g_previousClientTime = -1.0f;
 static int g_dxMSAASamplesReq = -9999;
 static int g_dxMSAAQualityReq = -9999;
@@ -898,8 +894,6 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
-	gEngfuncs.Cvar_RegisterVariable( &dx_gamma );
-	gEngfuncs.Cvar_RegisterVariable( &dx_brightness );
 	gEngfuncs.Cvar_RegisterVariable( &dx_fog );
 	gEngfuncs.Cvar_RegisterVariable( &dx_msaa_samples );
 	gEngfuncs.Cvar_RegisterVariable( &dx_msaa_quality );
@@ -947,36 +941,6 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_egon_beam_light_radius );
 	gEngfuncs.Cvar_RegisterVariable( &dx_egon_beam_light_max_samples );
 	g_contextCvarsRegistered = true;
-}
-
-static void R_ApplyGammaRamp( void )
-{
-	if( !device )
-		return;
-
-	const float gamma = std::max( 0.25f, std::min( 4.0f, dx_gamma.value ) );
-	const float brightness = std::max( 0.0f, std::min( 2.0f, dx_brightness.value ) );
-	if( fabsf( gamma - g_lastGamma ) < 0.0001f &&
-		fabsf( brightness - g_lastBrightness ) < 0.0001f )
-	{
-		return;
-	}
-
-	D3DGAMMARAMP ramp;
-	for( int i = 0; i < 256; ++i )
-	{
-		const float source = static_cast<float>( i ) / 255.0f;
-		const float corrected = std::min( 1.0f,
-			powf( source, 1.0f / gamma ) * brightness );
-		const WORD value = static_cast<WORD>( corrected * 65535.0f + 0.5f );
-		ramp.red[i] = value;
-		ramp.green[i] = value;
-		ramp.blue[i] = value;
-	}
-
-	device->SetGammaRamp( 0, D3DSGR_NO_CALIBRATION, &ramp );
-	g_lastGamma = gamma;
-	g_lastBrightness = brightness;
 }
 
 typedef int texnum_t;
@@ -1315,7 +1279,18 @@ static dlight_t *R_APIGetEntityLight( int number )
 	dlight_t *lights = reinterpret_cast<dlight_t *>( ENGINE_GET_PARM( PARM_GET_ELIGHTS_PTR ) );
 	return ( lights && number >= 0 && number < 64 ) ? &lights[number] : nullptr;
 }
-static byte R_APILightToTexGamma( byte color ) { return color; }
+static byte R_APILightToTexGamma( byte color )
+{
+	if( gp_host && FBitSet( gp_host->features, ENGINE_LINEAR_GAMMA_SPACE ) )
+		return color;
+
+	const auto *lightGammaTable = reinterpret_cast<const uint16_t *>(
+		ENGINE_GET_PARM( PARM_GET_LIGHTGAMMATABLE_PTR ) );
+	if( !lightGammaTable )
+		return color;
+
+	return static_cast<byte>( lightGammaTable[static_cast<unsigned int>( color ) << 2] >> 2 );
+}
 static float R_APIGetFrameTime( void ) { return std::max( 0.0f, g_frametime ); }
 static int R_APIFatPVS( const float *org, float radius, byte *visbuffer, qboolean merge, qboolean fullvis )
 {
@@ -2511,10 +2486,7 @@ static bool DX_ResetDevice( bool rebuildPresentParams )
 	if( g_dxLine ) g_dxLine->OnResetDevice( );
 	DX_InvalidateTextureBindCache( );
 	DX_RefreshFogCaps( );
-	g_lastGamma = -1.0f;
-	g_lastBrightness = -1.0f;
 	DX_UpdateTextureQuality( true );
-	R_ApplyGammaRamp( );
 	return true;
 }
 
@@ -2583,7 +2555,6 @@ static qboolean R_Init( void )
 	DX_RefreshFogCaps( );
 	DX_ResetFog( );
 	DX_UpdateTextureQuality( true );
-	R_ApplyGammaRamp( );
 	return true;
 }
 
@@ -3227,11 +3198,6 @@ static const byte *R_GetTextureOriginalBuffer( unsigned int idx )
 
 	const dxtexture_t &texture = g_Textures[idx];
 	return texture.original ? texture.original->buffer : nullptr;
-}
-
-static void DX_ProcessTexture( int texnum, float gamma, int topColor, int bottomColor )
-{
-
 }
 
 static void R_SetupSky( int *skytextures )
@@ -5315,7 +5281,6 @@ void R_BeginFrame( qboolean clear )
 
 	if( dx_remix_perf.value == 0.0f )
 		DX_InvalidateTextureBindCache( );
-	R_ApplyGammaRamp( );
 	R_BeginScratchFrame( );
 	R_BeginModelsFrame( );
 
@@ -5500,9 +5465,8 @@ void R_NewMap( void )
 
 static void R_GammaChanged( qboolean state )
 {
-	g_lastGamma = -1.0f;
-	g_lastBrightness = -1.0f;
-	R_ApplyGammaRamp( );
+	(void)state;
+	R_InvalidateLightmapGammaLut( );
 	R_RefreshLightmaps( );
 }
 

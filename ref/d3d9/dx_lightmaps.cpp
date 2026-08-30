@@ -10,19 +10,33 @@ namespace
 	constexpr size_t LIGHTMAP_MAX_DIRTY_RECTS = 32;
 }
 
+static bool g_lightmapGammaLutDirty = true;
+
+void R_InvalidateLightmapGammaLut( void )
+{
+	g_lightmapGammaLutDirty = true;
+}
+
 static void R_UpdateLightmapGammaLut( )
 {
-	const float gamma = std::max( 0.5f, std::min( 4.0f, r_lightmap_gamma.value ) );
-	if( fabsf( gamma - g_lightmapGammaLutValue ) < 0.0001f )
+	if( !g_lightmapGammaLutDirty )
 		return;
+
+	const bool linearGamma = gp_host &&
+		FBitSet( gp_host->features, ENGINE_LINEAR_GAMMA_SPACE );
+	const auto *lightGammaTable = reinterpret_cast<const uint16_t *>(
+		ENGINE_GET_PARM( PARM_GET_LIGHTGAMMATABLE_PTR ) );
 
 	for( int channel = 0; channel < 256; ++channel )
 	{
-		const float linear = static_cast<float>( channel ) / 255.0f;
-		g_lightmapGammaLut[channel] = static_cast<byte>( std::min( 255,
-			static_cast<int>( powf( linear, 1.0f / gamma ) * 255.0f + 0.5f ) ) );
+		g_lightmapGammaLut[channel] = linearGamma || !lightGammaTable
+			? static_cast<byte>( channel )
+			: static_cast<byte>( lightGammaTable[channel << 2] >> 2 );
 	}
-	g_lightmapGammaLutValue = gamma;
+
+	// Keep retrying until the engine gamma table is available.
+	if( linearGamma || lightGammaTable )
+		g_lightmapGammaLutDirty = false;
 }
 
 int R_GetLightmapAtlasCount( void )
@@ -3637,17 +3651,10 @@ bool R_ReadSurfaceStaticLight( const msurface_t *surface,
 	green = std::min( 255, ( green + 128 ) >> 8 );
 	blue = std::min( 255, ( blue + 128 ) >> 8 );
 
-	const float gamma = std::max( 0.5f, std::min( 4.0f, r_lightmap_gamma.value ) );
-	auto applyGamma = [gamma]( int channel ) -> byte
-		{
-			const float linear = static_cast<float>( channel ) / 255.0f;
-			return static_cast<byte>( std::min( 255, static_cast<int>(
-				powf( linear, 1.0f / gamma ) * 255.0f + 0.5f ) ) );
-		};
-
-	outLight.r = applyGamma( red );
-	outLight.g = applyGamma( green );
-	outLight.b = applyGamma( blue );
+	R_UpdateLightmapGammaLut( );
+	outLight.r = g_lightmapGammaLut[red];
+	outLight.g = g_lightmapGammaLut[green];
+	outLight.b = g_lightmapGammaLut[blue];
 	if( outLightVec )
 	{
 		if( deluxePlane )
@@ -3664,7 +3671,6 @@ void R_CheckLightmapBakeParams( void )
 	if( r_nolm.value != 0.0f )
 		return;
 
-	static float lastLightmapGamma = -1.0f;
 	static float lastAmbientOcclusion = -999.0f;
 	static float lastAoStrength = -999.0f;
 	static float lastAoRadius = -999.0f;
@@ -3682,7 +3688,6 @@ void R_CheckLightmapBakeParams( void )
 	static float lastAoCache = -999.0f;
 
 	const bool changed =
-		fabsf( lastLightmapGamma - r_lightmap_gamma.value ) > 0.0001f ||
 		fabsf( lastAmbientOcclusion - dx_ao.value ) > 0.0001f ||
 		fabsf( lastAoStrength - dx_ao_strength.value ) > 0.0001f ||
 		fabsf( lastAoRadius - dx_ao_radius.value ) > 0.0001f ||
@@ -3703,7 +3708,6 @@ void R_CheckLightmapBakeParams( void )
 		return;
 
 	R_RefreshLightmaps( );
-	lastLightmapGamma = r_lightmap_gamma.value;
 	lastAmbientOcclusion = dx_ao.value;
 	lastAoStrength = dx_ao_strength.value;
 	lastAoRadius = dx_ao_radius.value;

@@ -1886,24 +1886,12 @@ static bool R_StudioUploadNormals( )
 
 static float R_StudioDirectLightScale( )
 {
-	float direct = dx_studio_direct.value;
-	if( direct < 0.0f && gEngfuncs.pfnGetCvarPointer )
-	{
+	static cvar_t *engineDirect = nullptr;
+	if( !engineDirect && gEngfuncs.pfnGetCvarPointer )
+		engineDirect = gEngfuncs.pfnGetCvarPointer( "direct" );
 
-		static cvar_t *engineDirect = nullptr;
-		static bool triedEngineDirect = false;
-		if( !triedEngineDirect )
-		{
-			engineDirect = gEngfuncs.pfnGetCvarPointer( "v_direct" );
-			triedEngineDirect = true;
-		}
-		if( engineDirect )
-			direct = engineDirect->value;
-	}
-	if( direct < 0.0f )
-		direct = 0.9f;
-
-	return std::max( 0.75f, std::min( 1.0f, direct ) );
+	const float direct = engineDirect ? engineDirect->value : 0.9f;
+	return std::max( 0.0f, std::min( 1.0f, direct ) );
 }
 
 static byte R_StudioScaleColorChannel( byte channel, float factor )

@@ -166,8 +166,6 @@ model_drawdata_t *R_FindStudioModelDrawData( model_t *mod )
 convar_t r_nolm = { (char *)"r_nolm", (char *)"0", 0 };
 convar_t r_nointerp = { (char *)"r_nointerp", (char *)"0", 0 };
 
-convar_t r_lightmap_gamma = { (char *)"r_lightmap_gamma", (char *)"0.9", 0 };
-
 convar_t dx_overbright =
 { (char *)"dx_overbright", (char *)"1", 0 };
 
@@ -245,7 +243,7 @@ convar_t dx_lightmap_rebind =
 { (char *)"dx_lightmap_rebind", (char *)"0", 0 };
 
 convar_t dx_water_ripple =
-{ (char *)"dx_water_ripple", (char *)"0", 0 };
+{ (char *)"dx_water_ripple", (char *)"1", 0 };
 
 convar_t dx_water_ripple_resolution =
 { (char *)"dx_water_ripple_resolution", (char *)"0", 0 };
@@ -321,9 +319,6 @@ convar_t dx_studio_normals =
 { (char *)"dx_studio_normals", (char *)"1", 0 };
 convar_t dx_studio_normal_lighting =
 { (char *)"dx_studio_normal_lighting", (char *)"1", 0 };
-
-convar_t dx_studio_direct =
-{ (char *)"dx_studio_direct", (char *)"-1", 0 };
 
 convar_t dx_studio_extended_lighting =
 { (char *)"dx_studio_extended_lighting", (char *)"1", 0 };
@@ -456,7 +451,6 @@ void R_RegisterModelCvars( )
 
 	gEngfuncs.Cvar_RegisterVariable( &r_nolm );
 	gEngfuncs.Cvar_RegisterVariable( &r_nointerp );
-	gEngfuncs.Cvar_RegisterVariable( &r_lightmap_gamma );
 	gEngfuncs.Cvar_RegisterVariable( &dx_overbright );
 	gEngfuncs.Cvar_RegisterVariable( &dx_ao );
 	gEngfuncs.Cvar_RegisterVariable( &dx_ao_strength );
@@ -507,7 +501,6 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_decal_debug );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_normals );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_normal_lighting );
-	gEngfuncs.Cvar_RegisterVariable( &dx_studio_direct );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_extended_lighting );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_upload_normals );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_light_cache_dist );
@@ -867,7 +860,6 @@ std::array<int, DX_LIGHTSTYLE_COUNT> g_lightStyleValues = []( )
 	}( );
 
 std::array<byte, 256> g_lightmapGammaLut{};
-float g_lightmapGammaLutValue = -1.0f;
 int g_lightStyleRevision = 0;
 
 dxfast::HashMap<const model_t *, world_model_draw_t *> g_worldLightmappedModels;
