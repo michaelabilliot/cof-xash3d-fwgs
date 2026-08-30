@@ -101,15 +101,13 @@ static bool g_dxOrthoValid = false;
 static cvar_t *g_dxRSpeedsCvar = nullptr;
 
 
-static constexpr int DX_MAX_SCENE_ENTITIES = 4096;
-
-static cl_entity_s *g_opaqueBrushEntities[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_opaqueStudioEntities[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_opaqueSpriteEntities[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_translucentCandidates[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_entityLightEmitters[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_waterBrushEntities[DX_MAX_SCENE_ENTITIES] = {};
-static cl_entity_s *g_lateWaterBrushEntities[DX_MAX_SCENE_ENTITIES] = {};
+static std::vector<cl_entity_s *> g_opaqueBrushEntities;
+static std::vector<cl_entity_s *> g_opaqueStudioEntities;
+static std::vector<cl_entity_s *> g_opaqueSpriteEntities;
+static std::vector<cl_entity_s *> g_translucentCandidates;
+static std::vector<cl_entity_s *> g_entityLightEmitters;
+static std::vector<cl_entity_s *> g_waterBrushEntities;
+static std::vector<cl_entity_s *> g_lateWaterBrushEntities;
 
 static int g_opaqueBrushCount = 0;
 static int g_opaqueStudioCount = 0;
@@ -127,7 +125,7 @@ struct translucent_entity_t
 	int submissionOrder = 0;
 };
 
-static translucent_entity_t g_translucentDrawList[4096];
+static std::vector<translucent_entity_t> g_translucentDrawList;
 
 cl_entity_s *g_beamEntities[DX_MAX_BEAM_ENTITIES] = {};
 int g_beamEntityCount = 0;
@@ -3175,10 +3173,10 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		return true;
 	}
 
-	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 &&
-		g_entityLightEmitterCount < DX_MAX_SCENE_ENTITIES )
+	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 )
 	{
-		g_entityLightEmitters[g_entityLightEmitterCount++] = clent;
+		g_entityLightEmitters.push_back( clent );
+		++g_entityLightEmitterCount;
 	}
 
 	const int effectiveRenderMode = modelType == mod_studio
@@ -3187,30 +3185,26 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 
 	if( effectiveRenderMode != kRenderNormal )
 	{
-		if( g_translucentCandidateCount >= DX_MAX_SCENE_ENTITIES )
-			return false;
-		g_translucentCandidates[g_translucentCandidateCount++] = clent;
+		g_translucentCandidates.push_back( clent );
+		++g_translucentCandidateCount;
 		return true;
 	}
 
 	switch( modelType )
 	{
 	case mod_brush:
-		if( g_opaqueBrushCount >= DX_MAX_SCENE_ENTITIES )
-			return false;
-		g_opaqueBrushEntities[g_opaqueBrushCount++] = clent;
+		g_opaqueBrushEntities.push_back( clent );
+		++g_opaqueBrushCount;
 		break;
 
 	case mod_studio:
-		if( g_opaqueStudioCount >= DX_MAX_SCENE_ENTITIES )
-			return false;
-		g_opaqueStudioEntities[g_opaqueStudioCount++] = clent;
+		g_opaqueStudioEntities.push_back( clent );
+		++g_opaqueStudioCount;
 		break;
 
 	case mod_sprite:
-		if( g_opaqueSpriteCount >= DX_MAX_SCENE_ENTITIES )
-			return false;
-		g_opaqueSpriteEntities[g_opaqueSpriteCount++] = clent;
+		g_opaqueSpriteEntities.push_back( clent );
+		++g_opaqueSpriteCount;
 		break;
 	}
 
@@ -4270,6 +4264,8 @@ static void R_SetupSceneDLights( )
 
 static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdentity )
 {
+	g_waterBrushEntities.clear( );
+	g_lateWaterBrushEntities.clear( );
 	g_waterBrushCount = 0;
 	g_lateWaterBrushCount = 0;
 
@@ -4288,12 +4284,13 @@ static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdent
 
 		if( R_WaterIsTranslucent( ent ) )
 		{
-			if( g_lateWaterBrushCount < DX_MAX_SCENE_ENTITIES )
-				g_lateWaterBrushEntities[g_lateWaterBrushCount++] = ent;
+			g_lateWaterBrushEntities.push_back( ent );
+			++g_lateWaterBrushCount;
 		}
-		else if( g_waterBrushCount < DX_MAX_SCENE_ENTITIES )
+		else
 		{
-			g_waterBrushEntities[g_waterBrushCount++] = ent;
+			g_waterBrushEntities.push_back( ent );
+			++g_waterBrushCount;
 		}
 	}
 
@@ -4320,29 +4317,28 @@ static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdent
 static int R_BuildTranslucentList( const vec3_t viewOrigin )
 {
 	DX_PROFILE_SCOPE( classifySortScope, DX_PROFILE_ENTITY_CLASSIFY );
-	int count = 0;
+	g_translucentDrawList.clear( );
 
 	for( int i = 0; i < g_translucentCandidateCount; ++i )
 	{
 		cl_entity_s *ent = g_translucentCandidates[i];
 		if( !ent || !ent->model || !R_EntityMightBeVisible( ent ) )
 			continue;
-		if( count >= DX_MAX_SCENE_ENTITIES )
-			break;
 
-		translucent_entity_t &item = g_translucentDrawList[count++];
+		translucent_entity_t item;
 		item.entity = ent;
 		item.rank = R_TranslucentEntityRank( ent );
 		item.distanceSquared = R_TranslucentDistSq( ent, viewOrigin );
 		item.submissionOrder = i;
+		g_translucentDrawList.push_back( item );
 	}
 
-	if( count > 1 )
+	if( g_translucentDrawList.size( ) > 1 )
 	{
-		std::stable_sort( g_translucentDrawList,
-			g_translucentDrawList + count, R_TranslucentLess );
+		std::stable_sort( g_translucentDrawList.begin( ),
+			g_translucentDrawList.end( ), R_TranslucentLess );
 	}
-	return count;
+	return static_cast<int>( g_translucentDrawList.size( ) );
 }
 
 static void R_DrawWaterDepthPass( const D3DXMATRIX &identity, bool &worldIsIdentity,
@@ -5465,6 +5461,14 @@ void R_ClearScene( void )
 {
 	++g_studioApiFrameCount;
 
+	g_opaqueBrushEntities.clear( );
+	g_opaqueStudioEntities.clear( );
+	g_opaqueSpriteEntities.clear( );
+	g_translucentCandidates.clear( );
+	g_entityLightEmitters.clear( );
+	g_waterBrushEntities.clear( );
+	g_lateWaterBrushEntities.clear( );
+	g_translucentDrawList.clear( );
 	g_opaqueBrushCount = 0;
 	g_opaqueStudioCount = 0;
 	g_opaqueSpriteCount = 0;

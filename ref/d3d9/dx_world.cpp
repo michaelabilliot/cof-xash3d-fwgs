@@ -94,8 +94,6 @@
 dxfast::HashMap<model_t *, model_drawdata_t *> globalModels;
 
 model_t *g_worldmodel = nullptr;
-model_drawdata_t  worldModels[512];
-model_drawdata_t  studioModels[1024];
 
 #ifndef MAX_CLIENTS
 #define MAX_CLIENTS 64
@@ -4580,13 +4578,6 @@ void R_LoadMap( const model_t *mod )
 	g_worldModelFrontCache.fill( world_model_slot_t{} );
 	g_worldLightmappedModels.max_load_factor( 0.70f );
 	g_worldLightmappedModels.reserve( 64 );
-
-	for( auto &mdd : worldModels )
-	{
-		mdd.renderdata.clear( );
-		mdd.texIds.clear( );
-		mdd.loaded = false;
-	}
 
 	R_BuildMapLightmaps( mod );
 

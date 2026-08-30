@@ -4,7 +4,7 @@
 #include <cstring>
 #include <limits>
 
-dxtexture_t g_Textures[8096];
+std::deque<dxtexture_t> g_Textures( 1 );
 int g_texcount = 0;
 dxfast::HashMap<std::string, int> g_TextureIndex;
 dxfast::HashMap<std::string, int> g_StudioTexIndex;
@@ -17,19 +17,19 @@ static int DX_AllocateTextureId( void )
 	{
 		const int textureId = g_freeTextureIds.back( );
 		g_freeTextureIds.pop_back( );
-		memset( &g_Textures[textureId], 0, sizeof( g_Textures[textureId] ) );
+		g_Textures[textureId] = {};
 		return textureId;
 	}
 
-	if( g_texcount + 1 >= static_cast<int>(
-		sizeof( g_Textures ) / sizeof( g_Textures[0] ) ) )
+	const size_t textureId = g_Textures.size( );
+	if( textureId > static_cast<size_t>( std::numeric_limits<int>::max( ) ) )
 	{
 		return 0;
 	}
 
-	const int textureId = ++g_texcount;
-	memset( &g_Textures[textureId], 0, sizeof( g_Textures[textureId] ) );
-	return textureId;
+	g_Textures.emplace_back( );
+	g_texcount = static_cast<int>( textureId );
+	return g_texcount;
 }
 
 static constexpr unsigned int DX_BOUND_TEX_INVALID = 0xFFFFFFFFu;
@@ -263,8 +263,7 @@ void get_texture_name( const char *path, char *out, size_t out_size )
 
 const char *DX_TextureName( unsigned int texnum )
 {
-	if( texnum == 0 || texnum > static_cast<unsigned int>( g_texcount ) ||
-		texnum >= static_cast<unsigned int>( sizeof( g_Textures ) / sizeof( g_Textures[0] ) ) )
+	if( texnum == 0 || static_cast<size_t>( texnum ) >= g_Textures.size( ) )
 		return "";
 	return g_Textures[texnum].name;
 }
@@ -902,7 +901,8 @@ void R_StudioLoadTexture( model_t *mod, studiohdr_t *phdr, mstudiotexture_t *pte
 	gEngfuncs.Image_SetMDLPointer( reinterpret_cast<byte *>( phdr ) + ptexture->index );
 	Q_snprintf( texname, sizeof( texname ), "#%s/%s.mdl", mdlname, name );
 	const int textureId = DX_LoadTexture( texname, reinterpret_cast<byte *>( ptexture ), loaderBytes, flags );
-	if( textureId <= 0 || textureId >= static_cast<int>( sizeof( g_Textures ) / sizeof( g_Textures[0] ) ) )
+	if( textureId <= 0 ||
+		static_cast<size_t>( textureId ) >= g_Textures.size( ) )
 	{
 		ptexture->index = 1;
 		return;
@@ -964,7 +964,7 @@ void DX_FreeTexture( unsigned int texnum )
 	if( texture.original )
 		gEngfuncs.FS_FreeImage( texture.original );
 
-	memset( &texture, 0, sizeof( texture ) );
+	texture = {};
 	g_freeTextureIds.push_back( static_cast<int>( texnum ) );
 }
 

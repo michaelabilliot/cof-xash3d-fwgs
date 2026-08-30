@@ -14,6 +14,7 @@ extern "C" {
 #include <d3d9.h>
 #include <d3dx9.h>
 #include <vector>
+#include <deque>
 #include "dx_fast_hash.h"
 #include <iostream>
 #include <algorithm>
@@ -64,7 +65,7 @@ typedef struct
 	int texnum;
 } dxtexture_t;
 
-extern dxtexture_t g_Textures[8096];
+extern std::deque<dxtexture_t> g_Textures;
 //extern std::unordered_map< std::string, int > g_StudioTexIndex;
 extern dxfast::HashMap<std::string, int> g_StudioTexIndex;
 
