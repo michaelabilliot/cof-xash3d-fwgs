@@ -170,7 +170,7 @@ convar_t dx_overbright =
 { (char *)"dx_overbright", (char *)"1", 0 };
 
 convar_t dx_ao =
-{ (char *)"dx_ao", (char *)"1", 0 };
+{ (char *)"dx_ao", (char *)"0", 0 };
 convar_t dx_ao_strength =
 { (char *)"dx_ao_strength", (char *)"0.28", 0 };
 convar_t dx_ao_radius =
@@ -1370,6 +1370,98 @@ static void R_ApplyDecalLight( dx_decal_t &decal, D3DCOLOR color )
 
 static std::vector<dx_decal_t> g_dxDecals;
 
+struct remix_decal_texture_t
+{
+	IDirect3DTexture9 *source = nullptr;
+	IDirect3DTexture9 *cutout = nullptr;
+};
+
+static std::vector<remix_decal_texture_t> g_remixDecalTextures;
+
+static void R_ClearRemixDecalTextures( )
+{
+	for( remix_decal_texture_t &entry : g_remixDecalTextures )
+	{
+		if( entry.cutout )
+			entry.cutout->Release( );
+	}
+	g_remixDecalTextures.clear( );
+}
+
+static IDirect3DTexture9 *R_RemixLegacyDecalTexture( int textureIndex )
+{
+	if( !device || textureIndex <= 0 || textureIndex > g_texcount )
+		return nullptr;
+
+	dxtexture_t &sourceTexture = g_Textures[textureIndex];
+	if( !sourceTexture.tex || ( sourceTexture.flags & TF_HAS_ALPHA ) != 0 )
+		return sourceTexture.tex;
+
+	if( g_remixDecalTextures.size( ) <= static_cast<size_t>( textureIndex ) )
+		g_remixDecalTextures.resize( static_cast<size_t>( textureIndex ) + 1 );
+
+	remix_decal_texture_t &cache = g_remixDecalTextures[textureIndex];
+	if( cache.source == sourceTexture.tex && cache.cutout )
+		return cache.cutout;
+
+	if( cache.cutout )
+	{
+		cache.cutout->Release( );
+		cache.cutout = nullptr;
+	}
+	cache.source = sourceTexture.tex;
+
+	IDirect3DTexture9 *cutout = nullptr;
+	const int width = std::max( 1, sourceTexture.width );
+	const int height = std::max( 1, sourceTexture.height );
+	if( FAILED( device->CreateTexture( width, height, 1, 0, D3DFMT_A8R8G8B8,
+		D3DPOOL_MANAGED, &cutout, nullptr ) ) || !cutout )
+	{
+		return nullptr;
+	}
+
+	D3DLOCKED_RECT sourceLock{};
+	D3DLOCKED_RECT destinationLock{};
+	if( FAILED( sourceTexture.tex->LockRect( 0, &sourceLock, nullptr, D3DLOCK_READONLY ) ) ||
+		FAILED( cutout->LockRect( 0, &destinationLock, nullptr, 0 ) ) )
+	{
+		if( sourceLock.pBits )
+			sourceTexture.tex->UnlockRect( 0 );
+		cutout->Release( );
+		return nullptr;
+	}
+
+	for( int y = 0; y < height; ++y )
+	{
+		const byte *source = static_cast<const byte *>( sourceLock.pBits ) +
+			static_cast<size_t>( y ) * sourceLock.Pitch;
+		byte *destination = static_cast<byte *>( destinationLock.pBits ) +
+			static_cast<size_t>( y ) * destinationLock.Pitch;
+
+		for( int x = 0; x < width; ++x, source += 4, destination += 4 )
+		{
+			const int b = source[0];
+			const int g = source[1];
+			const int r = source[2];
+			const int deviation = std::max( abs( r * 2 - 255 ),
+				std::max( abs( g * 2 - 255 ), abs( b * 2 - 255 ) ) );
+
+			// Legacy decals use ~127 RGB as the neutral multiplicative value.
+			const int alpha = std::max( 0, std::min( 255,
+				( deviation - 8 ) * 2 ) );
+			destination[0] = static_cast<byte>( b );
+			destination[1] = static_cast<byte>( g );
+			destination[2] = static_cast<byte>( r );
+			destination[3] = static_cast<byte>( alpha );
+		}
+	}
+
+	cutout->UnlockRect( 0 );
+	sourceTexture.tex->UnlockRect( 0 );
+	cache.cutout = cutout;
+	return cache.cutout;
+}
+
 struct pending_decal_t
 {
 	int textureIndex = 0;
@@ -2124,6 +2216,7 @@ void R_ClearDecals( )
 {
 	g_dxDecals.clear( );
 	g_dxPendingDecals.clear( );
+	R_ClearRemixDecalTextures( );
 	R_ResetAttachments( );
 }
 
@@ -2338,7 +2431,8 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 
 	const float decalBiasStrength = std::max( 0.0f,
 		std::min( 4.0f, dx_decal_offset.value ) );
-	const float decalDepthBias = -0.0004f * decalBiasStrength;
+	const float decalDepthBias = dx_remix.value != 0.0f
+		? 0.0f : -0.0004f * decalBiasStrength;
 	DX_SetRenderStateCached( D3DRS_DEPTHBIAS,
 		DX_FloatStateBits( decalDepthBias ) );
 
@@ -2354,6 +2448,9 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 	const D3DCOLOR entityDecalFactor = R_DecalEntityFactor( ent );
 	const bool modulateEntityDecal =
 		entityDecalFactor != D3DCOLOR_ARGB( 255, 255, 255, 255 );
+	const bool remixDecal = dx_remix.value != 0.0f;
+	const bool remixDecalCutout = remixDecal && dx_remix_decal_cutout.value != 0.0f;
+	const float remixOffset = 0.05f + 0.025f * decalBiasStrength;
 
 	for( size_t first = 0; first < decalDrawList.size( ); )
 	{
@@ -2373,42 +2470,89 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 
 		for( size_t i = first; i < last; ++i )
 		{
-			const std::vector<dx_decal_vertex_t> &vertices =
-				decalDrawList[i]->vertices;
+			const dx_decal_t &decal = *decalDrawList[i];
+			const std::vector<dx_decal_vertex_t> &vertices = decal.vertices;
 
-			if( !modulateEntityDecal )
+			if( !modulateEntityDecal && !remixDecal )
 			{
 				decalVertexScratch.insert( decalVertexScratch.end( ),
 					vertices.begin( ), vertices.end( ) );
+				continue;
 			}
-			else
+
+			for( const dx_decal_vertex_t &source : vertices )
 			{
-				for( const dx_decal_vertex_t &source : vertices )
+				dx_decal_vertex_t vertex = source;
+				if( remixDecal )
 				{
-					dx_decal_vertex_t vertex = source;
+					// Depth bias is raster-only, so offset Remix decals geometrically.
+					vertex.x += decal.normal[0] * remixOffset;
+					vertex.y += decal.normal[1] * remixOffset;
+					vertex.z += decal.normal[2] * remixOffset;
+					vertex.diffuse = D3DCOLOR_ARGB( 255, 255, 255, 255 );
+				}
+				if( modulateEntityDecal )
 					vertex.diffuse = R_ModulateDecal(
 						vertex.diffuse, entityDecalFactor );
-					decalVertexScratch.push_back( vertex );
-				}
+				decalVertexScratch.push_back( vertex );
 			}
 		}
 
 		const dxtexture_t &decalTexture = g_Textures[textureIndex];
 
-		const bool premultiplied =
-			( decalTexture.flags & TF_PREMULTIPLIED ) != 0;
-		DX_SetRenderStateCached( D3DRS_SRCBLEND,
-			premultiplied ? D3DBLEND_ONE : D3DBLEND_SRCALPHA );
-		DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
+		const bool hasAlpha = ( decalTexture.flags & TF_HAS_ALPHA ) != 0;
+		IDirect3DTexture9 *remixLegacyCutout = nullptr;
+		if( remixDecalCutout && !hasAlpha )
+			remixLegacyCutout = R_RemixLegacyDecalTexture( textureIndex );
+		const bool remixCutout = remixDecalCutout &&
+			( hasAlpha || remixLegacyCutout != nullptr );
+		if( remixCutout )
+		{
+			const DWORD alphaRef = static_cast<DWORD>( std::max( 0.0f,
+				std::min( 255.0f, dx_remix_decal_alpha_ref.value ) ) );
+			DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, FALSE );
+			DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, TRUE );
+			DX_SetRenderStateCached( D3DRS_ALPHAFUNC, D3DCMP_GREATER );
+			DX_SetRenderStateCached( D3DRS_ALPHAREF, alphaRef );
+		}
+		else
+		{
+			const bool premultiplied =
+				( decalTexture.flags & TF_PREMULTIPLIED ) != 0;
+			DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
+			DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
+			DX_SetRenderStateCached( D3DRS_SRCBLEND,
+				premultiplied ? D3DBLEND_ONE : D3DBLEND_SRCALPHA );
+			DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
+		}
 
-		DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
-		DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
-		DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_MODULATE );
-		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
-		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
+		if( remixDecal )
+		{
+			DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_SELECTARG1 );
+			DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1 );
+			DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
+		}
+		else
+		{
+			DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_MODULATE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
+			DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
+		}
 
-		DX_Bind( 0, textureIndex );
+		if( remixLegacyCutout )
+		{
+			DX_BindRawTexture( 0, remixLegacyCutout );
+			DX_SetSamplerStateCached( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+			DX_SetSamplerStateCached( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+		}
+		else
+		{
+			DX_Bind( 0, textureIndex );
+		}
 		DX_ProfileEvent( DX_PROFILE_EVENT_DECAL_BATCH_DRAWN, 1 );
 		R_DrawScratchPrimitive( D3DPT_TRIANGLELIST,
 			static_cast<UINT>( decalVertexScratch.size( ) / 3 ),
@@ -4747,7 +4891,9 @@ void R_SetAlphaTestEnabled( bool enabled )
 	if( enabled )
 	{
 		DX_SetRenderStateCached( D3DRS_ALPHAFUNC, D3DCMP_GREATER );
-		DX_SetRenderStateCached( D3DRS_ALPHAREF, 0 );
+		// A 50% cutout removes bilinear alpha fringes under Remix.
+		DX_SetRenderStateCached( D3DRS_ALPHAREF,
+			dx_remix.value != 0.0f ? 127 : 0 );
 	}
 }
 

@@ -2216,11 +2216,31 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 
 		batch.vertices.insert( batch.vertices.end( ),
 			surfaceVertices, surfaceVertices + vertexCount );
+
+		const UINT surfaceFirstIndex = static_cast<UINT>( batch.indices.size( ) );
 		for( int vertexIndex = 2; vertexIndex < vertexCount; ++vertexIndex )
 		{
 			batch.indices.push_back( baseVertex );
 			batch.indices.push_back( baseVertex + vertexIndex - 1 );
 			batch.indices.push_back( baseVertex + vertexIndex );
+		}
+
+		// Keep per-surface ranges for one-sided Remix glass draws.
+		if( mod != g_worldmodel && dx_remix.value != 0.0f )
+		{
+			world_surface_draw_range_t range;
+			range.firstIndex = surfaceFirstIndex;
+			range.indexCount = static_cast<UINT>( batch.indices.size( ) ) -
+				surfaceFirstIndex;
+			if( surface->plane )
+			{
+				const float side = ( surface->flags & SURF_PLANEBACK ) ? -1.0f : 1.0f;
+				range.normal[0] = surface->plane->normal[0] * side;
+				range.normal[1] = surface->plane->normal[1] * side;
+				range.normal[2] = surface->plane->normal[2] * side;
+				range.planeDist = surface->plane->dist * side;
+			}
+			batch.surfaceRanges.push_back( range );
 		}
 
 		if( mod == g_worldmodel &&
@@ -2635,6 +2655,26 @@ void R_CollectBeamLights( void )
 	}
 }
 
+static bool R_RemixPlayerFlashlightEntity( int key, cl_entity_s **outEntity = nullptr )
+{
+	if( dx_remix.value == 0.0f || key <= 0 || !gp_cl ||
+		!gEngfuncs.R_BeamGetEntity || key > gp_cl->maxclients )
+	{
+		return false;
+	}
+
+	cl_entity_s *entity = gEngfuncs.R_BeamGetEntity( key );
+	if( !entity || entity->index != key ||
+		( entity->curstate.effects & EF_DIMLIGHT ) == 0 )
+	{
+		return false;
+	}
+
+	if( outEntity )
+		*outEntity = entity;
+	return true;
+}
+
 static void R_CollectDynamicLightArray( const dlight_t *lights, int count,
 	bool studioLocal = false )
 {
@@ -2648,6 +2688,10 @@ static void R_CollectDynamicLightArray( const dlight_t *lights, int count,
 		if( light.radius <= 1.0f || light.dark )
 			continue;
 		if( light.die > 0.0f && light.die < now )
+			continue;
+
+		// Remix replaces the legacy flashlight point light with a cone.
+		if( !studioLocal && R_RemixPlayerFlashlightEntity( light.key ) )
 			continue;
 
 		R_AddDLightInternal( light.origin, light.radius,
@@ -2702,7 +2746,10 @@ void R_CollectEntityDLight( const cl_entity_s *ent )
 	if( effects & EF_BRIGHTLIGHT )
 		R_AddDLight( ent->origin, 400.0f, 255, 255, 255, now + 0.10f, key );
 	if( effects & EF_DIMLIGHT )
-		R_AddDLight( ent->origin, 220.0f, 255, 255, 220, now + 0.10f, key );
+	{
+		if( dx_remix.value == 0.0f || !R_RemixPlayerFlashlightEntity( key ) )
+			R_AddDLight( ent->origin, 220.0f, 255, 255, 220, now + 0.10f, key );
+	}
 	if( effects & EF_LIGHT )
 		R_AddDLight( ent->origin, 180.0f, 255, 176, 64, now + 0.10f, key );
 }
@@ -2795,6 +2842,89 @@ D3DCOLOR R_AddStudioDLights( D3DCOLOR baseColor, const vec3_t point )
 		static_cast<int>( std::max( 0.0f, std::min( 255.0f, outB ) ) ) );
 }
 
+static void R_FillRemixFlashlight( const cl_entity_s *entity, D3DLIGHT9 &light )
+{
+	vec3_t origin, angles, forward;
+	const bool localPlayer = gp_cl && entity &&
+		entity->index == gp_cl->playernum + 1;
+
+	if( localPlayer && gpGlobals )
+	{
+		VectorCopy( gpGlobals->vieworg, origin );
+		VectorCopy( gpGlobals->viewangles, angles );
+	}
+	else
+	{
+		VectorCopy( entity->origin, origin );
+		origin[2] += entity->curstate.usehull == 1 ? 12.0f : 28.0f;
+		angles[PITCH] = entity->curstate.angles[PITCH] * 9.0f;
+		angles[YAW] = entity->angles[YAW];
+		angles[ROLL] = 0.0f;
+	}
+
+	AngleVectors( angles, forward, nullptr, nullptr );
+	VectorMA( origin, 4.0f, forward, origin );
+
+	light = D3DLIGHT9{};
+	light.Type = D3DLIGHT_SPOT;
+	light.Position.x = origin[0];
+	light.Position.y = origin[1];
+	light.Position.z = origin[2];
+	light.Direction.x = forward[0];
+	light.Direction.y = forward[1];
+	light.Direction.z = forward[2];
+
+	const float intensity = R_DynamicLightIntensityScale( );
+	light.Diffuse.r = intensity;
+	light.Diffuse.g = intensity;
+	light.Diffuse.b = intensity;
+	light.Diffuse.a = 1.0f;
+	light.Range = 2000.0f;
+	light.Attenuation0 = 1.0f;
+	light.Attenuation1 = 0.0f;
+	light.Attenuation2 = 3.0f / ( light.Range * light.Range );
+
+	light.Theta = DEG2RAD( 12.0f );
+	light.Phi = DEG2RAD( 24.0f );
+	light.Falloff = 1.0f;
+}
+
+static int R_EmitRemixFlashlights( int maxLights )
+{
+	if( dx_remix.value == 0.0f || maxLights <= 0 || !gp_cl ||
+		!gEngfuncs.R_BeamGetEntity ||
+		( dx_dlight_engine.value == 0.0f && dx_dlight_entities.value == 0.0f ) )
+	{
+		return 0;
+	}
+
+	int emitted = 0;
+	const int localIndex = gp_cl->playernum + 1;
+	auto emitPlayer = [&]( int playerIndex )
+	{
+		if( emitted >= maxLights )
+			return;
+		cl_entity_s *entity = nullptr;
+		if( !R_RemixPlayerFlashlightEntity( playerIndex, &entity ) )
+			return;
+
+		D3DLIGHT9 light{};
+		R_FillRemixFlashlight( entity, light );
+		device->SetLight( emitted, &light );
+		device->LightEnable( emitted, TRUE );
+		++emitted;
+	};
+
+	if( localIndex > 0 && localIndex <= gp_cl->maxclients )
+		emitPlayer( localIndex );
+	for( int i = 1; i <= gp_cl->maxclients && emitted < maxLights; ++i )
+	{
+		if( i != localIndex )
+			emitPlayer( i );
+	}
+	return emitted;
+}
+
 void R_ApplyDLights( void )
 {
 	if( !device )
@@ -2808,11 +2938,43 @@ void R_ApplyDLights( void )
 		return;
 	}
 
-	const int emitCount = std::min( 8, std::min( R_DynamicLightsMax( ),
-		static_cast<int>( g_dxDLights.size( ) ) ) );
-	for( int i = 0; i < emitCount; ++i )
+	if( dx_remix.value == 0.0f )
 	{
-		const dx_dlight_t &source = g_dxDLights[static_cast<size_t>( i )];
+		const int emitCount = std::min( 8, std::min( R_DynamicLightsMax( ),
+			static_cast<int>( g_dxDLights.size( ) ) ) );
+		for( int i = 0; i < emitCount; ++i )
+		{
+			const dx_dlight_t &source = g_dxDLights[static_cast<size_t>( i )];
+			D3DLIGHT9 light{};
+			light.Type = D3DLIGHT_POINT;
+			light.Position.x = source.origin[0];
+			light.Position.y = source.origin[1];
+			light.Position.z = source.origin[2];
+			const float intensity = R_DynamicLightIntensityScale( );
+			light.Diffuse.r = source.r * intensity;
+			light.Diffuse.g = source.g * intensity;
+			light.Diffuse.b = source.b * intensity;
+			light.Diffuse.a = 1.0f;
+			light.Range = source.radius;
+			light.Attenuation0 = 0.0f;
+			light.Attenuation1 = 1.0f / std::max( 1.0f, source.radius );
+			light.Attenuation2 = 1.0f / std::max( 1.0f, source.radius * source.radius );
+			device->SetLight( i, &light );
+			device->LightEnable( i, TRUE );
+		}
+
+		for( int i = emitCount; i < g_dxFixedLightCount; ++i )
+			device->LightEnable( i, FALSE );
+		g_dxFixedLightCount = emitCount;
+		return;
+	}
+
+	const int maxLights = std::min( 8, R_DynamicLightsMax( ) );
+	int emitted = R_EmitRemixFlashlights( maxLights );
+	for( size_t sourceIndex = 0;
+		sourceIndex < g_dxDLights.size( ) && emitted < maxLights; ++sourceIndex )
+	{
+		const dx_dlight_t &source = g_dxDLights[sourceIndex];
 		D3DLIGHT9 light{};
 		light.Type = D3DLIGHT_POINT;
 		light.Position.x = source.origin[0];
@@ -2827,13 +2989,14 @@ void R_ApplyDLights( void )
 		light.Attenuation0 = 0.0f;
 		light.Attenuation1 = 1.0f / std::max( 1.0f, source.radius );
 		light.Attenuation2 = 1.0f / std::max( 1.0f, source.radius * source.radius );
-		device->SetLight( i, &light );
-		device->LightEnable( i, TRUE );
+		device->SetLight( emitted, &light );
+		device->LightEnable( emitted, TRUE );
+		++emitted;
 	}
 
-	for( int i = emitCount; i < g_dxFixedLightCount; ++i )
+	for( int i = emitted; i < g_dxFixedLightCount; ++i )
 		device->LightEnable( i, FALSE );
-	g_dxFixedLightCount = emitCount;
+	g_dxFixedLightCount = emitted;
 }
 
 static unsigned int R_DynamicLightmapHashFloat( unsigned int hash, float value, float quantize )
@@ -3992,6 +4155,38 @@ static bool R_BrushEntityUsesLightmap( const world_model_draw_t &model,
 	}
 }
 
+static bool R_RemixGlassSurfaceFacesView(
+	const world_surface_draw_range_t &range, const D3DMATRIX &world )
+{
+	const float normalLengthSq = range.normal[0] * range.normal[0] +
+		range.normal[1] * range.normal[1] + range.normal[2] * range.normal[2];
+	if( normalLengthSq <= 1e-12f )
+		return true;
+
+	const float localX = range.normal[0] * range.planeDist;
+	const float localY = range.normal[1] * range.planeDist;
+	const float localZ = range.normal[2] * range.planeDist;
+
+	const float worldX = localX * world._11 + localY * world._21 +
+		localZ * world._31 + world._41;
+	const float worldY = localX * world._12 + localY * world._22 +
+		localZ * world._32 + world._42;
+	const float worldZ = localX * world._13 + localY * world._23 +
+		localZ * world._33 + world._43;
+
+	const float normalX = range.normal[0] * world._11 +
+		range.normal[1] * world._21 + range.normal[2] * world._31;
+	const float normalY = range.normal[0] * world._12 +
+		range.normal[1] * world._22 + range.normal[2] * world._32;
+	const float normalZ = range.normal[0] * world._13 +
+		range.normal[1] * world._23 + range.normal[2] * world._33;
+
+	const float toEyeX = g_vOrigin[0] - worldX;
+	const float toEyeY = g_vOrigin[1] - worldY;
+	const float toEyeZ = g_vOrigin[2] - worldZ;
+	return normalX * toEyeX + normalY * toEyeY + normalZ * toEyeZ > 0.01f;
+}
+
 void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 	const cl_entity_s *ent, float time )
 {
@@ -4000,6 +4195,13 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		return;
 
 	const bool needsEntityState = ent && ent->curstate.rendermode != kRenderNormal;
+	const bool remixSingleSidedGlass =
+		dx_remix.value != 0.0f && dx_remix_glass_single_sided.value != 0.0f &&
+		ent && ent->curstate.rendermode == kRenderTransTexture;
+	D3DMATRIX remixGlassWorld{};
+	if( remixSingleSidedGlass )
+		R_SetEntityWorldTransform( ent, time, &remixGlassWorld );
+
 	dx_entity_state_t entityState{};
 	if( needsEntityState )
 		R_BeginEntityRenderMode( ent, &entityState );
@@ -4126,7 +4328,54 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 			boundLightmapTexture = nullptr;
 		}
 
-		if( useSharedGeometry )
+		const bool filterRemixGlassSurfaces = remixSingleSidedGlass &&
+			!batch.surfaceRanges.empty( );
+
+		if( filterRemixGlassSurfaces )
+		{
+			if( batch.vertexBuffer && batch.indexBuffer && !useSharedGeometry )
+			{
+				device->SetStreamSource( 0, batch.vertexBuffer, 0,
+					sizeof( lightmap_vertex_t ) );
+				device->SetIndices( batch.indexBuffer );
+			}
+
+			for( const world_surface_draw_range_t &range : batch.surfaceRanges )
+			{
+				if( range.indexCount < 3 ||
+					!R_RemixGlassSurfaceFacesView( range, remixGlassWorld ) )
+				{
+					continue;
+				}
+
+				const UINT primitiveCount = range.indexCount / 3;
+				DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
+
+				if( useSharedGeometry )
+				{
+					DX_ProfileDraw( true, primitiveCount );
+					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
+						static_cast<INT>( batch.sharedBaseVertex ), 0,
+						batch.vertexCount, batch.sharedStartIndex + range.firstIndex,
+						primitiveCount );
+				}
+				else if( batch.vertexBuffer && batch.indexBuffer )
+				{
+					DX_ProfileDraw( true, primitiveCount );
+					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0,
+						batch.vertexCount, range.firstIndex, primitiveCount );
+				}
+				else if( !batch.vertices.empty( ) && !batch.indices.empty( ) &&
+					range.firstIndex + range.indexCount <= batch.indices.size( ) )
+				{
+					R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
+						static_cast<UINT>( batch.vertices.size( ) ), primitiveCount,
+						batch.indices.data( ) + range.firstIndex, D3DFMT_INDEX32,
+						batch.vertices.data( ), sizeof( lightmap_vertex_t ) );
+				}
+			}
+		}
+		else if( useSharedGeometry )
 		{
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
 			DX_ProfileDraw( true, batch.primitiveCount );

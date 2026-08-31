@@ -36,6 +36,7 @@ extern "C" {
 #include <cstdio>
 #include <cfloat>
 #include <cstdlib>
+#include <cstdarg>
 
 #pragma comment (lib, "d3d9.lib")
 #pragma comment (lib, "d3dx9.lib")
@@ -180,8 +181,19 @@ float g_dxCullNear = 4.0f;
 float g_dxCullFar = 8192.0f;
 
 static D3DVIEWPORT9 g_sceneViewport = {};
+static D3DXMATRIX g_sceneView = {};
 static D3DXMATRIX g_sceneProjection = {};
 static bool g_sceneViewportValid = false;
+
+struct dx_debug_text_3d_t
+{
+	vec3_t world = { 0.0f, 0.0f, 0.0f };
+	rgba_t color = { 255, 255, 255, 255 };
+	std::string text;
+};
+
+static constexpr size_t DX_DEBUG_TEXT_3D_MAX = 4096;
+static std::vector<dx_debug_text_3d_t> g_debugText3D;
 
 static constexpr UINT DX_CONTEXT_SCRATCH_VB_DEFAULT_BYTES = 512u * 1024u;
 static constexpr UINT DX_CONTEXT_SCRATCH_IB_DEFAULT_BYTES = 128u * 1024u;
@@ -370,6 +382,18 @@ static constexpr int DX_SKYBOX_SIDES = 6;
 static int g_skyTextures[DX_SKYBOX_SIDES] = {};
 
 convar_t dx_remix = { (char *)"dx_remix", (char *)"0", 0 };
+convar_t dx_remix_decal_cutout =
+{ (char *)"dx_remix_decal_cutout", (char *)"1", 0 };
+convar_t dx_remix_decal_alpha_ref =
+{ (char *)"dx_remix_decal_alpha_ref", (char *)"96", 0 };
+convar_t dx_remix_glass_single_sided =
+{ (char *)"dx_remix_glass_single_sided", (char *)"1", 0 };
+convar_t dx_remix_map_lights =
+{ (char *)"dx_remix_map_lights", (char *)"1", 0 };
+convar_t dx_remix_map_light_intensity =
+{ (char *)"dx_remix_map_light_intensity", (char *)"1", 0 };
+convar_t dx_remix_map_light_range_scale =
+{ (char *)"dx_remix_map_light_range_scale", (char *)"1", 0 };
 
 convar_t dx_fog = { (char *)"dx_fog", (char *)"1", 0 };
 
@@ -379,6 +403,8 @@ convar_t dx_anisotropy = { (char *)"dx_anisotropy", (char *)"16", 0 };
 
 convar_t dx_showtextures_zoom =
 { (char *)"dx_showtextures_zoom", (char *)"1.0", 0 };
+convar_t dx_debug_text3d_test =
+{ (char *)"dx_debug_text3d_test", (char *)"0", 0 };
 
 convar_t r_viewmodel_fov = { (char *)"r_viewmodel_fov", (char *)"60", 0 };
 
@@ -442,7 +468,7 @@ convar_t dx_egon_beam_light_radius = { (char *)"dx_egon_beam_light_radius", (cha
 convar_t dx_egon_beam_light_max_samples = { (char *)"dx_egon_beam_light_max_samples", (char *)"32", 0 };
 
 static bool g_contextCvarsRegistered = false;
-static bool g_showTextureCmdsRegistered = false;
+static bool g_contextCommandsRegistered = false;
 static float g_previousClientTime = -1.0f;
 static int g_dxMSAASamplesReq = -9999;
 static int g_dxMSAAQualityReq = -9999;
@@ -860,9 +886,720 @@ static void R_TextureZoomOutCmd( void ) { R_ShowTexturesSetZoom( dx_showtextures
 
 static void R_TextureZoomResetCmd( void ) { R_ShowTexturesSetZoom( 1.0f ); }
 
-static void R_RegisterTextureCommands( void )
+enum remix_map_light_type_t : unsigned char
 {
-	if( g_showTextureCmdsRegistered )
+	REMIX_MAP_LIGHT_POINT = 0,
+	REMIX_MAP_LIGHT_SPOT,
+	REMIX_MAP_LIGHT_DIRECTIONAL
+};
+
+struct remix_map_light_t
+{
+	int entityIndex = 0;
+	remix_map_light_type_t type = REMIX_MAP_LIGHT_POINT;
+	vec3_t origin = {};
+	vec3_t direction = { 1.0f, 0.0f, 0.0f };
+	float r = 1.0f;
+	float g = 1.0f;
+	float b = 1.0f;
+	float brightness = 0.0f;
+	float fade = 1.0f;
+	float innerCone = 10.0f;
+	float outerCone = 10.0f;
+	int falloff = 2;
+	int style = 0;
+};
+
+struct map_light_debug_t
+{
+	char classname[64] = {};
+	char origin[96] = {};
+	char light[96] = {};
+	char style[32] = {};
+	char targetname[64] = {};
+	char target[64] = {};
+	char angles[64] = {};
+	char angle[32] = {};
+	char pitch[32] = {};
+	char cone[32] = {};
+	char cone2[32] = {};
+	char fade[32] = {};
+	char falloff[32] = {};
+	char sky[32] = {};
+	char spread[32] = {};
+	char pattern[64] = {};
+	char spawnflags[32] = {};
+	char diffuseLight[96] = {};
+	char diffuseLight2[96] = {};
+};
+
+struct map_entity_record_t
+{
+	map_light_debug_t fields;
+	int entityIndex = 0;
+};
+
+struct remix_map_light_candidate_t
+{
+	size_t lightIndex = 0;
+	float distanceSquared = 0.0f;
+	bool directional = false;
+};
+
+static std::vector<remix_map_light_t> g_remixMapLights;
+static std::vector<remix_map_light_candidate_t> g_remixMapLightCandidates;
+static int g_remixMapLightSlotCount = 0;
+static int g_remixEnabledLightLimit = -1;
+static bool g_remixMapLightCapacityWarned = false;
+/* Keep the renderer's transient point lights in slots 0-7. Map lights start
+ * at 8 so their state never collides with muzzle flashes or the flashlight. */
+static constexpr int DX_REMIX_DYNAMIC_LIGHT_SLOTS = 8;
+
+static const char *R_ParseMapEntityToken( const char *data,
+	char *token, size_t tokenSize )
+{
+	if( !data || !token || tokenSize == 0 )
+		return nullptr;
+
+	token[0] = '\0';
+	for( ;; )
+	{
+		while( *data && static_cast<unsigned char>( *data ) <= ' ' )
+			++data;
+		if( data[0] == '/' && data[1] == '/' )
+		{
+			while( *data && *data != '\n' )
+				++data;
+			continue;
+		}
+		break;
+	}
+
+	if( !*data )
+		return nullptr;
+
+	if( *data == '{' || *data == '}' )
+	{
+		token[0] = *data++;
+		token[1] = '\0';
+		return data;
+	}
+
+	size_t length = 0;
+	if( *data == '"' )
+	{
+		++data;
+		while( *data && *data != '"' )
+		{
+			if( length + 1 < tokenSize )
+				token[length++] = *data;
+			++data;
+		}
+		if( *data == '"' )
+			++data;
+	}
+	else
+	{
+		while( *data && static_cast<unsigned char>( *data ) > ' ' &&
+			*data != '{' && *data != '}' )
+		{
+			if( length + 1 < tokenSize )
+				token[length++] = *data;
+			++data;
+		}
+	}
+
+	token[length] = '\0';
+	return data;
+}
+
+static void R_CopyMapLightField( char *destination, size_t destinationSize,
+	const char *value )
+{
+	if( !destination || destinationSize == 0 )
+		return;
+	std::snprintf( destination, destinationSize, "%s", value ? value : "" );
+}
+
+static void R_SetMapLightField( map_light_debug_t &light,
+	const char *key, const char *value )
+{
+	if( !strcmp( key, "classname" ) )
+		R_CopyMapLightField( light.classname, sizeof( light.classname ), value );
+	else if( !strcmp( key, "origin" ) )
+		R_CopyMapLightField( light.origin, sizeof( light.origin ), value );
+	else if( !strcmp( key, "_light" ) ||
+		( !strcmp( key, "light" ) && !light.light[0] ) )
+		R_CopyMapLightField( light.light, sizeof( light.light ), value );
+	else if( !strcmp( key, "style" ) )
+		R_CopyMapLightField( light.style, sizeof( light.style ), value );
+	else if( !strcmp( key, "targetname" ) )
+		R_CopyMapLightField( light.targetname, sizeof( light.targetname ), value );
+	else if( !strcmp( key, "target" ) )
+		R_CopyMapLightField( light.target, sizeof( light.target ), value );
+	else if( !strcmp( key, "angles" ) )
+		R_CopyMapLightField( light.angles, sizeof( light.angles ), value );
+	else if( !strcmp( key, "angle" ) )
+		R_CopyMapLightField( light.angle, sizeof( light.angle ), value );
+	else if( !strcmp( key, "pitch" ) )
+		R_CopyMapLightField( light.pitch, sizeof( light.pitch ), value );
+	else if( !strcmp( key, "_cone" ) )
+		R_CopyMapLightField( light.cone, sizeof( light.cone ), value );
+	else if( !strcmp( key, "_cone2" ) )
+		R_CopyMapLightField( light.cone2, sizeof( light.cone2 ), value );
+	else if( !strcmp( key, "_fade" ) )
+		R_CopyMapLightField( light.fade, sizeof( light.fade ), value );
+	else if( !strcmp( key, "_falloff" ) )
+		R_CopyMapLightField( light.falloff, sizeof( light.falloff ), value );
+	else if( !strcmp( key, "_sky" ) )
+		R_CopyMapLightField( light.sky, sizeof( light.sky ), value );
+	else if( !strcmp( key, "_spread" ) )
+		R_CopyMapLightField( light.spread, sizeof( light.spread ), value );
+	else if( !strcmp( key, "pattern" ) )
+		R_CopyMapLightField( light.pattern, sizeof( light.pattern ), value );
+	else if( !strcmp( key, "spawnflags" ) )
+		R_CopyMapLightField( light.spawnflags, sizeof( light.spawnflags ), value );
+	else if( !strcmp( key, "_diffuse_light" ) )
+		R_CopyMapLightField( light.diffuseLight, sizeof( light.diffuseLight ), value );
+	else if( !strcmp( key, "_diffuse_light2" ) )
+		R_CopyMapLightField( light.diffuseLight2, sizeof( light.diffuseLight2 ), value );
+}
+
+static bool R_IsMapLightClassname( const char *classname )
+{
+	return classname && ( !strcmp( classname, "light" ) ||
+		!strncmp( classname, "light_", 6 ) );
+}
+
+static void R_ParseMapEntities( std::vector<map_entity_record_t> &entities )
+{
+	entities.clear( );
+	if( !g_worldmodel || !g_worldmodel->entities || !g_worldmodel->entities[0] )
+		return;
+
+	const char *cursor = g_worldmodel->entities;
+	char token[1024];
+	char key[256];
+	int entityIndex = 0;
+	while( ( cursor = R_ParseMapEntityToken( cursor, token, sizeof( token ) ) ) != nullptr )
+	{
+		if( strcmp( token, "{" ) )
+			continue;
+
+		map_entity_record_t entity{};
+		entity.entityIndex = entityIndex++;
+		while( ( cursor = R_ParseMapEntityToken( cursor, token, sizeof( token ) ) ) != nullptr )
+		{
+			if( !strcmp( token, "}" ) )
+				break;
+
+			R_CopyMapLightField( key, sizeof( key ), token );
+			cursor = R_ParseMapEntityToken( cursor, token, sizeof( token ) );
+			if( !cursor || !strcmp( token, "}" ) )
+				break;
+			R_SetMapLightField( entity.fields, key, token );
+		}
+		entities.push_back( entity );
+	}
+}
+
+static bool R_ParseMapVector( const char *text, vec3_t value )
+{
+	if( !text || !text[0] )
+		return false;
+	return std::sscanf( text, "%f %f %f", &value[0], &value[1], &value[2] ) == 3;
+}
+
+static bool R_NormalizeMapDirection( vec3_t direction )
+{
+	const float length = VectorLength( direction );
+	if( length <= 0.0001f )
+		return false;
+	VectorScale( direction, 1.0f / length, direction );
+	return true;
+}
+
+static bool R_ParseMapLightEmission( const char *text,
+	float &red, float &green, float &blue, float &brightness )
+{
+	float values[4] = {};
+	const int count = text && text[0]
+		? std::sscanf( text, "%f %f %f %f",
+			&values[0], &values[1], &values[2], &values[3] ) : 0;
+
+	if( count >= 4 )
+	{
+		red = std::max( 0.0f, std::min( 1.0f, values[0] / 255.0f ) );
+		green = std::max( 0.0f, std::min( 1.0f, values[1] / 255.0f ) );
+		blue = std::max( 0.0f, std::min( 1.0f, values[2] / 255.0f ) );
+		brightness = std::max( 0.0f, values[3] );
+		return brightness > 0.0f;
+	}
+
+	if( count == 3 )
+	{
+		red = std::max( 0.0f, std::min( 1.0f, values[0] / 255.0f ) );
+		green = std::max( 0.0f, std::min( 1.0f, values[1] / 255.0f ) );
+		blue = std::max( 0.0f, std::min( 1.0f, values[2] / 255.0f ) );
+		brightness = 255.0f;
+		return red > 0.0f || green > 0.0f || blue > 0.0f;
+	}
+
+	if( count == 1 )
+	{
+		red = green = blue = 1.0f;
+		brightness = std::max( 0.0f, values[0] );
+		return brightness > 0.0f;
+	}
+
+	return false;
+}
+
+static const map_entity_record_t *R_FindMapTarget(
+	const std::vector<map_entity_record_t> &entities, const char *targetname )
+{
+	if( !targetname || !targetname[0] )
+		return nullptr;
+	for( const map_entity_record_t &entity : entities )
+	{
+		if( entity.fields.targetname[0] &&
+			!strcmp( entity.fields.targetname, targetname ) )
+		{
+			return &entity;
+		}
+	}
+	return nullptr;
+}
+
+static bool R_BuildMapLightDirection( const map_light_debug_t &raw,
+	const std::vector<map_entity_record_t> &entities, const vec3_t origin,
+	vec3_t direction )
+{
+	if( raw.target[0] )
+	{
+		const map_entity_record_t *target = R_FindMapTarget( entities, raw.target );
+		vec3_t targetOrigin;
+		if( target && R_ParseMapVector( target->fields.origin, targetOrigin ) )
+		{
+			VectorSubtract( targetOrigin, origin, direction );
+			if( R_NormalizeMapDirection( direction ) )
+				return true;
+		}
+	}
+
+	vec3_t angles = {};
+	R_ParseMapVector( raw.angles, angles );
+	if( raw.angle[0] )
+	{
+		const float angle = static_cast<float>( atof( raw.angle ) );
+		if( angle == -1.0f )
+		{
+			VectorSet( direction, 0.0f, 0.0f, 1.0f );
+			return true;
+		}
+		if( angle == -2.0f )
+		{
+			VectorSet( direction, 0.0f, 0.0f, -1.0f );
+			return true;
+		}
+		if( angle != 0.0f )
+			angles[1] = angle;
+	}
+	if( raw.pitch[0] )
+	{
+		const float pitch = static_cast<float>( atof( raw.pitch ) );
+		if( pitch != 0.0f )
+		{
+			// Hammer pitch has the opposite sign from AngleVectors.
+			angles[0] = -pitch;
+		}
+	}
+
+	vec3_t right, up;
+	AngleVectors( angles, direction, right, up );
+	return R_NormalizeMapDirection( direction );
+}
+
+static void R_DisableRemixMapLights( void )
+{
+	if( device )
+	{
+		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
+			device->LightEnable( DX_REMIX_DYNAMIC_LIGHT_SLOTS + i, FALSE );
+	}
+	g_remixMapLightSlotCount = 0;
+}
+
+static void R_ClearRemixMapLights( void )
+{
+	R_DisableRemixMapLights( );
+	g_remixMapLights.clear( );
+	g_remixMapLightCandidates.clear( );
+	g_remixEnabledLightLimit = -1;
+	g_remixMapLightCapacityWarned = false;
+}
+
+static void R_BuildRemixMapLights( void )
+{
+	R_ClearRemixMapLights( );
+	std::vector<map_entity_record_t> entities;
+	R_ParseMapEntities( entities );
+	if( entities.empty( ) )
+		return;
+
+	g_remixMapLights.reserve( entities.size( ) );
+	for( const map_entity_record_t &entity : entities )
+	{
+		const map_light_debug_t &raw = entity.fields;
+		if( !R_IsMapLightClassname( raw.classname ) )
+			continue;
+
+		remix_map_light_t light{};
+		light.entityIndex = entity.entityIndex;
+		R_ParseMapVector( raw.origin, light.origin );
+		if( !R_ParseMapLightEmission( raw.light, light.r, light.g, light.b, light.brightness ) )
+			continue;
+
+		light.style = raw.style[0] ? abs( atoi( raw.style ) ) : 0;
+		light.style = std::max( 0, std::min( DX_LIGHTSTYLE_COUNT - 1, light.style ) );
+		light.fade = raw.fade[0] ? static_cast<float>( atof( raw.fade ) ) : 1.0f;
+		if( light.fade <= 0.0f )
+			light.fade = 1.0f;
+		light.falloff = raw.falloff[0] ? atoi( raw.falloff ) : 2;
+		if( light.falloff != 1 )
+			light.falloff = 2;
+
+		light.innerCone = raw.cone[0] ? static_cast<float>( atof( raw.cone ) ) : 10.0f;
+		light.outerCone = raw.cone2[0] ? static_cast<float>( atof( raw.cone2 ) ) : light.innerCone;
+		light.innerCone = std::max( 0.1f, std::min( 179.0f, light.innerCone ) );
+		light.outerCone = std::max( light.innerCone, std::min( 179.0f, light.outerCone ) );
+
+		const bool isEnvironment = !strcmp( raw.classname, "light_environment" );
+		const bool isSpot = !strcmp( raw.classname, "light_spot" );
+		const bool isSky = raw.sky[0] && atoi( raw.sky ) != 0;
+
+		// Only light_spot is a cone; light is omnidirectional.
+		if( isEnvironment || ( isSpot && isSky ) )
+			light.type = REMIX_MAP_LIGHT_DIRECTIONAL;
+		else if( isSpot )
+			light.type = REMIX_MAP_LIGHT_SPOT;
+		else
+			light.type = REMIX_MAP_LIGHT_POINT;
+
+		if( light.type != REMIX_MAP_LIGHT_POINT &&
+			!R_BuildMapLightDirection( raw, entities, light.origin, light.direction ) )
+		{
+			VectorSet( light.direction, 1.0f, 0.0f, 0.0f );
+		}
+
+		g_remixMapLights.push_back( light );
+	}
+
+	g_remixMapLightCandidates.reserve( g_remixMapLights.size( ) );
+	if( !g_remixMapLights.empty( ) )
+	{
+		gEngfuncs.Con_Printf( "D3D9: cached %d BSP light entities for RTX Remix\n",
+			static_cast<int>( g_remixMapLights.size( ) ) );
+	}
+}
+
+static float R_RemixMapLightStyleScale( const remix_map_light_t &light )
+{
+	if( light.style < 0 || light.style >= DX_LIGHTSTYLE_COUNT )
+		return 1.0f;
+	return std::max( 0.0f, static_cast<float>( g_lightStyleValues[light.style] ) / 256.0f );
+}
+
+static float R_RemixMapLightDistanceSquared( const remix_map_light_t &light )
+{
+	const float x = light.origin[0] - g_vOrigin[0];
+	const float y = light.origin[1] - g_vOrigin[1];
+	const float z = light.origin[2] - g_vOrigin[2];
+	return x * x + y * y + z * z;
+}
+
+static float R_RemixMapLightRange( const remix_map_light_t &light )
+{
+	const float rangeScale = std::max( 0.05f,
+		std::min( 16.0f, dx_remix_map_light_range_scale.value ) );
+	return std::max( 32.0f, std::min( 8192.0f,
+		light.brightness * 2.0f * rangeScale / light.fade ) );
+}
+
+static const remix_map_light_t *R_FindRemixMapLight( int entityIndex )
+{
+	for( const remix_map_light_t &light : g_remixMapLights )
+	{
+		if( light.entityIndex == entityIndex )
+			return &light;
+	}
+	return nullptr;
+}
+
+static const char *R_RemixMapLightTypeName( remix_map_light_type_t type )
+{
+	switch( type )
+	{
+	case REMIX_MAP_LIGHT_SPOT: return "spot";
+	case REMIX_MAP_LIGHT_DIRECTIONAL: return "directional";
+	default: return "point";
+	}
+}
+
+static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
+	float styleScale, D3DLIGHT9 &light )
+{
+	light = D3DLIGHT9{};
+	const float intensityScale = std::max( 0.0f,
+		std::min( 16.0f, dx_remix_map_light_intensity.value ) );
+	const float intensity = source.brightness / 255.0f * styleScale * intensityScale;
+	light.Diffuse.r = source.r * intensity;
+	light.Diffuse.g = source.g * intensity;
+	light.Diffuse.b = source.b * intensity;
+	light.Diffuse.a = 1.0f;
+
+	if( source.type == REMIX_MAP_LIGHT_DIRECTIONAL )
+	{
+		light.Type = D3DLIGHT_DIRECTIONAL;
+		light.Direction.x = source.direction[0];
+		light.Direction.y = source.direction[1];
+		light.Direction.z = source.direction[2];
+		return;
+	}
+
+	light.Type = source.type == REMIX_MAP_LIGHT_SPOT ? D3DLIGHT_SPOT : D3DLIGHT_POINT;
+	light.Position.x = source.origin[0];
+	light.Position.y = source.origin[1];
+	light.Position.z = source.origin[2];
+	light.Range = R_RemixMapLightRange( source );
+	light.Attenuation0 = 1.0f;
+	if( source.falloff == 1 )
+	{
+		light.Attenuation1 = 3.0f / light.Range;
+		light.Attenuation2 = 0.0f;
+	}
+	else
+	{
+		light.Attenuation1 = 0.0f;
+		light.Attenuation2 = 3.0f / ( light.Range * light.Range );
+	}
+
+	if( source.type == REMIX_MAP_LIGHT_SPOT )
+	{
+		light.Direction.x = source.direction[0];
+		light.Direction.y = source.direction[1];
+		light.Direction.z = source.direction[2];
+
+		// D3D9 uses full cone apertures; Hammer stores half-angles.
+		const float d3dInnerCone = std::min( 179.0f, source.innerCone * 2.0f );
+		const float d3dOuterCone = std::min( 179.0f, source.outerCone * 2.0f );
+		light.Theta = DEG2RAD( d3dInnerCone );
+		light.Phi = DEG2RAD( d3dOuterCone );
+		light.Falloff = 1.0f;
+	}
+}
+
+static void R_ApplyRemixMapLights( void )
+{
+	if( !device || dx_remix.value == 0.0f || dx_remix_map_lights.value == 0.0f ||
+		g_remixMapLights.empty( ) || dx_remix_map_light_intensity.value <= 0.0f )
+	{
+		R_DisableRemixMapLights( );
+		return;
+	}
+
+	g_remixMapLightCandidates.clear( );
+	for( size_t i = 0; i < g_remixMapLights.size( ); ++i )
+	{
+		const remix_map_light_t &light = g_remixMapLights[i];
+		if( R_RemixMapLightStyleScale( light ) <= 0.001f )
+			continue;
+		remix_map_light_candidate_t candidate{};
+		candidate.lightIndex = i;
+		candidate.directional = light.type == REMIX_MAP_LIGHT_DIRECTIONAL;
+		candidate.distanceSquared = candidate.directional ? 0.0f : R_RemixMapLightDistanceSquared( light );
+		g_remixMapLightCandidates.push_back( candidate );
+	}
+
+	std::stable_sort( g_remixMapLightCandidates.begin( ), g_remixMapLightCandidates.end( ),
+		[]( const remix_map_light_candidate_t &a, const remix_map_light_candidate_t &b )
+		{
+			if( a.directional != b.directional )
+				return a.directional;
+			if( a.distanceSquared != b.distanceSquared )
+				return a.distanceSquared < b.distanceSquared;
+			return a.lightIndex < b.lightIndex;
+		} );
+
+	int emitted = 0;
+	for( const remix_map_light_candidate_t &candidate : g_remixMapLightCandidates )
+	{
+		if( g_remixEnabledLightLimit >= 0 &&
+			g_dxFixedLightCount + emitted >= g_remixEnabledLightLimit )
+		{
+			break;
+		}
+
+		const remix_map_light_t &source = g_remixMapLights[candidate.lightIndex];
+		D3DLIGHT9 light{};
+		R_FillRemixMapD3DLight( source, R_RemixMapLightStyleScale( source ), light );
+		const DWORD slot = static_cast<DWORD>( DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted );
+		HRESULT result = device->SetLight( slot, &light );
+		if( FAILED( result ) )
+		{
+			g_remixEnabledLightLimit = g_dxFixedLightCount + emitted;
+			if( !g_remixMapLightCapacityWarned )
+			{
+				gEngfuncs.Con_Printf(
+					"D3D9: RTX Remix accepted %d BSP lights; SetLight(%u) failed (0x%08X). "
+					"Set d3d9.maxEnabledLights to at least %d in rtx.conf to allow every active map light.\n",
+					emitted, slot, static_cast<unsigned int>( result ),
+					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+				g_remixMapLightCapacityWarned = true;
+			}
+			break;
+		}
+
+		result = device->LightEnable( slot, TRUE );
+		if( FAILED( result ) )
+		{
+			g_remixEnabledLightLimit = g_dxFixedLightCount + emitted;
+			if( !g_remixMapLightCapacityWarned )
+			{
+				gEngfuncs.Con_Printf(
+					"D3D9: RTX Remix accepted %d BSP lights; LightEnable(%u) failed (0x%08X). "
+					"Set d3d9.maxEnabledLights to at least %d in rtx.conf to allow every active map light.\n",
+					emitted, slot, static_cast<unsigned int>( result ),
+					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+				g_remixMapLightCapacityWarned = true;
+			}
+			break;
+		}
+		++emitted;
+	}
+
+	for( int i = emitted; i < g_remixMapLightSlotCount; ++i )
+		device->LightEnable( DX_REMIX_DYNAMIC_LIGHT_SLOTS + i, FALSE );
+	g_remixMapLightSlotCount = emitted;
+}
+
+static void R_PrintMapLight( const map_light_debug_t &light,
+	int entityIndex, int lightIndex )
+{
+	const char *origin = light.origin[0] ? light.origin : "0 0 0";
+	const char *style = light.style[0] ? light.style : "0";
+	float red = 0.0f, green = 0.0f, blue = 0.0f, brightness = 0.0f;
+	const int values = light.light[0]
+		? std::sscanf( light.light, "%f %f %f %f",
+			&red, &green, &blue, &brightness ) : 0;
+
+	if( values >= 4 )
+	{
+		gEngfuncs.Con_Printf(
+			"[%3d] ent %d %-18s origin=(%s) rgb=(%.0f %.0f %.0f) brightness=%.1f style=%s\n",
+			lightIndex, entityIndex, light.classname, origin,
+			red, green, blue, brightness, style );
+	}
+	else if( values == 1 )
+	{
+		gEngfuncs.Con_Printf(
+			"[%3d] ent %d %-18s origin=(%s) rgb=(255 255 255) brightness=%.1f style=%s\n",
+			lightIndex, entityIndex, light.classname, origin, red, style );
+	}
+	else if( values == 3 )
+	{
+		gEngfuncs.Con_Printf(
+			"[%3d] ent %d %-18s origin=(%s) rgb=(%.0f %.0f %.0f) brightness=<RGB only> style=%s\n",
+			lightIndex, entityIndex, light.classname, origin,
+			red, green, blue, style );
+	}
+	else
+	{
+		gEngfuncs.Con_Printf(
+			"[%3d] ent %d %-18s origin=(%s) _light=\"%s\" style=%s\n",
+			lightIndex, entityIndex, light.classname, origin,
+			light.light[0] ? light.light : "<unset>", style );
+	}
+
+	if( light.targetname[0] || light.target[0] || light.angles[0] ||
+		light.angle[0] || light.pitch[0] || light.cone[0] || light.cone2[0] )
+	{
+		gEngfuncs.Con_Printf(
+			"      targetname=\"%s\" target=\"%s\" angles=\"%s\" angle=%s pitch=%s cone=%s cone2=%s\n",
+			light.targetname[0] ? light.targetname : "-",
+			light.target[0] ? light.target : "-",
+			light.angles[0] ? light.angles : "-",
+			light.angle[0] ? light.angle : "-",
+			light.pitch[0] ? light.pitch : "-",
+			light.cone[0] ? light.cone : "-",
+			light.cone2[0] ? light.cone2 : "-" );
+	}
+
+	if( light.fade[0] || light.falloff[0] || light.sky[0] || light.spread[0] ||
+		light.pattern[0] || light.spawnflags[0] || light.diffuseLight[0] ||
+		light.diffuseLight2[0] )
+	{
+		gEngfuncs.Con_Printf(
+			"      fade=%s falloff=%s sky=%s spread=%s pattern=\"%s\" spawnflags=%s diffuse=\"%s\" diffuse2=\"%s\"\n",
+			light.fade[0] ? light.fade : "-",
+			light.falloff[0] ? light.falloff : "-",
+			light.sky[0] ? light.sky : "-",
+			light.spread[0] ? light.spread : "-",
+			light.pattern[0] ? light.pattern : "-",
+			light.spawnflags[0] ? light.spawnflags : "-",
+			light.diffuseLight[0] ? light.diffuseLight : "-",
+			light.diffuseLight2[0] ? light.diffuseLight2 : "-" );
+	}
+
+	const remix_map_light_t *remixLight = R_FindRemixMapLight( entityIndex );
+	if( remixLight )
+	{
+		gEngfuncs.Con_Printf( "      remix=%s styleScale=%.3f",
+			R_RemixMapLightTypeName( remixLight->type ),
+			R_RemixMapLightStyleScale( *remixLight ) );
+		if( remixLight->type != REMIX_MAP_LIGHT_POINT )
+		{
+			gEngfuncs.Con_Printf( " dir=(%.3f %.3f %.3f)",
+				remixLight->direction[0], remixLight->direction[1], remixLight->direction[2] );
+		}
+		if( remixLight->type != REMIX_MAP_LIGHT_DIRECTIONAL )
+		{
+			gEngfuncs.Con_Printf( " range=%.1f attenuation=%s",
+				R_RemixMapLightRange( *remixLight ),
+				remixLight->falloff == 1 ? "linear" : "inverse-square" );
+			if( remixLight->type == REMIX_MAP_LIGHT_SPOT )
+				gEngfuncs.Con_Printf( " cone=(%.1f %.1f)",
+					remixLight->innerCone, remixLight->outerCone );
+		}
+		gEngfuncs.Con_Printf( "\n" );
+	}
+}
+
+static void R_ListMapLightsCmd( void )
+{
+	if( !g_worldmodel || !g_worldmodel->entities || !g_worldmodel->entities[0] )
+	{
+		gEngfuncs.Con_Printf( "D3D9: no loaded BSP entity data\n" );
+		return;
+	}
+
+	gEngfuncs.Con_Printf( "D3D9: map lights for %s\n", g_worldmodel->name );
+	std::vector<map_entity_record_t> entities;
+	R_ParseMapEntities( entities );
+	int lightCount = 0;
+	for( const map_entity_record_t &entity : entities )
+	{
+		if( R_IsMapLightClassname( entity.fields.classname ) )
+			R_PrintMapLight( entity.fields, entity.entityIndex, ++lightCount );
+	}
+
+	gEngfuncs.Con_Printf( "D3D9: %d map light entit%s found\n",
+		lightCount, lightCount == 1 ? "y" : "ies" );
+}
+
+static void R_RegisterContextCommands( void )
+{
+	if( g_contextCommandsRegistered )
 		return;
 
 	gEngfuncs.Cmd_AddCommand( "dx_showtextures_zoom_in",
@@ -874,18 +1611,21 @@ static void R_RegisterTextureCommands( void )
 	gEngfuncs.Cmd_AddCommand( "dx_showtextures_zoom_reset",
 		R_TextureZoomResetCmd,
 		"Reset r_showtextures preview size" );
-	g_showTextureCmdsRegistered = true;
+	gEngfuncs.Cmd_AddCommand( "dx_listlights", R_ListMapLightsCmd,
+		"List BSP light entities and their key lighting data" );
+	g_contextCommandsRegistered = true;
 }
 
-static void R_RemoveTextureCommands( void )
+static void R_RemoveContextCommands( void )
 {
-	if( !g_showTextureCmdsRegistered )
+	if( !g_contextCommandsRegistered )
 		return;
 
 	gEngfuncs.Cmd_RemoveCommand( "dx_showtextures_zoom_in" );
 	gEngfuncs.Cmd_RemoveCommand( "dx_showtextures_zoom_out" );
 	gEngfuncs.Cmd_RemoveCommand( "dx_showtextures_zoom_reset" );
-	g_showTextureCmdsRegistered = false;
+	gEngfuncs.Cmd_RemoveCommand( "dx_listlights" );
+	g_contextCommandsRegistered = false;
 }
 
 static void R_RegisterContextCvars( void )
@@ -894,11 +1634,18 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_cutout );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_alpha_ref );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_glass_single_sided );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_lights );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_intensity );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_range_scale );
 	gEngfuncs.Cvar_RegisterVariable( &dx_fog );
 	gEngfuncs.Cvar_RegisterVariable( &dx_msaa_samples );
 	gEngfuncs.Cvar_RegisterVariable( &dx_msaa_quality );
 	gEngfuncs.Cvar_RegisterVariable( &dx_anisotropy );
 	gEngfuncs.Cvar_RegisterVariable( &dx_showtextures_zoom );
+	gEngfuncs.Cvar_RegisterVariable( &dx_debug_text3d_test );
 	gEngfuncs.Cvar_RegisterVariable( &r_viewmodel_fov );
 	gEngfuncs.Cvar_RegisterVariable( &r_viewmodel_near );
 	gEngfuncs.Cvar_RegisterVariable( &r_viewmodel_offset_x );
@@ -2428,8 +3175,24 @@ static void DX_UpdateRemix( void )
 	else
 		dx_remix.value = detected ? 1.0f : 0.0f;
 
-	gEngfuncs.Con_Printf( "D3D9: RTX Remix %s (dx_remix %d)\n",
-		detected ? "detected" : "not detected", detected ? 1 : 0 );
+	if( detected )
+	{
+		if( gEngfuncs.Cvar_SetValue )
+		{
+			gEngfuncs.Cvar_SetValue( "r_nolm", 1.0f );
+			gEngfuncs.Cvar_SetValue( "dx_studio_gpu_skinning", 0.0f );
+			gEngfuncs.Cvar_SetValue( "m_rawinput", 0.0f );
+		}
+		else
+		{
+			r_nolm.value = 1.0f;
+			dx_studio_gpu_skinning.value = 0.0f;
+		}
+	}
+
+	gEngfuncs.Con_Printf( "D3D9: RTX Remix %s (dx_remix %d%s)\n",
+		detected ? "detected" : "not detected", detected ? 1 : 0,
+		detected ? ", r_nolm=1; GPU skinning=0; m_rawinput=0; glow entities disabled" : "" );
 }
 
 static HRESULT DX_CreateDeviceFlags( DWORD flags )
@@ -2546,7 +3309,7 @@ static qboolean R_Init( void )
 	}
 
 	DX_ProfilerRegisterCommands( );
-	R_RegisterTextureCommands( );
+	R_RegisterContextCommands( );
 	DX_UpdateRemix( );
 
 	if( FAILED( D3DXCreateLine( device, &g_dxLine ) ) )
@@ -2560,7 +3323,7 @@ static qboolean R_Init( void )
 
 static void R_Shutdown( void )
 {
-	R_RemoveTextureCommands( );
+	R_RemoveContextCommands( );
 	DX_ProfilerRemoveCommands( );
 	R_FreeScratchBuffers( );
 	R_ModelsLostDevice( );
@@ -3154,6 +3917,9 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		? R_StudioRenderMode( clent )
 		: clent->curstate.rendermode;
 
+	if( dx_remix.value != 0.0f && effectiveRenderMode == kRenderGlow )
+		return false;
+
 	if( effectiveRenderMode != kRenderNormal )
 	{
 		g_translucentCandidates.push_back( clent );
@@ -3288,27 +4054,125 @@ static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r
 		v, sizeof( vertex2d_t ) );
 }
 
+static bool R_ProjectWorldPoint( const vec3_t world, D3DXVECTOR3 &projected )
+{
+	if( !device || !world || !g_sceneViewportValid ||
+		g_sceneViewport.Width == 0 || g_sceneViewport.Height == 0 )
+	{
+		return false;
+	}
+
+	D3DXMATRIX identity;
+	D3DXMatrixIdentity( &identity );
+	const D3DXVECTOR3 point( world[0], world[1], world[2] );
+	D3DXVec3Project( &projected, &point, &g_sceneViewport,
+		&g_sceneProjection, &g_sceneView, &identity );
+	return true;
+}
+
+static bool R_WorldPointBehindView( const vec3_t world )
+{
+	vec3_t delta;
+	VectorSubtract( world, g_vOrigin, delta );
+	return DotProduct( delta, g_vForward ) <= 0.001f;
+}
+
 static int WorldToScreen( const vec3_t world, vec3_t screen )
 {
-	if( !device || !world || !screen )
+	if( !world || !screen )
 		return true;
 
-	D3DVIEWPORT9 viewport{};
-	D3DXMATRIX worldMatrix{}, viewMatrix{}, projectionMatrix{};
-	device->GetViewport( &viewport );
-	device->GetTransform( D3DTS_WORLD, &worldMatrix );
-	device->GetTransform( D3DTS_VIEW, &viewMatrix );
-	device->GetTransform( D3DTS_PROJECTION, &projectionMatrix );
-
-	const D3DXVECTOR3 point( world[0], world[1], world[2] );
 	D3DXVECTOR3 projected;
-	D3DXVec3Project( &projected, &point, &viewport,
-		&projectionMatrix, &viewMatrix, &worldMatrix );
+	if( !R_ProjectWorldPoint( world, projected ) )
+		return true;
 
-	screen[0] = projected.x;
-	screen[1] = projected.y;
-	screen[2] = projected.z;
-	return projected.z < 0.0f || projected.z > 1.0f;
+	const float viewportX = static_cast<float>( g_sceneViewport.X );
+	const float viewportY = static_cast<float>( g_sceneViewport.Y );
+	const float viewportWidth = static_cast<float>( g_sceneViewport.Width );
+	const float viewportHeight = static_cast<float>( g_sceneViewport.Height );
+	screen[0] = ( ( projected.x - viewportX ) / viewportWidth ) * 2.0f - 1.0f;
+	screen[1] = 1.0f - ( ( projected.y - viewportY ) / viewportHeight ) * 2.0f;
+	screen[2] = 0.0f;
+	return R_WorldPointBehindView( world ) ||
+		projected.z < 0.0f || projected.z > 1.0f;
+}
+
+void R_DebugText3D( const vec3_t world, const rgba_t color, const char *text )
+{
+	if( !world || !text || !text[0] ||
+		FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
+	{
+		return;
+	}
+
+	if( g_debugText3D.size( ) >= DX_DEBUG_TEXT_3D_MAX )
+		return;
+
+	dx_debug_text_3d_t entry;
+	VectorCopy( world, entry.world );
+	if( color )
+		memcpy( entry.color, color, sizeof( entry.color ) );
+	entry.text = text;
+	g_debugText3D.push_back( std::move( entry ) );
+}
+
+void R_DebugText3DPrintf( const vec3_t world, const rgba_t color,
+	const char *format, ... )
+{
+	if( !format || !format[0] )
+		return;
+
+	char text[512];
+	va_list args;
+	va_start( args, format );
+	Q_vsnprintf( text, sizeof( text ), format, args );
+	va_end( args );
+	R_DebugText3D( world, color, text );
+}
+
+static void R_FlushDebugText3D( void )
+{
+	if( g_debugText3D.empty( ) )
+		return;
+
+	if( !gEngfuncs.Con_DrawString || !g_sceneViewportValid ||
+		FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
+	{
+		g_debugText3D.clear( );
+		return;
+	}
+
+	for( const dx_debug_text_3d_t &entry : g_debugText3D )
+	{
+		D3DXVECTOR3 projected;
+		if( !R_ProjectWorldPoint( entry.world, projected ) ||
+			R_WorldPointBehindView( entry.world ) ||
+			projected.z < 0.0f || projected.z > 1.0f )
+		{
+			continue;
+		}
+
+		const float minX = static_cast<float>( g_sceneViewport.X );
+		const float minY = static_cast<float>( g_sceneViewport.Y );
+		const float maxX = minX + static_cast<float>( g_sceneViewport.Width );
+		const float maxY = minY + static_cast<float>( g_sceneViewport.Height );
+		if( projected.x < minX || projected.x >= maxX ||
+			projected.y < minY || projected.y >= maxY )
+		{
+			continue;
+		}
+
+		int textWidth = 0;
+		int textHeight = 0;
+		if( gEngfuncs.Con_DrawStringLen )
+			gEngfuncs.Con_DrawStringLen( entry.text.c_str( ), &textWidth, &textHeight );
+
+		const int x = static_cast<int>( projected.x ) - textWidth / 2;
+		const int y = static_cast<int>( projected.y ) - textHeight / 2;
+		gEngfuncs.Con_DrawString( x, y, entry.text.c_str( ), entry.color );
+	}
+
+	g_debugText3D.clear( );
 }
 
 static qboolean VID_ScreenShot( const char *filename, int shot_type )
@@ -3417,6 +4281,7 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 	D3DSURFACE_DESC depthDesc{};
 
 	const D3DVIEWPORT9 savedSceneViewport = g_sceneViewport;
+	const D3DXMATRIX savedSceneView = g_sceneView;
 	const D3DXMATRIX savedSceneProjection = g_sceneProjection;
 	const bool savedSceneViewportValid = g_sceneViewportValid;
 	const unsigned int savedViewFlags = g_currentViewFlags;
@@ -3632,6 +4497,7 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 	}
 
 	g_sceneViewport = savedSceneViewport;
+	g_sceneView = savedSceneView;
 	g_sceneProjection = savedSceneProjection;
 	g_sceneViewportValid = savedSceneViewportValid;
 	g_currentViewFlags = savedViewFlags;
@@ -4225,6 +5091,7 @@ static void R_SetupSceneDLights( )
 		R_CollectEntityDLight( g_entityLightEmitters[i] );
 	R_CollectBeamLights( );
 	R_ApplyDLights( );
+	R_ApplyRemixMapLights( );
 	R_UpdateDLightOverlay( );
 }
 
@@ -4567,6 +5434,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		coordFix._33 = -1.0f;
 		view = view * coordFix;
 		device->SetTransform( D3DTS_VIEW, &view );
+		g_sceneView = view;
 
 		const float aspect = viewport.Height
 			? static_cast<float>( viewport.Width ) / viewport.Height : 1.0f;
@@ -4633,6 +5501,17 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 
 	DX_UpdateFog( rvp );
 	R_DrawEnts( rvp->vieworigin );
+
+	if( dx_debug_text3d_test.value != 0.0f &&
+		!FBitSet( rvp->flags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
+	{
+		vec3_t debugPoint;
+		VectorMA( rvp->vieworigin, 160.0f, g_vForward, debugPoint );
+		VectorMA( debugPoint, 16.0f, g_vUp, debugPoint );
+		const rgba_t debugColor = { 255, 208, 64, 255 };
+		R_DebugText3D( debugPoint, debugColor,
+			"D3D9 world-space debug text" );
+	}
 }
 
 static void DX_OrthoBounds( const float *mins, const float *maxs )
@@ -5278,6 +6157,7 @@ void R_BeginFrame( qboolean clear )
 	g_2dRenderMode = kRenderNormal;
 	g_2dModeActive = false;
 	R_Reset2DBatch( );
+	g_debugText3D.clear( );
 
 	if( dx_remix_perf.value == 0.0f )
 		DX_InvalidateTextureBindCache( );
@@ -5337,6 +6217,8 @@ void R_EndFrame( void )
 	if( !device )
 		return;
 
+	R_Flush2DBatch( );
+	R_FlushDebugText3D( );
 	R_Flush2DBatch( );
 
 	{
@@ -5459,6 +6341,7 @@ void R_NewMap( void )
 
 	R_SyncLightStylesFromEngine( );
 	R_RefreshLightmaps( );
+	R_BuildRemixMapLights( );
 
 	R_ActivateDecals( );
 }

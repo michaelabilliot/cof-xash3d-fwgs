@@ -120,6 +120,14 @@ struct world_lightmap_atlas_t
 	texture_t *materialGroup = nullptr;
 };
 
+struct world_surface_draw_range_t
+{
+	UINT firstIndex = 0;
+	UINT indexCount = 0;
+	float normal[3] = { 0.0f, 0.0f, 0.0f };
+	float planeDist = 0.0f;
+};
+
 struct world_material_batch_t
 {
 	texture_t *baseTexture = nullptr;
@@ -130,6 +138,7 @@ struct world_material_batch_t
 
 	std::vector<lightmap_vertex_t> vertices;
 	std::vector<DWORD> indices;
+	std::vector<world_surface_draw_range_t> surfaceRanges;
 
 	IDirect3DVertexBuffer9 *vertexBuffer = nullptr;
 	IDirect3DIndexBuffer9 *indexBuffer = nullptr;
@@ -807,6 +816,8 @@ int R_CreateDecalList( struct decallist_s *pList );
 float R_CurrentRenderTime( float fallback );
 float R_DistancePointToSegmentSq( const vec3_t point, const vec3_t start, const vec3_t end, float &outFraction );
 void R_DrawBeamEntities( bool transparent );
+void R_DebugText3D( const vec3_t world, const rgba_t color, const char *text );
+void R_DebugText3DPrintf( const vec3_t world, const rgba_t color, const char *format, ... );
 bool R_DrawBrushEntity( cl_entity_s *ent );
 void R_DrawBrushWater( cl_entity_s *ent );
 void R_DrawBrushWaterDepth( cl_entity_s *ent );
@@ -1036,6 +1047,10 @@ extern convar_t dx_particle_limit;
 extern convar_t dx_particle_size_scale;
 extern convar_t dx_particles;
 extern convar_t dx_player_weapon_models;
+extern convar_t dx_remix;
+extern convar_t dx_remix_decal_alpha_ref;
+extern convar_t dx_remix_decal_cutout;
+extern convar_t dx_remix_glass_single_sided;
 extern convar_t dx_remix_perf;
 extern convar_t dx_separate_style_lightmaps;
 extern convar_t dx_studio_extended_lighting;
@@ -1060,6 +1075,7 @@ extern convar_t dx_world_batch_cell;
 extern convar_t r_nocull;
 extern convar_t r_nointerp;
 extern convar_t r_nolm;
+extern convar_t r_viewmodel_near;
 
 void CL_DrawParticles( double frametime, particle_t *particles, float partsize );
 void CL_DrawTracers( double frametime, particle_t *tracers );

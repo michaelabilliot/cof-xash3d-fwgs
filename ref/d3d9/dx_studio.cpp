@@ -1026,6 +1026,11 @@ static void R_StudioCrossProduct( const float a[3], const float b[3], float out[
 	out[2] = a[0] * b[1] - a[1] * b[0];
 }
 
+static bool R_StudioChromeEnabled( unsigned int materialFlags )
+{
+	return ( materialFlags & STUDIO_NF_CHROME ) != 0;
+}
+
 static void R_StudioBuildChromeUV( const D3DMATRIX &world,
 	const BoneMat34 *boneMatrices, int normalBoneIndex,
 	const float skinnedNormal[3], float textureWidth, float textureHeight,
@@ -2286,7 +2291,7 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 				if( texId <= 0 || texId > g_texcount )
 					continue;
 				const unsigned int materialFlags = R_StudioTextureFlags( studioTexture );
-				const bool chrome = ( materialFlags & STUDIO_NF_CHROME ) != 0;
+				const bool chrome = R_StudioChromeEnabled( materialFlags );
 				const bool fullbright = ( materialFlags & STUDIO_NF_FULLBRIGHT ) != 0;
 				const bool flatshade = ( materialFlags & STUDIO_NF_FLATSHADE ) != 0;
 				const bool floatUv = ( materialFlags & STUDIO_NF_UV_COORDS ) != 0;
@@ -2831,7 +2836,7 @@ static studio_batch_t &R_FindStudioGpuBatch(
 	studio_batch_t batch;
 	batch.textureId = textureId;
 	batch.materialFlags = materialFlags;
-	batch.chrome = ( materialFlags & STUDIO_NF_CHROME ) != 0;
+	batch.chrome = R_StudioChromeEnabled( materialFlags );
 	cache.batches.push_back( std::move( batch ) );
 	return cache.batches.back( );
 }
@@ -2906,7 +2911,7 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 				continue;
 
 			const unsigned int materialFlags = R_StudioTextureFlags( studioTexture );
-			const bool chrome = ( materialFlags & STUDIO_NF_CHROME ) != 0;
+			const bool chrome = R_StudioChromeEnabled( materialFlags );
 			const bool floatUv = ( materialFlags & STUDIO_NF_UV_COORDS ) != 0;
 			cache.containsChrome |= chrome;
 			studio_batch_t &batch = R_FindStudioGpuBatch( cache, textureId, materialFlags );
@@ -3586,7 +3591,8 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 
 static bool R_StudioGlowShellEnabled( const cl_entity_s *ent )
 {
-	return ent && dx_studio_glowshell.value != 0.0f &&
+	return ent && dx_remix.value == 0.0f &&
+		dx_studio_glowshell.value != 0.0f &&
 		ent->curstate.renderfx == kRenderFxGlowShell;
 }
 
@@ -3945,6 +3951,116 @@ static void R_DrawStudioGlowShellCPU( const studio_cache_t &cache,
 	}
 }
 
+static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
+	const cl_entity_s *ent, const D3DMATRIX *worldMatrix )
+{
+	if( dx_remix.value == 0.0f || !worldMatrix ||
+		!cache.gpuSkinningPoseValid || cache.gpuSkinningBoneCount <= 0 )
+	{
+		return false;
+	}
+
+	// Clip hidden viewmodel geometry before Remix consumes it.
+	const float nearClip = std::max( 0.01f,
+		std::min( 16.0f, r_viewmodel_near.value ) );
+	const bool studioNormals = R_StudioNormalsEnabled( );
+	const bool uploadNormals = cache.buffersUploadNormals;
+	const UINT vertexStride = uploadNormals
+		? sizeof( studio_normal_lit_vertex_t )
+		: ( studioNormals ? sizeof( studio_fast_lit_vertex_t ) : sizeof( brush_vertex_t ) );
+
+	float lightDirByBone[MAXSTUDIOBONES][3] = {};
+	if( cache.lastNormalLightingEnabled && cache.lastCpuLocalLightDirValid )
+	{
+		for( int bone = 0; bone < cache.gpuSkinningBoneCount; ++bone )
+		{
+			R_StudioLightToBone( cache.lastCpuLocalLightDir,
+				cache.gpuSkinningBoneMatrices[bone], lightDirByBone[bone] );
+		}
+	}
+
+	device->SetFVF( uploadNormals ? STUDIO_NORMAL_LIT_FVF :
+		( studioNormals ? STUDIO_FAST_LIT_FVF : BRUSH_FVF ) );
+
+	static std::vector<byte> vertexScratch;
+	static std::vector<byte> nearClipMask;
+	static std::vector<DWORD> indexScratch;
+	const float depthX = worldMatrix->_11 * g_vForward[0] +
+		worldMatrix->_12 * g_vForward[1] + worldMatrix->_13 * g_vForward[2];
+	const float depthY = worldMatrix->_21 * g_vForward[0] +
+		worldMatrix->_22 * g_vForward[1] + worldMatrix->_23 * g_vForward[2];
+	const float depthZ = worldMatrix->_31 * g_vForward[0] +
+		worldMatrix->_32 * g_vForward[1] + worldMatrix->_33 * g_vForward[2];
+	const float depthOffset =
+		( worldMatrix->_41 - g_vOrigin[0] ) * g_vForward[0] +
+		( worldMatrix->_42 - g_vOrigin[1] ) * g_vForward[1] +
+		( worldMatrix->_43 - g_vOrigin[2] ) * g_vForward[2];
+	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
+	int boundTexture = -1;
+
+	for( const studio_batch_t &batch : cache.batches )
+	{
+		if( batch.sources.empty( ) || batch.indices.empty( ) ||
+			batch.primitiveCount == 0 )
+		{
+			continue;
+		}
+
+		vertexScratch.resize( batch.sources.size( ) * vertexStride );
+		R_FillStudioBatchCPU( batch, vertexScratch.data( ),
+			cache.gpuSkinningBoneMatrices, *worldMatrix, studioNormals,
+			cache.lastNormalLightingEnabled, uploadNormals, cache.lastDiffuse,
+			cache.lastNormalLightScale, lightDirByBone, cache.localLights,
+			cache.localLightCount );
+
+		nearClipMask.resize( batch.sources.size( ) );
+		for( size_t vertexIndex = 0; vertexIndex < batch.sources.size( ); ++vertexIndex )
+		{
+			const byte *vertexBytes = vertexScratch.data( ) + vertexIndex * vertexStride;
+			const float *position = reinterpret_cast<const float *>( vertexBytes );
+			const float depth = position[0] * depthX + position[1] * depthY +
+				position[2] * depthZ + depthOffset;
+			nearClipMask[vertexIndex] = depth >= nearClip;
+		}
+
+		indexScratch.clear( );
+		indexScratch.reserve( batch.indices.size( ) );
+		for( size_t index = 0; index + 2 < batch.indices.size( ); index += 3 )
+		{
+			const DWORD a = batch.indices[index];
+			const DWORD b = batch.indices[index + 1];
+			const DWORD c = batch.indices[index + 2];
+			if( a >= nearClipMask.size( ) || b >= nearClipMask.size( ) ||
+				c >= nearClipMask.size( ) || !nearClipMask[a] ||
+				!nearClipMask[b] || !nearClipMask[c] )
+			{
+				continue;
+			}
+
+			indexScratch.push_back( a );
+			indexScratch.push_back( b );
+			indexScratch.push_back( c );
+		}
+
+		if( indexScratch.empty( ) )
+			continue;
+
+		if( batch.textureId != boundTexture )
+		{
+			DX_Bind( 0, batch.textureId );
+			boundTexture = batch.textureId;
+		}
+		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
+		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
+		R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
+			static_cast<UINT>( batch.sources.size( ) ),
+			static_cast<UINT>( indexScratch.size( ) / 3 ),
+			indexScratch.data( ), D3DFMT_INDEX32, vertexScratch.data( ), vertexStride );
+	}
+
+	return true;
+}
+
 static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity_s *ent )
 {
 	if( R_DrawStudioSkinBatches( cache, ent, false ) )
@@ -4010,7 +4126,7 @@ static int R_StudioHeaderRenderMode( studiohdr_t *hdr )
 	{
 		const unsigned int flags = R_StudioTextureFlags( &textures[i] );
 		if( ( flags & STUDIO_NF_ADDITIVE ) != 0 &&
-			( flags & STUDIO_NF_CHROME ) == 0 )
+			!R_StudioChromeEnabled( flags ) )
 		{
 			++additive;
 		}
@@ -5374,7 +5490,11 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 			forceOverlayDepth && R_MuzzleBeforeViewmodel( );
 		if( drawMuzzleBeforeModel )
 			R_DrawMuzzleFlashes( ent );
-		R_DrawStudioGpuBatches( cache, ent );
+		if( !( forceOverlayDepth &&
+			R_DrawStudioRemixViewModelBatches( cache, ent, currentWorldMatrix ) ) )
+		{
+			R_DrawStudioGpuBatches( cache, ent );
+		}
 
 		if( normalRenderMode )
 			R_RestoreOpaqueEntityBaseline( );

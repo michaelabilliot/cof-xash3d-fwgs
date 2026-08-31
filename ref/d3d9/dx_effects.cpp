@@ -76,7 +76,7 @@ static D3DCOLOR R_ParticleColor( const particle_t *particle, bool tracer )
 	return D3DCOLOR_ARGB( alpha, r, g, b );
 }
 
-static void R_BeginParticlePass( bool additive )
+static void R_BeginParticlePass( bool additive, bool remixParticleTexture )
 {
 	if( !device )
 		return;
@@ -87,19 +87,47 @@ static void R_BeginParticlePass( bool additive )
 	D3DXMatrixIdentity( &identity );
 	device->SetTransform( D3DTS_WORLD, &identity );
 	device->SetFVF( D3D_PARTICLE_FVF );
-	DX_BindRawTexture( 0, nullptr );
+
+	const int particleTexture = remixParticleTexture
+		? DX_FindTexture( REF_PARTICLE_TEXTURE ) : 0;
+	if( particleTexture > 0 )
+	{
+		DX_Bind( 0, static_cast<unsigned int>( particleTexture ) );
+		DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_MODULATE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
+	}
+	else
+	{
+		DX_BindRawTexture( 0, nullptr );
+		DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_SELECTARG1 );
+		DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_DIFFUSE );
+		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1 );
+		DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE );
+	}
+
 	DX_BindRawTexture( 1, nullptr );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_SELECTARG1 );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_DIFFUSE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1 );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE );
 	DX_SetTextureStageStateCached( 1, D3DTSS_COLOROP, D3DTOP_DISABLE );
 	DX_SetTextureStageStateCached( 1, D3DTSS_ALPHAOP, D3DTOP_DISABLE );
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_NONE );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
 	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
-	DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
+	if( remixParticleTexture && particleTexture > 0 )
+	{
+		// Keep particle fading, but reject fully transparent texels for Remix.
+		DX_SetRenderStateCached( D3DRS_LIGHTING, FALSE );
+		DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, TRUE );
+		DX_SetRenderStateCached( D3DRS_ALPHAFUNC, D3DCMP_GREATER );
+		DX_SetRenderStateCached( D3DRS_ALPHAREF, 1 );
+	}
+	else
+	{
+		DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
+	}
 	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_BLENDOP, D3DBLENDOP_ADD );
 	DX_SetRenderStateCached( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
@@ -111,6 +139,7 @@ static void R_EndParticlePass( )
 {
 	if( !device )
 		return;
+	DX_BindRawTexture( 0, nullptr );
 	device->SetFVF( BRUSH_FVF );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
@@ -215,7 +244,8 @@ static void R_DrawParticles( particle_t *particles, float partsize,
 	if( maxDraw == 0 )
 		return;
 
-	R_BeginParticlePass( additive );
+	R_BeginParticlePass( additive,
+		dx_remix.value != 0.0f && !tracerList );
 	g_dxParticleVerts.clear( );
 	g_dxParticleVerts.reserve( 2048 * 6 );
 
