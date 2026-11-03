@@ -138,6 +138,7 @@ HRESULT DX_SetRenderStateCached( D3DRENDERSTATETYPE state, DWORD value )
 	}
 
 	DX_ProfileState( DX_PROFILE_STATE_RENDER, true );
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 	const HRESULT result = device->SetRenderState( state, value );
 	if( SUCCEEDED( result ) && index < DX_RENDER_STATE_CACHE_SIZE )
 	{
@@ -163,6 +164,7 @@ HRESULT DX_SetTextureStageStateCached( DWORD stage,
 	}
 
 	DX_ProfileState( DX_PROFILE_STATE_STAGE, true );
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 	const HRESULT result = device->SetTextureStageState( stage, type, value );
 	if( SUCCEEDED( result ) && stage < DX_MAX_TEXTURE_STAGES &&
 		typeIndex < DX_STAGE_STATE_CACHE_SIZE )
@@ -190,6 +192,7 @@ HRESULT DX_SetSamplerStateCached( DWORD sampler, D3DSAMPLERSTATETYPE type,
 
 	DX_InvalidateSamplerProfile( sampler );
 	DX_ProfileState( DX_PROFILE_STATE_SAMPLER, true );
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 	const HRESULT result = device->SetSamplerState( sampler, type, value );
 	if( SUCCEEDED( result ) && sampler < DX_MAX_TEXTURE_STAGES &&
 		typeIndex < DX_SAMPLER_STATE_CACHE_SIZE )
@@ -231,6 +234,7 @@ void DX_BindRawTexture( int tmu, IDirect3DBaseTexture9 *texture )
 	}
 
 	DX_ProfileTexture( DX_PROFILE_TEXTURE_RAW, true );
+	DX_TriBatchBarrier(DX_TRI_FLUSH_TEXTURE);
 	device->SetTexture( static_cast<DWORD>( tmu ), texture );
 	g_dxBoundTextureId[tmu] = DX_BOUND_TEX_RAW;
 	g_dxBoundRawTexture[tmu] = texture;
@@ -452,6 +456,7 @@ static bool DX_UploadRGBAImage( IDirect3DTexture9 *texture,
 static int DX_CreateTextureFromImage( const char *cacheName, int existingId,
 	rgbdata_t **image, texFlags_t flags )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_TEXTURE);
 	if( !cacheName || !cacheName[0] || !image || !( *image ) || !device )
 		return 0;
 
@@ -722,6 +727,7 @@ static bool DX_EnsureTextureStorage( dxtexture_t &texture, int width, int height
 qboolean DX_UpdateTexture( int texnum, int cols, int rows, int width, int height,
 	const byte *buffer, pixformat_t fmt )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_TEXTURE);
 	if( !buffer || texnum <= 0 || texnum > g_texcount )
 		return false;
 
@@ -987,6 +993,7 @@ void R_StudioLoadTexture( model_t *mod, studiohdr_t *phdr, mstudiotexture_t *pte
 
 void DX_FreeTexture( unsigned int texnum )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_TEXTURE);
 	if( texnum == 0 || texnum > static_cast<unsigned int>( g_texcount ) )
 		return;
 
@@ -1062,7 +1069,8 @@ void DX_Bind( int tmu, unsigned int texnum )
 	if( g_dxBoundTextureId[tmu] != texnum || g_dxBoundRawTexture[tmu] != d3dTexture )
 	{
 		DX_ProfileTexture( DX_PROFILE_TEXTURE_GL, true );
-		device->SetTexture( static_cast<DWORD>( tmu ), d3dTexture );
+		DX_TriBatchBarrier(DX_TRI_FLUSH_TEXTURE);
+	device->SetTexture( static_cast<DWORD>( tmu ), d3dTexture );
 		g_dxBoundTextureId[tmu] = texnum;
 		g_dxBoundRawTexture[tmu] = d3dTexture;
 	}

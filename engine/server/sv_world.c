@@ -818,7 +818,7 @@ Handles selection or creation of a clipping hull, and offseting (and
 eventually rotation) of the end points
 ==================
 */
-void SV_ClipMoveToEntity( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t maxs, const vec3_t end, trace_t *trace )
+static void SV_ClipMoveToEntityEx( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t maxs, const vec3_t end, trace_t *trace, int *studioHitbox )
 {
 	hull_t	*hull;
 	model_t	*model;
@@ -828,6 +828,7 @@ void SV_ClipMoveToEntity( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t 
 	qboolean	rotated, transform_bbox;
 	matrix4x4	matrix;
 
+	if(studioHitbox) *studioHitbox=-1;
 	PM_InitTrace( trace, end );
 
 	model = SV_ModelHandle( ent->v.modelindex );
@@ -918,6 +919,7 @@ void SV_ClipMoveToEntity( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t 
 		}
 
 		trace->hitgroup = Mod_HitgroupForStudioHull( last_hitgroup );
+        if(studioHitbox && trace->fraction<1) *studioHitbox=last_hitgroup;
 	}
 
 	if( trace->fraction != 1.0f )
@@ -939,6 +941,27 @@ void SV_ClipMoveToEntity( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t 
 
 	if( trace->fraction < 1.0f || trace->startsolid )
 		trace->ent = ent;
+}
+
+void SV_ClipMoveToEntity( edict_t *ent, const vec3_t start, vec3_t mins, vec3_t maxs, const vec3_t end, trace_t *trace )
+{
+    SV_ClipMoveToEntityEx(ent,start,mins,maxs,end,trace,NULL);
+}
+int SV_RagdollTraceBone(edict_t *ent,const vec3_t start,const vec3_t end,float fraction,vec3_t local)
+{
+    trace_t trace;int hitbox=-1;
+    model_t *model=SV_ModelHandle(ent->v.modelindex);
+    const studiohdr_t *header;
+    const mstudiobbox_t *boxes;
+    if(!model || model->type!=mod_studio || !(fraction>=0 && fraction<1)) return 0;
+    SV_ClipMoveToEntityEx(ent,start,vec3_origin,vec3_origin,end,&trace,&hitbox);
+    if(trace.ent!=ent || hitbox<0 || !(trace.fraction>=0 && trace.fraction<1) || fabsf(trace.fraction-fraction)>.0001f) return 0;
+    header=Mod_StudioExtradata(model);
+    if(!header || hitbox>=header->numhitboxes) return 0;
+    boxes=(const mstudiobbox_t*)((const byte*)header+header->hitboxindex);
+    if(boxes[hitbox].bone<0 || boxes[hitbox].bone>=header->numbones) return 0;
+    Mod_StudioHullLocalPoint(hitbox,trace.endpos,boxes[hitbox].bbmax,local);
+    return boxes[hitbox].bone+1;
 }
 
 /*

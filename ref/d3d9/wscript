@@ -2,12 +2,16 @@
 # encoding: utf-8
 
 import os
+import subprocess
+import sys
 
 
 def options(opt):
 	grp = opt.add_option_group('ref_d3d9 options')
 	grp.add_option('--dxsdk', action='store', dest='DXSDK_DIR', default='',
 		help='path to the legacy DirectX SDK containing D3DX9; DXSDK_DIR is also accepted')
+	grp.add_option('--verify-camera', action='store_true', default=False,
+		help='build CPU-only studio attachment regression executable')
 
 
 def _dxsdk_candidates(conf):
@@ -120,6 +124,131 @@ int main(void)
 def build(bld):
 	if not bld.env.D3D9:
 		return
+	# Bullet 3.25: CPU rigid dynamics only, built by the same compiler and CRT
+	# flags as the renderer (including x86 /MT). No CMake-generated ABI mismatch.
+	bullet = bld.path.find_node('../../3rdparty/bullet/src')
+	if not bullet or not bullet.find_node('btBulletDynamicsCommon.h'):
+		subprocess.run([sys.executable, bld.path.find_node('fetch_bullet.py').abspath()], check=True)
+		bullet = bld.path.find_node('../../3rdparty/bullet/src')
+	for name in ['LinearMath', 'BulletCollision', 'BulletDynamics']:
+		patterns = ['BulletDynamics/Dynamics/*.cpp', 'BulletDynamics/ConstraintSolver/*.cpp'] if name == 'BulletDynamics' else [name + '/**/*.cpp']
+		bld.stlib(source=bullet.ant_glob(patterns), target='ragdoll_' + name,
+			includes=[bullet.abspath()], export_includes=[bullet.abspath()],
+			cxxflags=['/EHsc'], defines=['NOMINMAX', '_CRT_SECURE_NO_WARNINGS'])
+	# The CPU regression executes the actual renderer animation evaluator without
+	# loading a renderer DLL. Keep this generated test include tied to its source.
+	studio_text = bld.path.find_node('dx_studio.cpp').read()
+	start = studio_text.index('static void QuaternionMultiply(')
+	end = studio_text.index('{', studio_text.index('static void StudioCalcBoneTransformsInternal(')) + 1
+	depth = 1
+	while depth:
+		depth += (studio_text[end] == '{') - (studio_text[end] == '}')
+		end += 1
+	generated = bld.path.get_bld().make_node('verify_ragdoll_animation.inc')
+	generated.parent.mkdir()
+	if not generated.exists() or generated.read() != studio_text[start:end]:
+		generated.write(studio_text[start:end])
+	bld.program(source=['verify_ragdoll.cpp', 'ragdoll_physics.cpp', 'ragdoll_reactions.cpp'], target='verify_ragdoll',
+		defines=['REF_DLL=1', 'NOMINMAX'],
+		use=['engine_includes', 'sdk_includes', 'public', 'ragdoll_BulletDynamics',
+			'ragdoll_BulletCollision', 'ragdoll_LinearMath'],
+		uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS + ['/W4'],
+		includes=['.', '../common'], subsystem='console')
+	def production_function(signature):
+		begin=studio_text.index(signature)
+		opening=studio_text.index('{',begin);depth=1;end=opening+1
+		while depth:
+			depth+=(studio_text[end]=='{')-(studio_text[end]=='}');end+=1
+		return studio_text[begin:end]
+	functions=['static void R_StudioRotateVectorByBone(', 'static bool R_StudioNormalizeVector(',
+		'static void R_StudioLightToEntity(', 'static int R_StudioPoseBudget(',
+		'static bool R_StudioPoseBudgetOK(', 'static bool R_StudioPoseCached(',
+		'static void R_FillStudioBatchCPU(', 'static void R_StudioCommitPose(',
+		'static void R_StudioBoneLightDirs(', 'static bool R_UploadStudioVertices(',
+		'static bool R_UpdateStudioVertices(', 'static bool R_DrawStudioSkinBatches(']
+	code='\n'.join(production_function(f) for f in functions)
+	render_test=bld.path.get_bld().make_node('verify_ragdoll_render.inc')
+	if not render_test.exists() or render_test.read()!=code: render_test.write(code)
+	# Compile actual ABI declarations with a minimal standalone engine fixture.
+	api = bld.path.find_node('../../engine/ref_api.h').read()
+	decls = api[api.index('#define REF_RAGDOLL_SNAPSHOT_VERSION'):api.index('struct con_nprint_s;', api.index('#define REF_RAGDOLL_SNAPSHOT_VERSION'))]
+	native = bld.path.find_node('../../engine/eiface.h').read()
+	begin = native.index('typedef struct', native.index('// Returned by TraceLine'))
+	decls += native[begin:native.index('} TraceResult;', begin)+len('} TraceResult;')]
+	import re
+	native_header=bld.path.find_node('../../engine/server/sv_ragdoll_source.h').read()
+	setup=[]
+	for name,rva in [('player',0xaa250),('generic',0xa99c0),('player_loop',0xaa3a8),('generic_loop',0xa9abf),('player_call',0xaa641),('generic_call',0xa9c25)]:
+		values=re.search(r'const byte '+name+r'\[\]\s*=\s*\{([^}]+)\}',native_header)[1]
+		setup.append('const byte '+name+'[]={'+values+'}; memcpy(nativeImage+'+str(rva)+','+name+',sizeof('+name+'));')
+	image_fixture=bld.path.get_bld().make_node('verify_ragdoll_native_image.inc')
+	setup='\n'.join(setup)
+	if not image_fixture.exists() or image_fixture.read()!=setup:image_fixture.write(setup)
+	hull_source=bld.path.find_node('../../engine/common/mod_studio.c').read()
+	begin=hull_source.index('void Mod_StudioHullLocalPoint(');end=hull_source.index('}',begin)+1
+	end=hull_source.index('}',end)+1
+	hull_test=bld.path.get_bld().make_node('verify_ragdoll_hull.inc')
+	if not hull_test.exists() or hull_test.read()!=hull_source[begin:end]: hull_test.write(hull_source[begin:end])
+	types = bld.path.get_bld().make_node('verify_ragdoll_event_types.inc')
+	if not types.exists() or types.read()!=decls: types.write(decls)
+	for file,signature,output in [('engine/server/sv_pmove.c','static void SV_AddLinksToPmove(', 'verify_ragdoll_server_movement.inc'), ('engine/client/dll_int/cl_pmove.c','static void CL_AddLinksToPmove(', 'verify_ragdoll_client_movement.inc')]:
+		text=bld.path.find_node('../../'+file).read();begin=text.index(signature);opening=text.index('{',begin);end=opening+1;depth=1
+		while depth:
+			depth+=(text[end]=='{')-(text[end]=='}');end+=1
+		node=bld.path.get_bld().make_node(output)
+		if not node.exists() or node.read()!=text[begin:end]:node.write(text[begin:end])
+	bld.program(source='verify_ragdoll_events.cpp', target='verify_ragdoll_events',
+		defines=['NOMINMAX'], use=['engine_includes','sdk_includes','public'],
+		cxxflags=bld.env.D3D9_CXXFLAGS+['/EHsc','/W4'],includes=['.'],subsystem='console')
+	if bld.options.verify_camera:
+		bld.program(source='verify_viewmodel_units.cpp', target='verify_viewmodel_units',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_asset_overlay.cpp', target='verify_asset_overlay',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_cof_decals.cpp', target='verify_cof_decals',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_player_visibility.cpp', target='verify_player_visibility',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_camera_flash.cpp', target='verify_camera_flash',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_2d.cpp', target='verify_2d',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_animation.cpp', target='verify_animation',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_dual.cpp', target='verify_dual',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_batching.cpp', target='verify_batching',
+			defines=['NOMINMAX'], use=['werror'],
+			cxxflags=bld.env.D3D9_CXXFLAGS, includes=['.'], subsystem='console')
+		bld.program(source='verify_camera.cpp', target='verify_camera',
+			defines=['REF_DLL=1', 'NOMINMAX'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
 
 	source = [
 		'r_context.cpp',
@@ -130,6 +259,9 @@ def build(bld):
 		'dx_textures.cpp',
 		'dx_profiler.cpp',
 		'dx_studio_shader.cpp',
+		'dx_ragdoll.cpp',
+		'ragdoll_physics.cpp',
+		'ragdoll_reactions.cpp',
 	]
 
 	bld.shlib(
@@ -137,6 +269,7 @@ def build(bld):
 		target='ref_d3d9',
 		defines=['REF_DLL=1', 'NOMINMAX'],
 		use=[
+			'ragdoll_BulletDynamics', 'ragdoll_BulletCollision', 'ragdoll_LinearMath',
 			'ref_common',
 			'engine_includes',
 			'sdk_includes',

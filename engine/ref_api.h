@@ -319,6 +319,54 @@ typedef struct remap_info_s
 } remap_info_t;
 
 typedef struct convar_s convar_t;
+// Synchronous read-only local-server snapshot. No game-private pointers cross
+// this boundary; generation changes whenever an edict slot is recycled.
+#define REF_RAGDOLL_SNAPSHOT_VERSION 5
+#define REF_RAGDOLL_MAX_HITS 8
+enum { REF_RAGDOLL_PISTOL=1, REF_RAGDOLL_SHOTGUN=2, REF_RAGDOLL_RIFLE=3 };
+typedef struct ref_ragdoll_hit_s
+{
+	unsigned int id, shot;
+	int group, pellets, total_pellets, weapon;
+    int bone; /* studio bone + 1, zero when no authoritative studio hit */
+    unsigned int pellet_mask;
+    int local_valid;
+    float local_position[3]; /* actual trace hull coordinates, in game units */
+    int lethal;
+    float damage; /* native accumulated contribution; -1 when only state evidence survives */
+	float time, position[3], direction[3];
+} ref_ragdoll_hit_t;
+typedef struct ref_ragdoll_entity_s
+{
+	int serial, modelindex, monster, dead, solid, effects;
+    int generation;
+	float velocity[3];
+	float health, server_time;
+	int deadflag, sequence, grounded;
+    int native_death; /* -1 unsupported, 0 alive, 1 native Killed memory */
+	char classname[64];
+	unsigned int impact_id;
+	int impact_group;
+	float impact_position[3], impact_direction[3];
+	int hit_count, hit_rejected;
+	ref_ragdoll_hit_t hits[REF_RAGDOLL_MAX_HITS];
+} ref_ragdoll_entity_t;
+/* Engine-owned bounded mailbox. Payloads contain renderer-independent values only.
+ * Query a valid edict to acquire; set bytes last to commit. Zero invalidates. */
+#define REF_RAGDOLL_CLAIM_VERSION 1
+typedef struct ref_ragdoll_claim_s {
+    int version,generation,index,serial,modelindex,owner;
+} ref_ragdoll_claim_t;
+enum { REF_RAGDOLL_UNOWNED=0, REF_RAGDOLL_IMPACT=1, REF_RAGDOLL_DYNAMIC=2, REF_RAGDOLL_RESTING=3 };
+
+#define REF_RAGDOLL_RETAIN_VERSION 1
+#define REF_RAGDOLL_RETAIN_BYTES 65516 /* 64 KiB slot minus 20-byte envelope */
+#define REF_RAGDOLL_RETAIN_COUNT 128
+typedef struct ref_ragdoll_retained_s {
+    int generation, index, serial;
+    unsigned int version, bytes;
+    byte data[REF_RAGDOLL_RETAIN_BYTES];
+} ref_ragdoll_retained_t;
 struct con_nprint_s;
 struct engine_studio_api_s;
 struct r_studio_interface_s;
@@ -350,6 +398,10 @@ typedef enum
 	PARM_GET_DLIGHTS_PTR = -21,
 	PARM_GET_ELIGHTS_PTR = -22,
 	PARM_GET_STUDIO_HDR = -23, // current m_pStudioHeader in renderer
+	PARM_GET_RAGDOLL_RETAINED = -25, // index=acquire, -index-3=lookup; -1=generation, -2=version, -3=count, -65536-slot=iterate
+    PARM_RAGDOLL_CLAIM = -27, // arg=index: generation-checked ownership mailbox; -2=version
+    PARM_RAGDOLL_ACK = -26, // arg=index: unsigned event acknowledgement mailbox
+    PARM_GET_RAGDOLL_ENTITY = -24, // snapshot pointer; arg=index, -1=local edict high-water mark
 
 	// implemented by ref_dll
 

@@ -15,6 +15,7 @@ GNU General Public License for more details.
 
 #include "common.h"
 #include "client.h"
+#include "server.h"
 #include "const.h"
 #include "cl_tent.h"
 #include "pm_local.h"
@@ -424,7 +425,10 @@ static void CL_AddLinksToPmove( frame_t *frame )
 		if( state->solid == SOLID_TRIGGER || ( state->solid == SOLID_NOT && state->skin >= CONTENTS_EMPTY ))
 			continue;
 
-		// dead body
+		if( !cls.demoplayback && SV_RagdollOwnsPlayerCollision( state->number, state->modelindex ))
+            continue;
+
+        // dead body
 		if( state->mins[2] == 0.0f && state->maxs[2] == 1.0f )
 			continue;
 

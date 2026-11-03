@@ -295,6 +295,7 @@ static void R_DrawParticles( particle_t *particles, float partsize,
 
 void CL_DrawParticles( double frametime, particle_t *particles, float partsize )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	(void)frametime;
 	R_DrawParticles( particles, partsize,
 		dx_particle_additive.value != 0.0f, false );
@@ -302,6 +303,7 @@ void CL_DrawParticles( double frametime, particle_t *particles, float partsize )
 
 void CL_DrawTracers( double frametime, particle_t *tracers )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	(void)frametime;
 	R_DrawParticles( tracers, std::max( 1.0f, dx_tracer_width.value ), true, true );
 }
@@ -1818,6 +1820,7 @@ void R_DrawBeamEntities( bool transparent )
 
 void CL_DrawBeams( int fTrans, BEAM *beams )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !beams || dx_beams.value == 0.0f )
 		return;
 

@@ -800,6 +800,16 @@ int Mod_HitgroupForStudioHull( int index )
 	return studio_hull_hitgroup[index];
 }
 
+/* The trace hull planes are cached with the hull. Do not read studio_bones
+ * here: a hull cache hit need not recompute those global matrices. */
+void Mod_StudioHullLocalPoint(int hitbox,const vec3_t point,const vec3_t maximum,vec3_t local)
+{
+    for(int axis=0;axis<3;++axis) {
+        const mplane_t *plane=&studio_planes[hitbox*6+axis*2];
+        local[axis]=DotProduct(plane->normal,point)-(plane->dist-maximum[axis]);
+    }
+}
+
 /*
 ====================
 StudioBoundVertex

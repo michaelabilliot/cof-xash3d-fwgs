@@ -48,7 +48,28 @@ extern "C" {
 #include "dx_models.h"
 #include "enginefeatures.h"
 #include "dx_local.h"
+#include "dx_ragdoll.h"
+#include "dx_cof_scene.h"
 #include "dx_profiler.h"
+#include "dx_batching.h"
+#include "dx_cof_dual.h"
+#include "dx_cof_pause.h"
+#include "dx_map_light_api.h"
+#include "dx_map_sky.h"
+#include "dx_light_position.h"
+#include "dx_studio_fixture.h"
+static dx_cof_dual_state_t g_cofDual;
+static uint64_t g_cofDualPass=0;
+static dx_cof_player_visibility_t g_cofPlayerVisibility;
+static void R_ResetCofPlayerVisibility(){g_cofPlayerVisibility.clear();}
+extern "C" __declspec(dllexport) int __cdecl DX_CofPlayerVisibilityV1(unsigned reasons,float time) {
+ return g_cofPlayerVisibility.publish(reasons,time)?1:0;
+}
+bool R_CofPlayerDrawAllowed(const cl_entity_s* entity) {
+ // DeadPlayer geometry delegates to StudioDrawPlayer in the native client too.
+ if(!entity||(!entity->player&&entity->curstate.renderfx!=kRenderFxDeadPlayer))return true;
+ return !g_cofPlayerVisibility.hidden(R_CurrentRenderTime(0.f));
+}
 
 #ifndef SURF_DRAWTURB
 #define SURF_DRAWTURB 0x0010
@@ -87,6 +108,8 @@ static int g_2dBatchTexture = 0;
 static int g_2dBatchRenderMode = kRenderNormal;
 static void R_Flush2DBatch( );
 static void R_Reset2DBatch( );
+static void R_ResetTriangleBatch();
+static void R_TriBatchStats();
 
 static bool g_dxSceneActive = false;
 unsigned int g_currentViewFlags = 0;
@@ -341,9 +364,22 @@ static bool R_UploadScratchIndices( const void *indices, UINT bytes,
 	return true;
 }
 
+bool R_DrawBoundVertexIndices(INT baseVertex,UINT vertexCount,const DWORD* indices,UINT count) {
+    if(!device || !indices || !count || count%3 || count>262144) return false;
+    UINT start=0;
+    if(!R_UploadScratchIndices(indices,count*sizeof(DWORD),D3DFMT_INDEX32,start)) return false;
+    DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_INDEX_BYTES,count*sizeof(DWORD));
+    device->SetIndices(g_contextScratchIB);
+    const HRESULT result=device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,baseVertex,0,vertexCount,start,count/3);
+    if(FAILED(result)) return false;
+    DX_ProfileDraw(true,count/3);
+    return true;
+}
+
 bool R_DrawScratch( D3DPRIMITIVETYPE type,
 	UINT primitiveCount, UINT vertexCount, const void *vertices, UINT stride )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !vertices || primitiveCount == 0 || vertexCount == 0 )
 		return false;
 	UINT vertexOffset = 0;
@@ -351,14 +387,14 @@ bool R_DrawScratch( D3DPRIMITIVETYPE type,
 		return false;
 	device->SetStreamSource( 0, g_contextScratchVB, vertexOffset, stride );
 	DX_ProfileDraw( false, primitiveCount );
-	device->DrawPrimitive( type, 0, primitiveCount );
-	return true;
+	return SUCCEEDED(device->DrawPrimitive( type, 0, primitiveCount ));
 }
 
 static bool R_DrawScratchIndexed( D3DPRIMITIVETYPE type,
 	UINT vertexCount, UINT primitiveCount, const void *indices,
 	D3DFORMAT indexFormat, const void *vertices, UINT stride )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !vertices || !indices || vertexCount == 0 || primitiveCount == 0 )
 		return false;
 	UINT vertexOffset = 0;
@@ -386,10 +422,28 @@ convar_t dx_remix_decal_cutout =
 { (char *)"dx_remix_decal_cutout", (char *)"1", 0 };
 convar_t dx_remix_decal_alpha_ref =
 { (char *)"dx_remix_decal_alpha_ref", (char *)"96", 0 };
+convar_t dx_triapi_batch =
+{ (char *)"dx_triapi_batch", (char *)"1", 0 };
+static convar_t dx_triapi_debug={(char*)"dx_triapi_debug",(char*)"0",0};
+convar_t dx_triapi_batch_max_vertices =
+{ (char *)"dx_triapi_batch_max_vertices", (char *)"32768", 0 };
+convar_t dx_remix_glass_batch =
+{ (char *)"dx_remix_glass_batch", (char *)"1", 0 };
+
 convar_t dx_remix_glass_single_sided =
 { (char *)"dx_remix_glass_single_sided", (char *)"1", 0 };
 convar_t dx_remix_map_lights =
 { (char *)"dx_remix_map_lights", (char *)"1", 0 };
+convar_t dx_remix_map_light_api = { (char *)"dx_remix_map_light_api", (char *)"1", 0 };
+convar_t dx_remix_map_light_radius = { (char *)"dx_remix_map_light_radius", (char *)"8", 0 };
+convar_t dx_remix_map_light_clearance = { (char *)"dx_remix_map_light_clearance", (char *)"1", 0 };
+convar_t dx_remix_map_light_centering = { (char *)"dx_remix_map_light_centering", (char *)"1", 0 };
+convar_t dx_remix_map_light_output_scale = { (char *)"dx_remix_map_light_output_scale", (char *)"0.75", 0 };
+// Relative to the project's existing light calibration; archived for next run.
+convar_t light_level = { (char *)"light_level", (char *)"1", FCVAR_ARCHIVE };
+static float R_MapLightLevel() {
+ return std::isfinite(light_level.value) ? std::clamp(light_level.value,0.f,16.f) : 1.f;
+}
 convar_t dx_remix_map_light_intensity =
 { (char *)"dx_remix_map_light_intensity", (char *)"1", 0 };
 convar_t dx_remix_map_light_range_scale =
@@ -886,6 +940,15 @@ static void R_TextureZoomOutCmd( void ) { R_ShowTexturesSetZoom( dx_showtextures
 
 static void R_TextureZoomResetCmd( void ) { R_ShowTexturesSetZoom( 1.0f ); }
 
+static dx_map_light::Bridge g_mapEmitterBridge;
+static bool R_CofLanternModel(const cl_entity_s* ent,bool view) {
+ return ent && ent->model && ent->model->type==mod_studio && !(ent->curstate.effects&EF_NODRAW) &&
+  !Q_stricmp(ent->model->name,view?"models/weapons/lantern/v_lantern.mdl":"models/weapons/lantern/w_lantern.mdl");
+}
+static dx_map_sky::Selection g_mapSky{ GetTickCount() & 0x3fffffffu };
+static ULONGLONG g_mapSkyRetryAt = 0;
+static uint64_t g_mapEmitterIdentity = 0;
+
 enum remix_map_light_type_t : unsigned char
 {
 	REMIX_MAP_LIGHT_POINT = 0,
@@ -896,6 +959,15 @@ enum remix_map_light_type_t : unsigned char
 struct remix_map_light_t
 {
 	int entityIndex = 0;
+	float centeredRadius = 8.f;
+	float manualRadius = 0.f;
+	vec3_t centeredOrigin = {}, automaticOrigin = {};
+	int fixture = -1;
+	int bulb = -1;
+	const char *positionReason = "authored; no verified fixture profile";
+	const char *submissionRoute = "not submitted";
+	bool manualPosition = false;
+	dx_map_light::Instance instance;
 	remix_map_light_type_t type = REMIX_MAP_LIGHT_POINT;
 	vec3_t origin = {};
 	vec3_t direction = { 1.0f, 0.0f, 0.0f };
@@ -912,6 +984,8 @@ struct remix_map_light_t
 
 struct map_light_debug_t
 {
+	char model[64] = {};
+	char body[32] = {}, skin[32] = {}, scale[32] = {}, sequence[32] = {};
 	char classname[64] = {};
 	char origin[96] = {};
 	char light[96] = {};
@@ -946,6 +1020,8 @@ struct remix_map_light_candidate_t
 	bool directional = false;
 };
 
+static std::vector<dx_studio_fixture::Bulb> g_studioBulbs;
+static std::vector<dx_light_position::Fixture> g_brushGlobes;
 static std::vector<remix_map_light_t> g_remixMapLights;
 static std::vector<remix_map_light_candidate_t> g_remixMapLightCandidates;
 static int g_remixMapLightSlotCount = 0;
@@ -1024,7 +1100,13 @@ static void R_CopyMapLightField( char *destination, size_t destinationSize,
 static void R_SetMapLightField( map_light_debug_t &light,
 	const char *key, const char *value )
 {
-	if( !strcmp( key, "classname" ) )
+	if( !strcmp( key, "model" ) )
+		R_CopyMapLightField( light.model, sizeof( light.model ), value );
+	else if( !strcmp( key, "body" ) ) R_CopyMapLightField(light.body,sizeof(light.body),value);
+	else if( !strcmp( key, "skin" ) ) R_CopyMapLightField(light.skin,sizeof(light.skin),value);
+	else if( !strcmp( key, "scale" ) ) R_CopyMapLightField(light.scale,sizeof(light.scale),value);
+	else if( !strcmp( key, "sequence" ) ) R_CopyMapLightField(light.sequence,sizeof(light.sequence),value);
+	else if( !strcmp( key, "classname" ) )
 		R_CopyMapLightField( light.classname, sizeof( light.classname ), value );
 	else if( !strcmp( key, "origin" ) )
 		R_CopyMapLightField( light.origin, sizeof( light.origin ), value );
@@ -1222,6 +1304,7 @@ static bool R_BuildMapLightDirection( const map_light_debug_t &raw,
 
 static void R_DisableRemixMapLights( void )
 {
+	for( auto &light : g_remixMapLights ){g_mapEmitterBridge.retire( light.instance );light.submissionRoute="disabled";}
 	if( device )
 	{
 		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
@@ -1234,9 +1317,149 @@ static void R_ClearRemixMapLights( void )
 {
 	R_DisableRemixMapLights( );
 	g_remixMapLights.clear( );
+	g_studioBulbs.clear();
+	g_brushGlobes.clear();
 	g_remixMapLightCandidates.clear( );
 	g_remixEnabledLightLimit = -1;
 	g_remixMapLightCapacityWarned = false;
+}
+
+static const float *R_MapLightPosition( const remix_map_light_t &light )
+{
+	return dx_remix_map_light_centering.value != 0.f ? light.centeredOrigin : light.origin;
+}
+
+static bool R_MapLightPositionAllowed( const vec3_t original, const vec3_t position )
+{
+	if( !g_worldmodel || !g_worldmodel->nodes ) return false;
+	int budget=8192;
+	return dx_light_position::clearSegment(g_worldmodel->nodes,
+		dx_light_position::Point{original[0],original[1],original[2]},
+		dx_light_position::Point{position[0],position[1],position[2]},
+		[](mnode_t *node){return node->contents;},
+		[](mnode_t *node,const dx_light_position::Point& point){return node->plane?DotProduct(point.data(),node->plane->normal)-node->plane->dist:std::numeric_limits<float>::quiet_NaN();},
+		[](mnode_t *node,int side){return node_child(node,side,g_worldmodel);},budget);
+}
+
+static std::vector<dx_light_position::Fixture> R_CollectLampFixtures( const std::vector<model_t *> &models )
+{
+	std::vector<dx_light_position::Face> faces;
+	int owner=0;
+	for( auto model:models )
+	{
+		++owner;
+		if( !model || model->type!=mod_brush ) continue;
+		int first=0,count=0;
+		if( !R_GetBrushSurfaceRange(model,first,count) ) continue;
+		for( int i=first;i<first+count;++i )
+		{
+			const auto surface=&model->surfaces[i];
+			if( !surface->texinfo || !surface->texinfo->texture || surface->numedges<3 || surface->numedges>64 ) continue;
+			const auto texture=surface->texinfo->texture;
+			const std::string name(texture->name,strnlen(texture->name,sizeof(texture->name)));
+			if( !dx_light_position::outdoorGlobeMaterial(name) ) continue;
+			dx_light_position::Face face;face.owner=owner;
+			for( int edge=0;edge<surface->numedges;++edge )
+			{
+				const auto vertex=R_GetBrushSurfaceVertex(model,surface,edge);
+				if( !vertex ){face.vertices.clear();break;}
+				face.vertices.push_back({vertex->position[0],vertex->position[1],vertex->position[2]});
+			}
+			if( face.vertices.size()>=3 )faces.push_back(std::move(face));
+			if( faces.size()>32768 ) return {};
+		}
+	}
+	return dx_light_position::fixtures(faces);
+}
+
+static void R_CollectStudioBulbs(const std::vector<map_entity_record_t>& entities)
+{
+    const auto fs=gEngfuncs.fsapi;
+    if(!fs||!fs->Open||!fs->FileLength||!fs->Read||!fs->Close)return;
+    std::map<std::string,std::vector<unsigned char>> cache;
+    for(const auto& entity:entities)
+    {
+        const auto& raw=entity.fields;
+        if(strcmp(raw.classname,"env_model")||!dx_studio_fixture::profile(raw.model))continue;
+        const int body=atoi(raw.body),skin=atoi(raw.skin);
+        if(dx_studio_fixture::profile(raw.model)==4&&body==1)continue;
+        if(atoi(raw.sequence)!=0){gEngfuncs.Con_Printf("D3D9: fixture entity %d: unsupported nonzero sequence\n",entity.entityIndex);continue;}
+        auto found=cache.find(raw.model);
+        if(found==cache.end())
+        {
+            std::vector<unsigned char> data;auto file=fs->Open(raw.model,"rb",false);
+            if(file){const auto size=fs->FileLength(file);if(size>0&&size<=16*1024*1024){data.resize(size_t(size));if(fs->Read(file,data.data(),data.size())!=size)data.clear();}fs->Close(file);}
+            found=cache.emplace(raw.model,std::move(data)).first;
+        }
+        cl_entity_s entityTransform{};
+        R_ParseMapVector(raw.origin,entityTransform.origin);R_ParseMapVector(raw.angles,entityTransform.angles);
+        if(!raw.angles[0]&&raw.angle[0])entityTransform.angles[1]=float(atof(raw.angle));
+        entityTransform.curstate.scale=raw.scale[0]?float(atof(raw.scale)):1.f;
+        if(!std::isfinite(entityTransform.curstate.scale)){gEngfuncs.Con_Printf("D3D9: fixture entity %d: invalid scale\n",entity.entityIndex);continue;}
+        if(entityTransform.curstate.scale<=0)entityTransform.curstate.scale=1.f;
+        D3DMATRIX world;R_StudioFixtureTransform(entityTransform.origin,entityTransform.angles,entityTransform.curstate.scale,&world);
+        dx_studio_fixture::Bulb bulb;std::string reason;
+        if(!dx_studio_fixture::extract(found->second,raw.model,body,skin,world,bulb,reason))
+        {gEngfuncs.Con_Printf("D3D9: fixture entity %d rejected: %s\n",entity.entityIndex,reason.c_str());continue;}
+        bulb.entity=entity.entityIndex;
+        const auto duplicate=std::find_if(g_studioBulbs.begin(),g_studioBulbs.end(),[&](const dx_studio_fixture::Bulb& existing){return existing.model==bulb.model&&dx_light_position::distanceSquared(existing.bounds.center,bulb.bounds.center)<.25f;});
+        if(duplicate==g_studioBulbs.end())g_studioBulbs.push_back(std::move(bulb));
+    }
+}
+
+static float R_CenteredFixtureRadius(const remix_map_light_t& light)
+{
+    const dx_light_position::Point origin{light.centeredOrigin[0],light.centeredOrigin[1],light.centeredOrigin[2]};
+    float radius=8.f;
+    if(light.bulb<0 && light.fixture>=0 && size_t(light.fixture)>=g_studioBulbs.size()) {
+        const size_t index=size_t(light.fixture)-g_studioBulbs.size();
+        if(index<g_brushGlobes.size()) {
+            const auto& globe=g_brushGlobes[index];
+            radius=std::max(radius,globe.radius+std::sqrt(dx_light_position::distanceSquared(origin,globe.center)));
+        }
+    }
+    if(light.bulb>=0&&size_t(light.bulb)<g_studioBulbs.size())radius=std::max(radius,dx_studio_fixture::clearance(g_studioBulbs[size_t(light.bulb)],origin));
+    return radius;
+}
+
+static float R_FinalMapLightRadius(const remix_map_light_t& light)
+{
+    if(light.manualRadius>0.f)return light.manualRadius;
+    const float base=std::isfinite(dx_remix_map_light_radius.value)?std::clamp(dx_remix_map_light_radius.value,1.f,24.f):8.f;
+    // Only verified studio/outdoor brush globes may enlarge an emitter.
+    return light.fixture>=0 && dx_remix_map_light_clearance.value!=0.f && dx_remix_map_light_centering.value!=0.f ? std::min(24.f,std::max(base,light.centeredRadius)) : base;
+}
+
+static std::string R_LightPositionFile()
+{
+	if( !g_worldmodel ) return {};
+	std::string name=g_worldmodel->name;
+	const auto slash=name.find_last_of("/\\");if(slash!=std::string::npos)name.erase(0,slash+1);
+	const auto dot=name.find_last_of('.');if(dot!=std::string::npos)name.resize(dot);
+	if(name.empty()||name.size()>63)return {};
+	for(unsigned char c:name)if(!std::isalnum(c)&&c!='_'&&c!='-')return {};
+	return "maps/"+name+"_light_positions.txt";
+}
+
+static void R_LoadLightPositions()
+{
+	const auto fs=gEngfuncs.fsapi;const auto path=R_LightPositionFile();
+	if(path.empty()||!fs||!fs->Open||!fs->FileLength||!fs->Read||!fs->Close)return;
+	auto file=fs->Open(path.c_str(),"rb",false);if(!file)return;
+	const auto size=fs->FileLength(file);std::string text;
+	if(size>0&&size<=65536){text.resize(size_t(size));if(fs->Read(file,&text[0],text.size())!=size)text.clear();}
+	fs->Close(file);
+	for(const auto& entry:dx_light_position::parse(text)) for(auto& light:g_remixMapLights)
+	{
+		const dx_light_position::Point authored{light.origin[0],light.origin[1],light.origin[2]};
+		if(light.type==REMIX_MAP_LIGHT_DIRECTIONAL||!dx_light_position::applicable(entry,light.entityIndex,authored))continue;
+		if(entry.radius>0)light.manualRadius=entry.radius;
+		if(!entry.hasPosition)continue;
+		if(!R_MapLightPositionAllowed(light.origin,entry.position.data()))continue;
+		if(light.bulb>=0&&dx_studio_fixture::clearance(g_studioBulbs[size_t(light.bulb)],entry.position)>24.f){gEngfuncs.Con_Printf("D3D9: manual light %d rejected: studio clearance exceeds 24\n",light.entityIndex);continue;}
+		VectorCopy(entry.position.data(),light.centeredOrigin);light.manualPosition=true;
+		light.centeredRadius=R_CenteredFixtureRadius(light);
+	}
 }
 
 static void R_BuildRemixMapLights( void )
@@ -1247,12 +1470,37 @@ static void R_BuildRemixMapLights( void )
 	if( entities.empty( ) )
 		return;
 
+	// Stable map-specific identities do not depend on distance-sorted D3D slots.
+	g_mapEmitterIdentity = 1469598103934665603ull;
+	for( const char *c = g_worldmodel->name; *c; ++c ) g_mapEmitterIdentity = (g_mapEmitterIdentity ^ static_cast<unsigned char>(*c))*1099511628211ull;
+	std::vector<model_t *> fixtures;
+	if( gEngfuncs.Mod_ForName ) for( const auto &entity : entities )
+	{
+		const auto &raw = entity.fields;
+		if( raw.model[0] != '*' || (strcmp(raw.classname,"func_illusionary") && strcmp(raw.classname,"func_wall")) ) continue;
+		vec3_t origin={}, angles={};
+		R_ParseMapVector(raw.origin,origin); R_ParseMapVector(raw.angles,angles);
+		if( VectorLength(origin) > .001f || VectorLength(angles) > .001f ) continue;
+		auto model=gEngfuncs.Mod_ForName(raw.model,false,false);
+		if( model && model->type==mod_brush ) fixtures.push_back(model);
+	}
+	std::vector<model_t *> fixtureSurfaces=fixtures;
+	fixtureSurfaces.push_back(g_worldmodel);
+	R_CollectStudioBulbs(entities);
+	std::vector<dx_light_position::Fixture> lampFixtures;
+	for(const auto& bulb:g_studioBulbs)lampFixtures.push_back(bulb.bounds);
+	const auto brushFixtures=R_CollectLampFixtures(fixtureSurfaces);
+    for(const auto& globe:brushFixtures)if(globe.radius>=1.f && globe.radius<=24.f)g_brushGlobes.push_back(globe);
+    lampFixtures.insert(lampFixtures.end(),g_brushGlobes.begin(),g_brushGlobes.end());
 	g_remixMapLights.reserve( entities.size( ) );
 	for( const map_entity_record_t &entity : entities )
 	{
 		const map_light_debug_t &raw = entity.fields;
 		if( !R_IsMapLightClassname( raw.classname ) )
 			continue;
+		// The forest's isolated spawn fill is intentionally absent on every load.
+		if(g_worldmodel && !Q_stricmp(g_worldmodel->name,"maps/c_forest1.bsp") &&
+		   entity.entityIndex==2 && !strcmp(raw.classname,"light")) continue;
 
 		remix_map_light_t light{};
 		light.entityIndex = entity.entityIndex;
@@ -1292,12 +1540,32 @@ static void R_BuildRemixMapLights( void )
 			VectorSet( light.direction, 1.0f, 0.0f, 0.0f );
 		}
 
+		// Authored indoor placement is intentional; nearby textured faces alone
+		// do not justify moving the source into a shade or through its opening.
+		VectorCopy(light.origin,light.centeredOrigin);
+		if(light.type==REMIX_MAP_LIGHT_POINT && !lampFixtures.empty())
+		{
+			const auto match=dx_light_position::locate({light.origin[0],light.origin[1],light.origin[2]},lampFixtures,24.f,true);
+			if(match.fixture>=0&&R_MapLightPositionAllowed(light.origin,match.position.data()))
+			{VectorCopy(match.position.data(),light.centeredOrigin);light.fixture=match.fixture;
+				if(size_t(match.fixture)<g_studioBulbs.size())light.bulb=match.fixture;
+				light.positionReason=light.bulb>=0?"verified studio globe":"verified outdoor brush globe";}
+			else if(match.fixture>=0)light.positionReason="correction crosses world solid";
+		}
+		VectorCopy(light.centeredOrigin,light.automaticOrigin);
+		light.centeredRadius=R_CenteredFixtureRadius(light);
 		g_remixMapLights.push_back( light );
 	}
 
+	R_LoadLightPositions();
+	int centered=0;for(const auto& light:g_remixMapLights)if(light.fixture>=0||light.manualPosition)++centered;
+	gEngfuncs.Con_Printf("D3D9: lamp centering: %d local fixtures (%d studio), %d matched lights (dx_remix_map_light_centering)\n",int(lampFixtures.size()),int(g_studioBulbs.size()),centered);
 	g_remixMapLightCandidates.reserve( g_remixMapLights.size( ) );
 	if( !g_remixMapLights.empty( ) )
 	{
+		int corrected = 0;
+		for( const auto &light : g_remixMapLights ) if( R_FinalMapLightRadius(light) > 8.f ) ++corrected;
+		gEngfuncs.Con_Printf("D3D9: map emitter clearance: %d enlarged beyond 8 units; energy preserved\n", corrected);
 		gEngfuncs.Con_Printf( "D3D9: cached %d BSP light entities for RTX Remix\n",
 			static_cast<int>( g_remixMapLights.size( ) ) );
 	}
@@ -1312,9 +1580,10 @@ static float R_RemixMapLightStyleScale( const remix_map_light_t &light )
 
 static float R_RemixMapLightDistanceSquared( const remix_map_light_t &light )
 {
-	const float x = light.origin[0] - g_vOrigin[0];
-	const float y = light.origin[1] - g_vOrigin[1];
-	const float z = light.origin[2] - g_vOrigin[2];
+	const auto position=R_MapLightPosition(light);
+	const float x = position[0] - g_vOrigin[0];
+	const float y = position[1] - g_vOrigin[1];
+	const float z = position[2] - g_vOrigin[2];
 	return x * x + y * y + z * z;
 }
 
@@ -1368,9 +1637,10 @@ static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
 	}
 
 	light.Type = source.type == REMIX_MAP_LIGHT_SPOT ? D3DLIGHT_SPOT : D3DLIGHT_POINT;
-	light.Position.x = source.origin[0];
-	light.Position.y = source.origin[1];
-	light.Position.z = source.origin[2];
+	const auto position=R_MapLightPosition(source);
+	light.Position.x = position[0];
+	light.Position.y = position[1];
+	light.Position.z = position[2];
 	light.Range = R_RemixMapLightRange( source );
 	light.Attenuation0 = 1.0f;
 	if( source.falloff == 1 )
@@ -1402,7 +1672,7 @@ static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
 static void R_ApplyRemixMapLights( void )
 {
 	if( !device || dx_remix.value == 0.0f || dx_remix_map_lights.value == 0.0f ||
-		g_remixMapLights.empty( ) || dx_remix_map_light_intensity.value <= 0.0f )
+		g_remixMapLights.empty( ) || dx_remix_map_light_intensity.value <= 0.0f || R_MapLightLevel() <= 0.f )
 	{
 		R_DisableRemixMapLights( );
 		return;
@@ -1411,9 +1681,13 @@ static void R_ApplyRemixMapLights( void )
 	g_remixMapLightCandidates.clear( );
 	for( size_t i = 0; i < g_remixMapLights.size( ); ++i )
 	{
-		const remix_map_light_t &light = g_remixMapLights[i];
+		remix_map_light_t &light = g_remixMapLights[i];
 		if( R_RemixMapLightStyleScale( light ) <= 0.001f )
+		{
+			light.submissionRoute="style off";
+			g_mapEmitterBridge.retire(light.instance);
 			continue;
+		}
 		remix_map_light_candidate_t candidate{};
 		candidate.lightIndex = i;
 		candidate.directional = light.type == REMIX_MAP_LIGHT_DIRECTIONAL;
@@ -1432,22 +1706,28 @@ static void R_ApplyRemixMapLights( void )
 		} );
 
 	int emitted = 0;
+	int apiEmitted = 0;
 	for( const remix_map_light_candidate_t &candidate : g_remixMapLightCandidates )
 	{
-		if( g_remixEnabledLightLimit >= 0 &&
-			g_dxFixedLightCount + emitted >= g_remixEnabledLightLimit )
-		{
-			break;
-		}
-
-		const remix_map_light_t &source = g_remixMapLights[candidate.lightIndex];
+		remix_map_light_t &source = g_remixMapLights[candidate.lightIndex];
 		D3DLIGHT9 light{};
 		R_FillRemixMapD3DLight( source, R_RemixMapLightStyleScale( source ), light );
+		const float radius = R_FinalMapLightRadius(source);
+		const float level = R_MapLightLevel();
+		const float outputScale = (std::isfinite(dx_remix_map_light_output_scale.value) ? std::clamp(dx_remix_map_light_output_scale.value,0.f,4.f) : .75f) * level;
+		if( dx_remix_map_light_api.value != 0.f && source.type != REMIX_MAP_LIGHT_DIRECTIONAL &&
+			g_mapEmitterBridge.emit(source.instance,light,radius,g_mapEmitterIdentity ^ (uint64_t(source.entityIndex+1)*0x9e3779b97f4a7c15ull),outputScale) ) { source.submissionRoute="Remix API"; ++apiEmitted; continue; }
+		g_mapEmitterBridge.retire(source.instance);
+		source.submissionRoute="legacy capacity/error";
+		light.Diffuse.r *= level;
+		light.Diffuse.g *= level;
+		light.Diffuse.b *= level;
+		if( g_remixEnabledLightLimit >= 0 && DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted >= g_remixEnabledLightLimit ) continue;
 		const DWORD slot = static_cast<DWORD>( DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted );
 		HRESULT result = device->SetLight( slot, &light );
 		if( FAILED( result ) )
 		{
-			g_remixEnabledLightLimit = g_dxFixedLightCount + emitted;
+			g_remixEnabledLightLimit = DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted;
 			if( !g_remixMapLightCapacityWarned )
 			{
 				gEngfuncs.Con_Printf(
@@ -1457,13 +1737,13 @@ static void R_ApplyRemixMapLights( void )
 					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
 				g_remixMapLightCapacityWarned = true;
 			}
-			break;
+			continue;
 		}
 
 		result = device->LightEnable( slot, TRUE );
 		if( FAILED( result ) )
 		{
-			g_remixEnabledLightLimit = g_dxFixedLightCount + emitted;
+			g_remixEnabledLightLimit = DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted;
 			if( !g_remixMapLightCapacityWarned )
 			{
 				gEngfuncs.Con_Printf(
@@ -1473,14 +1753,27 @@ static void R_ApplyRemixMapLights( void )
 					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
 				g_remixMapLightCapacityWarned = true;
 			}
-			break;
+			device->LightEnable( slot, FALSE );
+			continue;
 		}
+		source.submissionRoute="legacy D3D";
 		++emitted;
 	}
 
 	for( int i = emitted; i < g_remixMapLightSlotCount; ++i )
 		device->LightEnable( DX_REMIX_DYNAMIC_LIGHT_SLOTS + i, FALSE );
 	g_remixMapLightSlotCount = emitted;
+	static uint64_t previousMap=0;
+	static int previousApi=-1, previousD3D=-1;
+	static ULONGLONG lastReport=0;
+	const ULONGLONG now=GetTickCount64();
+	if( previousMap != g_mapEmitterIdentity ||
+		((previousApi != apiEmitted || previousD3D != emitted) && now-lastReport >= 5000) )
+	{
+		gEngfuncs.Con_Printf("D3D9: map emitters active: API=%d D3D=%d\n",apiEmitted,emitted);
+		previousMap=g_mapEmitterIdentity;previousApi=apiEmitted;previousD3D=emitted;
+		lastReport=now;
+	}
 }
 
 static void R_PrintMapLight( const map_light_debug_t &light,
@@ -1564,6 +1857,9 @@ static void R_PrintMapLight( const map_light_debug_t &light,
 		}
 		if( remixLight->type != REMIX_MAP_LIGHT_DIRECTIONAL )
 		{
+			gEngfuncs.Con_Printf(" position=(%.2f %.2f %.2f) source=%s",R_MapLightPosition(*remixLight)[0],R_MapLightPosition(*remixLight)[1],R_MapLightPosition(*remixLight)[2],remixLight->manualPosition?"manual":(remixLight->fixture>=0?"fixture":"authored"));
+            gEngfuncs.Con_Printf(" radius=%.3f radiusSource=%s route=%s reason=%s",R_FinalMapLightRadius(*remixLight),remixLight->manualRadius>0?"manual":(remixLight->fixture>=0?"verified-profile":"default"),remixLight->submissionRoute,dx_remix_map_light_centering.value==0?"centering disabled":(remixLight->manualPosition?"manual override":remixLight->positionReason));
+            if(remixLight->bulb>=0){const auto& bulb=g_studioBulbs[size_t(remixLight->bulb)];gEngfuncs.Con_Printf(" fixture=%s body=%d skin=%d entity=%d",bulb.model.c_str(),bulb.body,bulb.skin,bulb.entity);}
 			gEngfuncs.Con_Printf( " range=%.1f attenuation=%s",
 				R_RemixMapLightRange( *remixLight ),
 				remixLight->falloff == 1 ? "linear" : "inverse-square" );
@@ -1597,6 +1893,80 @@ static void R_ListMapLightsCmd( void )
 		lightCount, lightCount == 1 ? "y" : "ies" );
 }
 
+static void R_LightPositionCmd()
+{
+	if(!gEngfuncs.Cmd_Argc||!gEngfuncs.Cmd_Argv)return;
+	const int argc=gEngfuncs.Cmd_Argc();
+	if(argc<2){gEngfuncs.Con_Printf("Usage: dx_light_position <entity> [x y z | auto | authored]\nUse dx_listlights for entity IDs; dx_light_positions_save persists manual edits.\n");return;}
+	char *end=nullptr;const long entity=std::strtol(gEngfuncs.Cmd_Argv(1),&end,10);
+	if(!end||end==gEngfuncs.Cmd_Argv(1)||*end||entity<0||entity>1000000)return;
+	auto found=std::find_if(g_remixMapLights.begin(),g_remixMapLights.end(),[&](const remix_map_light_t& light){return light.entityIndex==entity;});
+	if(found==g_remixMapLights.end()||found->type==REMIX_MAP_LIGHT_DIRECTIONAL){gEngfuncs.Con_Printf("No local BSP light for entity %ld\n",entity);return;}
+	auto& light=*found;
+	if(argc==3&&!strcmp(gEngfuncs.Cmd_Argv(2),"auto")){VectorCopy(light.automaticOrigin,light.centeredOrigin);light.manualPosition=false;}
+	else if(argc==3&&!strcmp(gEngfuncs.Cmd_Argv(2),"authored")){VectorCopy(light.origin,light.centeredOrigin);light.manualPosition=true;}
+	else if(argc==5)
+	{
+		dx_light_position::Override entry;entry.entity=int(entity);entry.authored={light.origin[0],light.origin[1],light.origin[2]};
+		for(int i=0;i<3;++i){const auto arg=gEngfuncs.Cmd_Argv(i+2);entry.position[i]=std::strtof(arg,&end);if(!end||end==arg||*end)return;}
+		if(!dx_light_position::applicable(entry,int(entity),entry.authored)||!R_MapLightPositionAllowed(light.origin,entry.position.data())||
+            (light.bulb>=0&&dx_studio_fixture::clearance(g_studioBulbs[size_t(light.bulb)],entry.position)>24.f))
+		{gEngfuncs.Con_Printf("Position rejected: nonfinite, over 256 units from authored origin, crossing world solid, or studio clearance over 24.\n");return;}
+		VectorCopy(entry.position.data(),light.centeredOrigin);light.manualPosition=true;
+	}
+	else if(argc!=2){gEngfuncs.Con_Printf("Usage: dx_light_position <entity> [x y z | auto | authored]\n");return;}
+	light.centeredRadius=R_CenteredFixtureRadius(light);
+	gEngfuncs.Con_Printf("Light %d: authored %.3f %.3f %.3f; corrected %.3f %.3f %.3f; radius %.3f; %s\n",light.entityIndex,light.origin[0],light.origin[1],light.origin[2],light.centeredOrigin[0],light.centeredOrigin[1],light.centeredOrigin[2],R_FinalMapLightRadius(light),light.manualPosition?"manual":"automatic");
+}
+
+static void R_LightRadiusCmd() {
+ if(!gEngfuncs.Cmd_Argc||!gEngfuncs.Cmd_Argv)return;
+ const int argc=gEngfuncs.Cmd_Argc();
+ if(argc<2||argc>3){gEngfuncs.Con_Printf("Usage: dx_light_radius <entity> [1..24 | auto]\n");return;}
+ char* end=nullptr;const char* arg=gEngfuncs.Cmd_Argv(1);
+ const long entity=std::strtol(arg,&end,10);
+ if(end==arg||*end||entity<0||entity>1000000)return;
+ auto found=std::find_if(g_remixMapLights.begin(),g_remixMapLights.end(),[&](const remix_map_light_t& light){return light.entityIndex==entity;});
+ if(found==g_remixMapLights.end()||found->type==REMIX_MAP_LIGHT_DIRECTIONAL){gEngfuncs.Con_Printf("No local BSP light for entity %ld\n",entity);return;}
+ if(argc==3) {
+  arg=gEngfuncs.Cmd_Argv(2);
+  if(!strcmp(arg,"auto"))found->manualRadius=0.f;
+  else {
+   const float value=std::strtof(arg,&end);
+   if(end==arg||*end||!std::isfinite(value)||value<1.f||value>24.f){gEngfuncs.Con_Printf("Radius must be a finite value from 1 to 24.\n");return;}
+   found->manualRadius=value;
+  }
+ }
+ gEngfuncs.Con_Printf("Light %ld: emitter radius %.3f (%s); position unchanged. dx_light_positions_save persists edits.\n",entity,R_FinalMapLightRadius(*found),found->manualRadius>0?"manual":"automatic");
+}
+
+static void R_SaveLightPositionsCmd()
+{
+	const auto fs=gEngfuncs.fsapi;const auto path=R_LightPositionFile();
+	if(path.empty()||!fs||!fs->WriteFile)return;
+	std::ostringstream text;text.imbue(std::locale::classic());text.precision(9);
+	text<<"# entity authored_x authored_y authored_z corrected_x corrected_y corrected_z\n# radius entity authored_x authored_y authored_z radius_units\n";
+	int count=0;
+	for(const auto& light:g_remixMapLights)if(light.manualPosition||light.manualRadius>0)
+	{
+		if(++count>256){gEngfuncs.Con_Printf("Too many manual corrections; not saved.\n");return;}
+        if(light.manualPosition) {
+            text<<light.entityIndex;
+            for(float x:light.origin)text<<' '<<x;
+            for(float x:light.centeredOrigin)text<<' '<<x;
+            text<<'\n';
+        }
+        if(light.manualRadius>0) {
+            text<<"radius "<<light.entityIndex;
+            for(float x:light.origin)text<<' '<<x;
+            text<<' '<<light.manualRadius<<'\n';
+        }
+	}
+	const auto contents=text.str();
+	const bool saved=fs->WriteFile(path.c_str(),contents.data(),fs_offset_t(contents.size()))!=0;
+	gEngfuncs.Con_Printf("%s %d manual light overrides: %s\n",saved?"Saved":"Failed to save",count,path.c_str());
+}
+
 static void R_RegisterContextCommands( void )
 {
 	if( g_contextCommandsRegistered )
@@ -1613,6 +1983,9 @@ static void R_RegisterContextCommands( void )
 		"Reset r_showtextures preview size" );
 	gEngfuncs.Cmd_AddCommand( "dx_listlights", R_ListMapLightsCmd,
 		"List BSP light entities and their key lighting data" );
+	gEngfuncs.Cmd_AddCommand("dx_light_radius",R_LightRadiusCmd,"Inspect or change one BSP light emitter radius independently of position");
+	gEngfuncs.Cmd_AddCommand("dx_light_position",R_LightPositionCmd,"Inspect or correct a BSP light position");
+	gEngfuncs.Cmd_AddCommand("dx_light_positions_save",R_SaveLightPositionsCmd,"Save per-map position and radius overrides without editing the BSP");
 	g_contextCommandsRegistered = true;
 }
 
@@ -1625,6 +1998,9 @@ static void R_RemoveContextCommands( void )
 	gEngfuncs.Cmd_RemoveCommand( "dx_showtextures_zoom_out" );
 	gEngfuncs.Cmd_RemoveCommand( "dx_showtextures_zoom_reset" );
 	gEngfuncs.Cmd_RemoveCommand( "dx_listlights" );
+	gEngfuncs.Cmd_RemoveCommand("dx_light_radius");
+	gEngfuncs.Cmd_RemoveCommand("dx_light_position");
+	gEngfuncs.Cmd_RemoveCommand("dx_light_positions_save");
 	g_contextCommandsRegistered = false;
 }
 
@@ -1634,10 +2010,21 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
+	DX_RagdollRegister();
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_cutout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_alpha_ref );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_glass_single_sided );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_glass_batch );
+	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_batch );
+	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_debug );
+	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_batch_max_vertices );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_lights );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_api );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_radius );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_clearance );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_output_scale );
+	gEngfuncs.Cvar_RegisterVariable( &light_level );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_centering );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_intensity );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_map_light_range_scale );
 	gEngfuncs.Cvar_RegisterVariable( &dx_fog );
@@ -1705,21 +2092,24 @@ static model_t *g_studioApiRenderModel = nullptr;
 static void *g_studioApiHeader = nullptr;
 static int g_studioApiForceFaceFlags = 0;
 static int g_studioApiFrameCount = 0;
-static float g_studioApiIdentity3x4[3][4] =
+// The historical float****/float*** API signatures carry FLAT matrix storage.
+// Native clients cast the returned address to [MAXSTUDIOBONES][3][4], not a
+// pointer chain (see ref/gl/gl_studio.c). All four writable regions must be
+// independent: native dual-wield pose setup uses them outside our draw path.
+alignas(16) static float g_studioApiBoneTransform[MAXSTUDIOBONES][3][4]{};
+alignas(16) static float g_studioApiLightTransform[MAXSTUDIOBONES][3][4]{};
+alignas(16) static float g_studioApiAliasTransform[3][4] =
 {
 	{ 1.0f, 0.0f, 0.0f, 0.0f },
 	{ 0.0f, 1.0f, 0.0f, 0.0f },
 	{ 0.0f, 0.0f, 1.0f, 0.0f }
 };
-static float *g_studioApiIdentity3x4Rows[3] =
+alignas(16) static float g_studioApiRotationMatrix[3][4] =
 {
-	g_studioApiIdentity3x4[0],
-	g_studioApiIdentity3x4[1],
-	g_studioApiIdentity3x4[2]
+	{ 1.0f, 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 1.0f, 0.0f, 0.0f },
+	{ 0.0f, 0.0f, 1.0f, 0.0f }
 };
-static float **g_studioApiIdentity3x4Ptr = g_studioApiIdentity3x4Rows;
-static float ***g_studioApiIdentity3x4Ptr2 = &g_studioApiIdentity3x4Ptr;
-static float ****g_studioApiIdentity3x4Ptr3 = &g_studioApiIdentity3x4Ptr2;
 
 static void *R_StudioAPIMemCalloc( int number, size_t size )
 {
@@ -1831,10 +2221,10 @@ static void R_StudioGetAliasScale( float *x, float *y )
 	if( y ) *y = 1.0f;
 }
 
-static float ****R_StudioAPIGetBoneTransform( void ) { return g_studioApiIdentity3x4Ptr3; }
-static float ****R_StudioAPIGetLightTransform( void ) { return g_studioApiIdentity3x4Ptr3; }
-static float ***R_StudioAPIGetAliasTransform( void ) { return g_studioApiIdentity3x4Ptr2; }
-static float ***R_StudioAPIGetRotationMatrix( void ) { return g_studioApiIdentity3x4Ptr2; }
+static float ****R_StudioAPIGetBoneTransform( void ) { return reinterpret_cast<float ****>(g_studioApiBoneTransform); }
+static float ****R_StudioAPIGetLightTransform( void ) { return reinterpret_cast<float ****>(g_studioApiLightTransform); }
+static float ***R_StudioAPIGetAliasTransform( void ) { return reinterpret_cast<float ***>(g_studioApiAliasTransform); }
+static float ***R_StudioAPIGetRotationMatrix( void ) { return reinterpret_cast<float ***>(g_studioApiRotationMatrix); }
 
 static void R_StudioAPISetupModel( int bodypart, void **ppbodypart, void **ppsubmodel )
 {
@@ -1856,6 +2246,7 @@ static void R_StudioAPISetRemapColors( int top, int bottom ) { (void)top; (void)
 
 static bool R_CopyPlayerModelName( const char *source, char *dest, size_t destSize )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !dest || destSize == 0 )
 		return false;
 	dest[0] = '\0';
@@ -2207,6 +2598,45 @@ struct triapi_state_t
 };
 
 static triapi_state_t g_triApi;
+#include "dx_triapi_trace.h"
+static dx_triangle_batch_t<brush_vertex_t> g_triangleBatch;
+static bool g_triangleBatchScope=false, g_triangleBatchFlushing=false;
+struct tri_batch_stats_t {
+    unsigned sourceDraws=0,outputDraws=0,sourceVertices=0,triangles=0,failures=0;
+    unsigned flushes[DX_TRI_FLUSH_COUNT]{};
+};
+static tri_batch_stats_t g_triBatchStats;
+
+void DX_TriBatchBarrier(int reason) {
+    if(g_triangleBatchFlushing || g_triangleBatch.vertices.empty()) return;
+    g_triangleBatchFlushing=true;
+    if(reason>=0 && reason<DX_TRI_FLUSH_COUNT) ++g_triBatchStats.flushes[reason];
+    if(device) {
+        D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
+        device->SetTransform(D3DTS_WORLD,&identity); device->SetFVF(BRUSH_FVF);
+        const UINT count=static_cast<UINT>(g_triangleBatch.vertices.size());
+        if(R_DrawScratch(D3DPT_TRIANGLELIST,count/3,count,g_triangleBatch.vertices.data(),sizeof(brush_vertex_t))) {
+            ++g_triBatchStats.outputDraws;
+            DX_ProfileEvent(DX_PROFILE_EVENT_TRI_BATCH_DRAWN,1);
+        } else ++g_triBatchStats.failures;
+    }
+    g_triangleBatch.vertices.clear(); g_triangleBatchFlushing=false;
+}
+static void R_ResetTriangleBatch() {
+    R_TriTrace("reset");
+    g_triangleBatch.vertices.clear(); g_triangleBatchScope=false; g_triApi.active=false;
+}
+static void R_TriBatchStats() {
+    const auto& v=g_triBatchStats;
+    gEngfuncs.Con_Printf("D3D9 TriAPI batch: enabled=%d maxVerts=%u sourceDraws=%u outputDraws=%u sourceVerts=%u triangles=%u failures=%u\n",
+        dx_triapi_batch.value!=0.f,static_cast<unsigned>(DX_BatchVertexLimit(dx_triapi_batch_max_vertices.value)),
+        v.sourceDraws,v.outputDraws,v.sourceVertices,v.triangles,v.failures);
+    gEngfuncs.Con_Printf("saved submissions: %.2f%%\n",v.sourceDraws ?
+        100.0*(1.0-static_cast<double>(v.outputDraws)/v.sourceDraws):0.0);
+    gEngfuncs.Con_Printf("flushes: state=%u texture=%u incompatible=%u capacity=%u pass=%u\n",
+        v.flushes[0],v.flushes[1],v.flushes[2],v.flushes[3],v.flushes[4]);
+}
+
 
 static byte R_TriFloatToByte( float value )
 {
@@ -2282,6 +2712,7 @@ static size_t R_TriVertexCount( )
 
 static void R_TriBegin( int mode )
 {
+	R_TriTrace("begin-enter");
 	if( !device )
 		return;
 
@@ -2303,6 +2734,7 @@ static void R_TriBegin( int mode )
 		break;
 	}
 
+	if(g_2dModeActive || mode==TRI_POINTS || mode==TRI_LINES) DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	g_triApi.active = true;
 	g_triApi.screenSpace = g_2dModeActive;
 	g_triApi.primitiveMode = mode;
@@ -2321,6 +2753,7 @@ static void R_TriBegin( int mode )
 		if( g_triApi.vertices.capacity( ) < 256 )
 			g_triApi.vertices.reserve( 256 );
 	}
+	R_TriTrace("begin-ready");
 }
 
 static void R_TriEmitQuadIndices( )
@@ -2385,6 +2818,7 @@ static void R_TriExpandQuadStrip( )
 
 static void R_TriEnd( void )
 {
+	R_TriTrace("end");
 	if( !g_triApi.active || !device )
 	{
 		g_triApi.active = false;
@@ -2395,6 +2829,23 @@ static void R_TriEnd( void )
 	const UINT vertexCount = static_cast<UINT>( R_TriVertexCount( ) );
 	if( vertexCount == 0 )
 		return;
+
+    if(g_triangleBatchScope) {
+        ++g_triBatchStats.sourceDraws; g_triBatchStats.sourceVertices+=vertexCount;
+        unsigned triangles=0;
+        const bool supported=DX_Triangulate(g_triApi.primitiveMode,vertexCount,[&](size_t,size_t,size_t){++triangles;});
+        g_triBatchStats.triangles+=triangles;
+        DX_ProfileEvent(DX_PROFILE_EVENT_TRI_SOURCE_DRAW,1);
+        if(dx_triapi_batch.value!=0.f && !g_triApi.screenSpace && supported) {
+            D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
+            device->SetTransform(D3DTS_WORLD,&identity);
+            g_triangleBatch.append(g_triApi.primitiveMode,g_triApi.vertices.data(),vertexCount,
+                DX_BatchVertexLimit(dx_triapi_batch_max_vertices.value),[]{DX_TriBatchBarrier(DX_TRI_FLUSH_CAPACITY);});
+            return;
+        }
+        ++g_triBatchStats.outputDraws;
+    }
+    DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 
 	if( g_triApi.screenSpace )
 	{
@@ -2578,10 +3029,12 @@ static void R_TriVertex3f( float x, float y, float z )
 
 		if( g_triApi.primitiveMode == TRI_QUADS )
 		{
-
+			if(g_triApi.screenQuadCount<0 || g_triApi.screenQuadCount>=4)
+				R_TriTrace("invalid-quad-index-before-write",true);
 			g_triApi.screenQuad[g_triApi.screenQuadCount++] = vertex;
 			if( g_triApi.screenQuadCount == 4 )
 			{
+				R_TriTrace("quad-commit");
 				const vertex2d_t *q = g_triApi.screenQuad;
 				g_triApi.screenVertices.push_back( q[0] );
 				g_triApi.screenVertices.push_back( q[1] );
@@ -2594,6 +3047,7 @@ static void R_TriVertex3f( float x, float y, float z )
 		}
 		else
 		{
+			R_TriTrace("ui-vertex");
 			g_triApi.screenVertices.push_back( vertex );
 		}
 		return;
@@ -2653,6 +3107,7 @@ static int R_TriSpriteTexture( model_t *spriteModel, int frame )
 
 static void R_TriFog( float flFogColor[3], float flStart, float flEnd, int bOn )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 
 	if( g_dxFog.source == DX_FOG_INTERNAL_WATER ||
 		g_dxFog.source == DX_FOG_INTERNAL_QUAKE ||
@@ -2688,6 +3143,7 @@ static void R_TriFog( float flFogColor[3], float flStart, float flEnd, int bOn )
 
 static void R_TriFogParams( float flDensity, int iFogSkybox )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 	g_dxFog.density = std::max( 0.0f, flDensity );
 	g_dxFog.skybox = iFogSkybox != 0;
 	if( g_dxFog.source == DX_FOG_CUSTOM )
@@ -3180,19 +3636,17 @@ static void DX_UpdateRemix( void )
 		if( gEngfuncs.Cvar_SetValue )
 		{
 			gEngfuncs.Cvar_SetValue( "r_nolm", 1.0f );
-			gEngfuncs.Cvar_SetValue( "dx_studio_gpu_skinning", 0.0f );
 			gEngfuncs.Cvar_SetValue( "m_rawinput", 0.0f );
 		}
 		else
 		{
 			r_nolm.value = 1.0f;
-			dx_studio_gpu_skinning.value = 0.0f;
 		}
 	}
 
 	gEngfuncs.Con_Printf( "D3D9: RTX Remix %s (dx_remix %d%s)\n",
 		detected ? "detected" : "not detected", detected ? 1 : 0,
-		detected ? ", r_nolm=1; GPU skinning=0; m_rawinput=0; glow entities disabled" : "" );
+		detected ? ", r_nolm=1; GPU skinning follows user setting; m_rawinput=0; glow entities disabled" : "" );
 }
 
 static HRESULT DX_CreateDeviceFlags( DWORD flags )
@@ -3220,8 +3674,19 @@ static HRESULT DX_CreateDevice( void )
 	return result;
 }
 
-static bool DX_ResetDevice( bool rebuildPresentParams )
+static void (__cdecl *g_inventoryResetCallback)()=nullptr;
+extern "C" __declspec(dllexport) void __cdecl DX_SetInventoryResetCallbackV1(void (__cdecl *callback)()) {
+    if(g_inventoryResetCallback && g_inventoryResetCallback!=callback)g_inventoryResetCallback();
+    g_inventoryResetCallback=callback;
+}
+static bool DX_ResetDevice( bool rebuildPresentParams, const char *reason )
 {
+	if(g_inventoryResetCallback)g_inventoryResetCallback();
+	R_ResetCofPlayerVisibility();
+	g_cofDual.clear();
+	R_ResetTriangleBatch();
+	R_ResetCofLights();
+	R_RetireViewmodelFlashes(nullptr);
 	if( !device )
 		return false;
 
@@ -3233,6 +3698,7 @@ static bool DX_ResetDevice( bool rebuildPresentParams )
 	R_ModelsLostDevice( );
 	DX_InvalidateTextureBindCache( );
 
+	DX_RagdollDeviceReset(reason);
 	HRESULT result = device->Reset( &d3dpp );
 	if( FAILED( result ) && d3dpp.MultiSampleType != D3DMULTISAMPLE_NONE )
 	{
@@ -3309,6 +3775,7 @@ static qboolean R_Init( void )
 	}
 
 	DX_ProfilerRegisterCommands( );
+	gEngfuncs.Cmd_AddCommand("dx_triapi_batch_stats",R_TriBatchStats,"Show transparent TriangleAPI batch counters");
 	R_RegisterContextCommands( );
 	DX_UpdateRemix( );
 
@@ -3323,8 +3790,17 @@ static qboolean R_Init( void )
 
 static void R_Shutdown( void )
 {
+	if(g_inventoryResetCallback)g_inventoryResetCallback();
+	g_mapSky.invalidate();
+	g_mapSkyRetryAt = 0;
+	R_ClearRemixMapLights();
+	DX_RagdollReset("renderer-shutdown");
+	R_ResetCofPlayerVisibility();
+	g_cofDual.clear();
+	R_ResetTriangleBatch();
 	R_RemoveContextCommands( );
 	DX_ProfilerRemoveCommands( );
+	gEngfuncs.Cmd_RemoveCommand("dx_triapi_batch_stats");
 	R_FreeScratchBuffers( );
 	R_ModelsLostDevice( );
 	DX_InvalidateTextureBindCache( );
@@ -3380,6 +3856,16 @@ static cl_entity_s *R_EngineViewModelEntity( void )
 {
 	return reinterpret_cast<cl_entity_s *>(
 		ENGINE_GET_PARM( PARM_GET_VIEWENT_PTR ) );
+}
+
+// Versioned ABI avoids private global RVAs when this renderer is rebuilt.
+extern "C" __declspec(dllexport) int __cdecl DX_InventoryDeviceV1(
+	IDirect3DDevice9 **outDevice, bool **outSceneActive )
+{
+	if( !outDevice || !outSceneActive ) return 0;
+	*outDevice = device;
+	*outSceneActive = &g_dxSceneActive;
+	return 1;
 }
 
 static cl_entity_s *R_CurrentViewModel( void )
@@ -3907,7 +4393,7 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		return true;
 	}
 
-	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 )
+	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 || R_CofLanternModel(clent,false) )
 	{
 		g_entityLightEmitters.push_back( clent );
 		++g_entityLightEmitterCount;
@@ -4004,6 +4490,7 @@ static void R_Apply2DNeutralState( void )
 
 static void R_Set2DMode( qboolean enable )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 	if( !device )
 		return;
 	if( !enable )
@@ -4024,6 +4511,18 @@ static void R_Set2DMode( qboolean enable )
 	R_Apply2DNeutralState( );
 }
 
+// Called before MainUI draws its black scrim and sharp text.
+extern "C" __declspec(dllexport) int __cdecl DX_CofPauseBackgroundV1()
+{
+	if( !device || !g_dxSceneActive ) return 0;
+	DX_TriBatchBarrier( DX_TRI_FLUSH_STATE );
+	R_Flush2DBatch();
+	const HRESULT result = cof_pause::blurBackground( device, g_dxSceneActive );
+	DX_InvalidateD3DStateCache();
+	DX_InvalidateTextureBindCache();
+	return result == S_OK ? 1 : 0;
+}
+
 static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r, byte g, byte b, byte a )
 {
 	if( !device || w <= 0.0f || h <= 0.0f )
@@ -4032,6 +4531,8 @@ static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r
 	R_Flush2DBatch( );
 	DX_PROFILE_SCOPE( profile2dFillScope, DX_PROFILE_2D );
 	R_Set2DMode( true );
+	R_Apply2DNeutralState();
+	DX_SetRenderStateCached(D3DRS_BLENDOP,D3DBLENDOP_ADD);
 	DX_BindRawTexture( 0, nullptr );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_SELECTARG1 );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_DIFFUSE );
@@ -4413,6 +4914,7 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 			ownedScene = true;
 		}
 
+		DX_TriBatchBarrier(DX_TRI_FLUSH_STATE);
 		hr = device->SetRenderTarget( 0, captureTarget );
 		if( SUCCEEDED( hr ) )
 			hr = device->SetDepthStencilSurface( captureDepth );
@@ -4803,7 +5305,7 @@ static sky_vertex_t R_MakeSkyVertex( float s, float t, int axis, float farClip )
 	{
 		const int map = DX_SKY_ST_TO_VEC[axis][component];
 		const float value = b[abs( map ) - 1];
-		position[component] = ( map < 0 ? -value : value ) + g_vOrigin[component];
+		position[component] = map < 0 ? -value : value;
 	}
 
 	sky_vertex_t vertex;
@@ -4857,7 +5359,10 @@ static void R_DrawSkybox( void )
 
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );
-	device->SetTransform( D3DTS_WORLD, &identity );
+	// Keep the sky mesh camera-independent; only its instance follows the eye.
+	D3DXMATRIX skyWorld;
+	D3DXMatrixTranslation( &skyWorld, g_vOrigin[0], g_vOrigin[1], g_vOrigin[2] );
+	device->SetTransform( D3DTS_WORLD, &skyWorld );
 	device->SetFVF( D3DFVF_SKY_VERTEX );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
@@ -4885,18 +5390,97 @@ static void R_DrawSkybox( void )
 	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, FALSE );
 }
 
+static cl_entity_s* R_CofHandheldViewModel(bool* mirrored=nullptr) {
+ if(mirrored)*mirrored=false;
+ const auto flashlight=[](const cl_entity_s* ent){return ent&&ent->model&&ent->model->type==mod_studio&&
+  !(ent->curstate.effects&EF_NODRAW)&&!Q_stricmp(ent->model->name,"models/weapons/flashlight/v_flashlight.mdl");};
+ auto ent=R_CurrentViewModel();if(flashlight(ent))return ent;
+ ent=g_cofDual.current(R_CurrentRenderTime(0.f));
+ if(!flashlight(ent))return nullptr;
+ if(mirrored)*mirrored=g_cofDual.mirror;
+ return ent;
+}
+bool R_CofHandheldLightEquipped(){return R_CofHandheldViewModel()!=nullptr;}
+bool R_CofHandheldLightPose(dx_cof_light_state_v2& pose) {
+ bool mirrored=false;auto ent=R_CofHandheldViewModel(&mirrored);
+ if(!ent)return false;
+ float points[6],offsets[3]={
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
+ if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points,mirrored))return false;
+ for(int i=0;i<3;++i){pose.origin[i]=points[i];pose.direction[i]=points[3+i]-points[i];}
+ return DX_CofValid(pose);
+}
+
+bool R_CofPhoneLightActive(unsigned flags) {
+ const auto ent=R_CurrentViewModel();
+ return !(flags&(DX_COF_HANDHELD|DX_COF_WEAPON)) &&
+  (flags&(DX_COF_MAIN|DX_COF_REDUCED)) && ent && ent->model &&
+  !Q_stricmp(ent->model->name,"models/weapons/mobile/v_mobile.mdl");
+}
+bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose) {
+ auto ent=R_CurrentViewModel();if(!ent)return false;
+ float points[6],offsets[3]={
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
+ if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points))return false;
+ // Native74910 receives viewmodel attachment[1], not the camera or phone pivot.
+ // Its aiming angles remain the camera angles; the attachment is an emitter.
+ for(int i=0;i<3;++i)pose.origin[i]=points[3+i];
+ return DX_CofValid(pose);
+}
+
+static bool g_sceneViewModelHidden=false;
+bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose) {
+ auto ent=R_CurrentViewModel();
+ const auto drawViewModel=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("r_drawviewmodel"):nullptr;
+ if(!ent||g_sceneViewModelHidden||!gp_cl||gp_cl->viewentity!=gp_cl->playernum+1||
+    ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0||ENGINE_GET_PARM(PARM_THIRDPERSON)||
+    (drawViewModel&&drawViewModel->value==0.f)||
+    Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return false;
+ const float offsets[3]={
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
+ return R_StudioCameraFlashPoint(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,pose.origin)!=0;
+}
+extern "C" __declspec(dllexport) void __cdecl DX_SceneViewModelHiddenV1( int hidden )
+{
+	g_sceneViewModelHidden=hidden!=0;
+	if(hidden)g_cofDual.clear();
+	if(hidden)R_RetireViewmodelFlashes(nullptr);
+}
+
+extern "C" __declspec(dllexport) int __cdecl DX_CofDualViewModelV1(const cl_entity_t* entity,int mirror,float time)
+{
+    return g_cofDual.publish(entity,mirror,time)?1:0;
+}
+
+extern "C" __declspec(dllexport) void __cdecl DX_CofDualHandsV1(int primary,int secondary) {
+    g_cofDual.primaryHiddenArm=g_cofDual.valid&&primary>=0&&primary<=2?primary:0;
+    g_cofDual.secondaryHiddenArm=g_cofDual.valid&&secondary>=0&&secondary<=2?secondary:0;
+}
+
 static void R_DrawViewModel( void )
 {
-
-	if( ENGINE_GET_PARM( PARM_THIRDPERSON ) )
-		return;
+	// Match the other Xash renderers: external camera scenes have no weapon.
+	const auto drawViewModel=gEngfuncs.pfnGetCvarPointer ?
+		gEngfuncs.pfnGetCvarPointer("r_drawviewmodel") : nullptr;
+	if(drawViewModel && drawViewModel->value==0.0f) { R_RetireViewmodelFlashes(nullptr);return; }
+	if( g_sceneViewModelHidden || !gp_cl ||
+		gp_cl->viewentity != gp_cl->playernum + 1 ||
+		ENGINE_GET_PARM( PARM_LOCAL_HEALTH ) <= 0 ) { R_RetireViewmodelFlashes(nullptr);return; }
+	if( ENGINE_GET_PARM( PARM_THIRDPERSON ) ) { R_RetireViewmodelFlashes(nullptr);return; }
 
 	cl_entity_s *viewModel = R_CurrentViewModel( );
 	if( !viewModel || !viewModel->model ||
 		viewModel->model->type != mod_studio ||
 		( viewModel->curstate.effects & EF_NODRAW ) )
 	{
-		return;
+		R_RetireViewmodelFlashes(nullptr);
+		if(!g_cofDual.current(static_cast<float>(gp_cl->time)))return;
 	}
 
 	const D3DVIEWPORT9 oldViewport = g_sceneViewport;
@@ -4931,9 +5515,20 @@ static void R_DrawViewModel( void )
 	const float upOffset = std::max( -128.0f, std::min( 128.0f,
 		r_viewmodel_offset_z.value ) );
 
-	R_DrawStudioViewModel( viewModel, g_vOrigin, g_vAngles,
+	const bool dualCurrent=g_cofDual.current(static_cast<float>(gp_cl->time))!=nullptr;
+	if(viewModel)R_DrawStudioViewModel( viewModel, g_vOrigin, g_vAngles,
 		g_vForward, g_vRight, g_vUp,
-		forwardOffset, rightOffset, upOffset );
+		forwardOffset, rightOffset, upOffset, false, true, dualCurrent?g_cofDual.primaryHiddenArm:0 );
+	g_cofDual.submit(static_cast<float>(gp_cl->time),g_cofDualPass,[&](cl_entity_t* secondary,bool mirrored) {
+		DX_SetRenderStateCached(D3DRS_CULLMODE,mirrored?D3DCULL_CW:D3DCULL_CCW);
+		R_DrawStudioViewModel(secondary,g_vOrigin,g_vAngles,g_vForward,g_vRight,g_vUp,
+			forwardOffset,rightOffset,upOffset,mirrored,false,g_cofDual.secondaryHiddenArm);
+		const auto debug=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("cof8_dual_debug"):nullptr;
+		static unsigned budget=120;
+		if(debug && debug->value!=0.f && budget && gEngfuncs.Con_Printf) {
+			--budget;gEngfuncs.Con_Printf("DUAL MODEL: draw-request model=%s seq=%d body=%d mirror=%d geometryOnly=1\n",secondary->model->name,secondary->curstate.sequence,secondary->curstate.body,mirrored);
+		}
+	});
 
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );
@@ -5082,9 +5677,46 @@ static void R_MarkWorldTransformDirty( bool &isIdentity )
 	isIdentity = false;
 }
 
+// Native lanterns use the client's private light pool, not engine dlights.
+static void R_CollectLanternLights() {
+ unsigned active=0;
+ const auto submit=[&](int key,const float* point) {
+  for(int i=0;i<3;++i)if(!std::isfinite(point[i]))return;
+  // Keep a stable dynamic D3D light, as for the working phone/flashlight.
+  // Recreating API lights as the hand sways produces temporal discontinuities.
+  if(active>=6)return;
+  R_AddDLight(point,220.f,8,8,8,R_CurrentRenderTime(0.f)+.1f,key);
+  ++active;
+ };
+ if(device && dx_remix.value!=0.f && dx_dlights.value!=0.f && dx_dlight_entities.value!=0.f) {
+  if(!g_sceneViewModelHidden && gp_cl && gp_cl->viewentity==gp_cl->playernum+1 && ENGINE_GET_PARM(PARM_LOCAL_HEALTH)>0 &&
+     !ENGINE_GET_PARM(PARM_THIRDPERSON)) {
+   const auto draw=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("r_drawviewmodel"):nullptr;
+   cl_entity_s* hands[2]={R_CurrentViewModel(),g_cofDual.current(R_CurrentRenderTime(0.f))};
+   float offsets[3]={std::clamp(r_viewmodel_offset_x.value,-128.f,128.f),
+    std::clamp(r_viewmodel_offset_y.value,-128.f,128.f),std::clamp(r_viewmodel_offset_z.value,-128.f,128.f)};
+   for(int hand=0;hand<2;++hand)if((!draw||draw->value!=0.f)&&R_CofLanternModel(hands[hand],true)) {
+    float points[6];
+    if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,points,hand==1&&g_cofDual.mirror))
+     submit(-1-hand,points);
+   }
+  }
+  for(auto ent:g_entityLightEmitters)if(R_CofLanternModel(ent,false)) {
+   float point[3]={ent->origin[0],ent->origin[1],ent->origin[2]+6.f};
+   if(ent->index>0)submit(ent->index,point);
+  }
+
+ }
+ static unsigned previous=~0u;static ULONGLONG reported=0;
+ if(previous!=active && GetTickCount64()-reported>1000) {
+  gEngfuncs.Con_Printf("D3D9: stable lantern point lights: %u\n",active);previous=active;reported=GetTickCount64();
+ }
+}
+
 static void R_SetupSceneDLights( )
 {
 	R_BeginDLights( );
+	R_CollectLanternLights();
 	R_CollectEngineDLights( );
 	R_CollectMuzzleLights( );
 	for( int i = 0; i < g_entityLightEmitterCount; ++i )
@@ -5346,7 +5978,10 @@ void R_DrawEnts( const vec3_t view_origin )
 
 	if( gEngfuncs.pfnDrawTransparentTriangles )
 	{
-		gEngfuncs.pfnDrawTransparentTriangles( );
+        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS);
+        g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true;
+        gEngfuncs.pfnDrawTransparentTriangles( );
+        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false;
 		R_MarkWorldTransformDirty( worldIsIdentity );
 		R_SetWorldIdentity( identity, worldIsIdentity );
 	}
@@ -5381,6 +6016,8 @@ void R_DrawEnts( const vec3_t view_origin )
 
 static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 {
+	++g_cofDualPass;
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !rvp )
 		return;
 
@@ -5393,13 +6030,13 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		return;
 	if( cooperative == D3DERR_DEVICENOTRESET )
 	{
-		DX_ResetDevice( true );
+		DX_ResetDevice( true, "device-not-reset" );
 		return;
 	}
 
 	if( DX_PresentChanged( ) )
 	{
-		DX_ResetDevice( true );
+		DX_ResetDevice( true, "present-parameters-changed" );
 		return;
 	}
 
@@ -5714,6 +6351,11 @@ static void R_Apply2DBlendMode( int mode )
 		DX_SetRenderStateCached( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
 		DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_ONE );
 		break;
+	case kRenderScreenFadeModulate:
+		DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
+		DX_SetRenderStateCached( D3DRS_SRCBLEND, D3DBLEND_ZERO );
+		DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR );
+		break;
 	}
 }
 
@@ -5736,6 +6378,18 @@ static void R_Flush2DBatch( void )
 	DX_PROFILE_SCOPE( profile2dBatchScope, DX_PROFILE_2D );
 	if( device )
 	{
+		const dxtexture_t *texture = R_GetTexture( g_2dBatchTexture );
+		if( texture && (texture->flags & TF_FONT) == TF_FONT )
+		{
+			// Client/menu effects can change the device directly, without updating
+			// our shadows. Glyph UVs must address this atlas with no inherited
+			// shader or generated/transformed texture coordinates. Keep batching
+			// glyphs; repair the state once per submitted font batch.
+			DX_TriBatchBarrier( DX_TRI_FLUSH_INCOMPATIBLE );
+			DX_InvalidateTextureBindCache();
+			device->SetVertexShader( nullptr );
+			device->SetPixelShader( nullptr );
+		}
 
 		if( !g_2dModeActive )
 		{
@@ -5802,6 +6456,11 @@ static void R_Queue2DTexturedQuad( float x, float y, float w, float h,
 
 static void VGUI_SetupDrawing( qboolean rect )
 {
+	// Like ref_gl, VGUI always uses straight alpha, regardless of the last
+	// HUD sprite's render mode. Record it for the deferred 2D batch as well.
+	if( g_2dRenderMode != kRenderTransTexture )
+		R_Flush2DBatch( );
+	g_2dRenderMode = kRenderTransTexture;
 
 	R_Set2DMode( true );
 	R_Apply2DBlendMode( g_2dRenderMode );
@@ -6144,8 +6803,26 @@ static void R_ShowTextures( void )
 
 void R_BeginFrame( qboolean clear )
 {
+	DX_RagdollFrame();
+	R_ResetTriangleBatch();
 	if( !device )
 		return;
+	const auto skyConnection = ENGINE_GET_PARM( PARM_CONNSTATE );
+	const auto skyWorld = gp_cl ? gp_cl->models[1] : nullptr;
+	// Recover the authoritative active map even if a loading/disconnect frame
+	// cleared a previously submitted selection or no fresh BSP callback occurred.
+	if( skyConnection == ca_active && skyWorld && g_mapSky.observeActive(skyWorld->name) )
+		g_mapSkyRetryAt = 0;
+	else if( skyConnection == ca_disconnected && !skyWorld )
+		g_mapSky.disconnected();
+	if( dx_remix.value != 0.0f && GetTickCount64() >= g_mapSkyRetryAt )
+	{
+		g_mapSkyRetryAt = GetTickCount64() + 1000;
+		if( g_mapSky.update( reinterpret_cast<uintptr_t>( GetModuleHandleA("d3d9.dll") ),
+			[]( const char* key, const char* value ) { return g_mapEmitterBridge.setConfig(key, value); } ) )
+			gEngfuncs.Con_Printf("D3D9: NUMOS sky %s -> %s\n",
+				g_mapSky.mapName().empty() ? "default" : g_mapSky.mapName().c_str(), g_mapSky.look());
+	}
 
 	if( !g_dxRSpeedsCvar && gEngfuncs.pfnGetCvarPointer )
 		g_dxRSpeedsCvar = gEngfuncs.pfnGetCvarPointer( "r_speeds" );
@@ -6214,6 +6891,8 @@ void R_RenderFrame( )
 
 void R_EndFrame( void )
 {
+	R_TriTraceFlush("frame-complete");
+	DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false;
 	if( !device )
 		return;
 
@@ -6301,6 +6980,13 @@ void R_SetRenderMode( int mode )
 		DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_ONE );
 		DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
 		break;
+	case kRenderScreenFadeModulate:
+		DX_SetRenderStateCached(D3DRS_ALPHABLENDENABLE,TRUE);
+		DX_SetRenderStateCached(D3DRS_BLENDOP,D3DBLENDOP_ADD);
+		DX_SetRenderStateCached(D3DRS_SRCBLEND,D3DBLEND_ZERO);
+		DX_SetRenderStateCached(D3DRS_DESTBLEND,D3DBLEND_SRCCOLOR);
+		DX_SetRenderStateCached(D3DRS_ZWRITEENABLE,FALSE);
+		break;
 	}
 }
 
@@ -6331,8 +7017,17 @@ void R_ClearScene( void )
 
 void R_NewMap( void )
 {
+	DX_RagdollReset("new-map");
+	R_ResetCofPlayerVisibility();
+	g_cofDual.clear();
+	R_ResetCofLights();
+	R_RetireViewmodelFlashes(nullptr);
+	R_ResetTriangleBatch();
 	DX_ResetFog( );
 	g_worldmodel = gp_cl ? gp_cl->models[1] : nullptr;
+	// This callback also runs when a same-map reload reuses its cached BSP.
+	g_mapSky.loaded( g_worldmodel ? g_worldmodel->name : nullptr );
+	g_mapSkyRetryAt = 0;
 	g_dxOverviewView = false;
 	g_dxOrthoValid = false;
 	memset( g_playerSubmitted, 0, sizeof( g_playerSubmitted ) );

@@ -606,6 +606,7 @@ static qboolean SV_RunGameFrame( void )
 			sv.frametime = fps;
 
 			SV_Physics();
+			SV_RagdollConfirmImpacts();
 
 			sv.time_residual -= fps;
 			sv.time += fps;
@@ -617,6 +618,7 @@ static qboolean SV_RunGameFrame( void )
 	else
 	{
 		SV_Physics();
+		SV_RagdollConfirmImpacts();
 		sv.time += sv.frametime;
 		return true;
 	}

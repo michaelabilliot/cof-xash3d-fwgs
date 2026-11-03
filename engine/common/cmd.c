@@ -283,7 +283,12 @@ void Cbuf_ExecStuffCmds( void )
 
 	for( i = 0; i < host.argc; i++ )
 	{
-		if( host.argv[i] && host.argv[i][0] == '+' && ( host.argv[i][1] < '0' || host.argv[i][1] > '9' ) && l + Q_strlen( host.argv[i] ) - 1 <= sizeof( build ) - 1 )
+		// Accept -dx_* value as a renderer-cvar alias for +dx_* value. Only
+		// registered cvars qualify: other engine switches retain their meaning.
+		const qboolean dxCvar = host.argv[i] &&
+			!Q_strncmp( host.argv[i], "-dx_", 4 ) &&
+			Cvar_FindVar( host.argv[i] + 1 ) != NULL;
+		if( host.argv[i] && ( host.argv[i][0] == '+' || dxCvar ) && ( host.argv[i][1] < '0' || host.argv[i][1] > '9' ) && l + Q_strlen( host.argv[i] ) + 1 <= sizeof( build ) )
 		{
 			j = 1;
 

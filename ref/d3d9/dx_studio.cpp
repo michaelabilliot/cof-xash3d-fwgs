@@ -1,5 +1,8 @@
 
 #include "dx_local.h"
+#include "dx_studio_palette.h"
+#include "dx_ragdoll.h"
+#include "dx_effect_timing.h"
 #include "dx_studio_shader.h"
 
 constexpr float DX_STUDIO_SHADE_LAMBERT = 1.4953241f;
@@ -610,6 +613,14 @@ static void StudioCalcBoneTransformsInternal( model_t *mod, studiohdr_t *hdr,
 			memcpy( boneMats[i], localMats[i], sizeof( BoneMat34 ) );
 	}
 }
+
+bool R_StudioSampleRagdollReference(model_t *model,studiohdr_t *hdr,int sequence,float frame,BoneMat34 *out) {
+    if(!out || !R_StudioHeaderValid(hdr) || sequence<0 || sequence>=hdr->numseq || !std::isfinite(frame))return false;
+    cl_entity_t isolated{};isolated.model=model;isolated.curstate.sequence=sequence;
+    StudioCalcBoneTransformsInternal(model,hdr,sequence,frame,out,-1,0,0,&isolated,0);
+    return true;
+}
+
 
 static int R_PlayerGaitSlot( const cl_entity_s *ent )
 {
@@ -1486,38 +1497,6 @@ static D3DCOLOR R_StudioApplyLocalLights( D3DCOLOR baseDiffuse,
 		static_cast<int>( std::max( 0.0f, std::min( 1.0f, outB ) ) * 255.0f + 0.5f ) );
 }
 
-static bool R_StudioEventFrameCrossed( const mstudioseqdesc_t *seqdesc,
-	float lastFrame, float currentFrame, float eventFrame,
-	bool sequenceChanged, bool sameSequenceRestart )
-{
-	constexpr float kEventEpsilon = 0.001f;
-
-	if( sequenceChanged || lastFrame < -0.5f )
-		return eventFrame <= currentFrame + kEventEpsilon;
-
-	if( currentFrame + kEventEpsilon < lastFrame )
-	{
-		if( seqdesc && ( seqdesc->flags & STUDIO_LOOPING ) )
-		{
-
-			const float lastNativeFrame =
-				std::max( 1.0f, static_cast<float>( seqdesc->numframes - 1 ) );
-			const bool realWrap =
-				lastFrame >= lastNativeFrame * 0.75f &&
-				currentFrame <= lastNativeFrame * 0.25f;
-			return realWrap &&
-				( eventFrame > lastFrame ||
-				  eventFrame <= currentFrame + kEventEpsilon );
-		}
-
-		return sameSequenceRestart &&
-			eventFrame <= currentFrame + kEventEpsilon;
-	}
-
-	return eventFrame > lastFrame + kEventEpsilon &&
-		eventFrame <= currentFrame + kEventEpsilon;
-}
-
 static bool R_FindMuzzleFlash(
 	const mstudioseqdesc_t *seqdesc, studiohdr_t *hdr, float nativeFrame,
 	int &outAttachment, int &outOption )
@@ -1562,6 +1541,25 @@ static bool R_FindMuzzleFlash(
 	return true;
 }
 
+static unsigned g_muzzleVisibilityGeneration=1;
+void R_RetireViewmodelFlashes(const cl_entity_s* entity) {
+ if(!entity)++g_muzzleVisibilityGeneration;
+ g_rendererMuzzleFlashes.erase(std::remove_if(g_rendererMuzzleFlashes.begin(),g_rendererMuzzleFlashes.end(),
+  [&](const muzzleflash_t& flash){return flash.viewModel&&(!entity||flash.entity==entity);}),g_rendererMuzzleFlashes.end());
+}
+static bool R_ModelHasMuzzleEvents(const studiohdr_t* hdr) {
+ if(!hdr||hdr->numseq<=0||hdr->numseq>4096||hdr->seqindex<0||
+  static_cast<size_t>(hdr->seqindex)+static_cast<size_t>(hdr->numseq)*sizeof(mstudioseqdesc_t)>static_cast<size_t>(hdr->length))return false;
+ const auto sequences=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ for(int seq=0;seq<hdr->numseq;++seq) {
+  const auto& desc=sequences[seq];
+  if(desc.numevents<0||desc.numevents>4096||desc.eventindex<0||
+   static_cast<size_t>(desc.eventindex)+static_cast<size_t>(desc.numevents)*sizeof(mstudioevent_t)>static_cast<size_t>(hdr->length))continue;
+  const auto events=reinterpret_cast<const mstudioevent_t*>(reinterpret_cast<const byte*>(hdr)+desc.eventindex);
+  for(int i=0;i<desc.numevents;++i){int attachment;if(R_StudioMuzzleAttachment(events[i].event,attachment))return true;}
+ }
+ return false;
+}
 static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 	cl_entity_s *ent, int sequence, float renderFrame,
 	const BoneMat34 *boneMatrices, const D3DMATRIX &world,
@@ -1580,6 +1578,13 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 
 	muzzleflash_state_t &state =
 		R_GetEntityCache( ent ).muzzleflash;
+	if( state.model != ent->model || (viewModel && state.visibilityGeneration!=g_muzzleVisibilityGeneration) ) {
+		if(viewModel)R_RetireViewmodelFlashes(ent);
+		state = muzzleflash_state_t{};
+		state.model = ent->model;
+		state.visibilityGeneration=g_muzzleVisibilityGeneration;
+		state.modelHasMuzzleEvents=R_ModelHasMuzzleEvents(hdr);
+	}
 	const bool sequenceChanged = state.lastSequence != sequence;
 
 	const float nativeLastFrame =
@@ -1609,6 +1614,7 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 					attachment, muzzleOrigin );
 				R_SpawnRendererMuzzleFlash( ent, muzzleOrigin,
 					option, false, renderTime );
+                R_CofLightDebug("muzzle source=player-EF model=%s sequence=%d anim=%.4f frame=%.3f",ent->model->name,sequence,ent->curstate.animtime,nativeRenderFrame);
 
 				spawned = true;
 			}
@@ -1632,16 +1638,18 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 		return false;
 	}
 
-	const float lastFrame = sequenceChanged ? -1.0f : state.lastFrame;
-	const bool animTimeChanged =
-		state.lastAnimTime < -9000.0f ||
-		fabsf( ent->curstate.animtime - state.lastAnimTime ) > 0.0001f;
-	const bool sameSequenceRestart =
-		!sequenceChanged && animTimeChanged &&
-		nativeRenderFrame + 0.001f < lastFrame;
+	const float lastFrame = state.lastFrame;
+    const float window=std::max(0.0f,std::min(0.1f,static_cast<float>(gp_cl->time-gp_cl->oldtime))) *
+        fabsf(ent->curstate.framerate) * seqdesc->fps;
+    state.cursor.begin(sequence,ent->curstate.animtime,renderTime,nativeRenderFrame,nativeLastFrame,
+        (seqdesc->flags&STUDIO_LOOPING)!=0,window);
+    const bool sameSequenceRestart=state.cursor.restart;
+    const bool authoredOnly=DX_CofAuthoredMuzzle(R_CofClientPresent() && viewModel && ent->model &&
+        !strncmp(ent->model->name,"models/weapons/",15),state.modelHasMuzzleEvents);
 	bool spawned = false;
 
-	if( seqdesc->numevents > 0 && seqdesc->eventindex > 0 )
+	if( seqdesc->numevents > 0 && seqdesc->numevents<=4096 && seqdesc->eventindex > 0 &&
+        static_cast<size_t>(seqdesc->eventindex)+static_cast<size_t>(seqdesc->numevents)*sizeof(mstudioevent_t)<=static_cast<size_t>(hdr->length) )
 	{
 		mstudioevent_t *events =
 			(mstudioevent_t *)( (byte *)hdr + seqdesc->eventindex );
@@ -1660,9 +1668,7 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 
 			const float eventFrame =
 				static_cast<float>( events[i].frame );
-			if( !R_StudioEventFrameCrossed(
-				seqdesc, lastFrame, nativeRenderFrame, eventFrame,
-				sequenceChanged, sameSequenceRestart ) )
+            if(!state.cursor.event(i,eventFrame))
 			{
 				continue;
 			}
@@ -1672,20 +1678,23 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 				attachment, muzzleOrigin );
 			R_SpawnRendererMuzzleFlash( ent, muzzleOrigin,
 				atoi( events[i].options ), viewModel, renderTime );
+            R_CofLightDebug("muzzle source=authored model=%s sequence=%d event=%d index=%d anim=%.4f frame=%.3f",ent->model->name,sequence,events[i].event,i,ent->curstate.animtime,nativeRenderFrame);
 			spawned = true;
 		}
 	}
 
-	if( hasEfMuzzle && !state.hadEfMuzzleFlash && !spawned )
+	if( DX_MuzzleFallback(authoredOnly,hasEfMuzzle,state.hadEfMuzzleFlash,spawned) )
 	{
 		vec3_t muzzleOrigin;
 		R_StudioAttachmentPoint(
 			hdr, boneMatrices, world, 0, muzzleOrigin );
 		R_SpawnRendererMuzzleFlash(
 			ent, muzzleOrigin, 20, viewModel, renderTime );
+        R_CofLightDebug("muzzle source=EF model=%s sequence=%d anim=%.4f frame=%.3f",ent->model->name,sequence,ent->curstate.animtime,nativeRenderFrame);
 		spawned = true;
 	}
 
+    if(viewModel && authoredOnly)ent->curstate.effects &= ~EF_MUZZLEFLASH;
 	state.hadEfMuzzleFlash = hasEfMuzzle;
 	state.lastSequence = sequence;
 	state.lastAnimTime = ent->curstate.animtime;
@@ -1718,7 +1727,7 @@ static float R_MuzzleFlashFade( const cl_entity_s *ent,
 	float bestFade = 0.0f;
 	for( const muzzleflash_t &flash : g_rendererMuzzleFlashes )
 	{
-		if( flash.entity != ent || now > flash.dieTime )
+		if( flash.entity != ent || !DX_FlashAlive(flash.startTime,flash.dieTime,now) )
 			continue;
 
 		const float life = std::max( 0.001f, flash.dieTime - flash.startTime );
@@ -1791,7 +1800,7 @@ static void R_DrawMuzzleFlashes( const cl_entity_s *ent )
 	for( size_t i = 0; i < g_rendererMuzzleFlashes.size( ); )
 	{
 		muzzleflash_t &flash = g_rendererMuzzleFlashes[i];
-		if( now > flash.dieTime )
+		if( !DX_FlashAlive(flash.startTime,flash.dieTime,now) || (flash.viewModel && flash.entity && flash.model!=flash.entity->model) )
 		{
 			g_rendererMuzzleFlashes[i] = g_rendererMuzzleFlashes.back( );
 			g_rendererMuzzleFlashes.pop_back( );
@@ -2210,11 +2219,21 @@ void ExtractStudioModelBatched( studiohdr_t *hdr, model_drawdata_t &out )
 	}
 }
 
+// Native CoF1001f9c0 filters bone names per submitted vertex. Triangles
+// touching hidden vertices are omitted intact to avoid broken strip bridges.
+static bool R_CofArmHidden(studiohdr_t* hdr,int bone,int hiddenArm) {
+ if(!hiddenArm||bone<0||bone>=hdr->numbones||
+    !R_StudioRangeValid(hdr,hdr->boneindex,static_cast<size_t>(hdr->numbones)*sizeof(mstudiobone_t)))return false;
+ const auto bones=reinterpret_cast<mstudiobone_t*>(reinterpret_cast<byte*>(hdr)+hdr->boneindex);
+ char name[33]{};memcpy(name,bones[bone].name,32);
+ return strstr(name,hiddenArm==2?"r_":"l_")!=nullptr;
+}
+
 static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, float frame,
 	model_drawdata_t &out, int gaitSeq, float gaitFrame, float gaitYaw,
 	int entityBody, int entitySkin, const cl_entity_s *ent, float renderTime,
 	D3DCOLOR vertexDiffuse, const float studioWorldLightDir[3], float directLightScale,
-	const D3DMATRIX *currentWorldMatrix, const BoneMat34 *precomputedBoneMatrices = nullptr )
+	const D3DMATRIX *currentWorldMatrix, const BoneMat34 *precomputedBoneMatrices = nullptr, int hiddenArm = 0 )
 {
 	out.renderdata.clear( );
 	out.texIds.clear( );
@@ -2332,6 +2351,7 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 						break;
 
 					int tmp[256];
+                    bool hidden[256]{};
 
 					for( int i = 0; i < count; ++i )
 					{
@@ -2345,7 +2365,8 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 							count = 0; break;
 						}
 
-						Key k{ vertIdx, normalIdx, s, t };
+						hidden[i]=R_CofArmHidden(hdr,vertbone[vertIdx],hiddenArm);
+                        Key k{ vertIdx, normalIdx, s, t };
 						auto found = remap.find( k );
 						if( found != remap.end( ) )
 						{
@@ -2415,7 +2436,8 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 					{
 						for( int i = 1; i < count - 1; ++i )
 						{
-							batch.indices.push_back( tmp[0] );
+							if(hidden[0]||hidden[i]||hidden[i+1])continue;
+                            batch.indices.push_back( tmp[0] );
 							batch.indices.push_back( tmp[i] );
 							batch.indices.push_back( tmp[i + 1] );
 						}
@@ -2424,7 +2446,8 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 					{
 						for( int i = 0; i < count - 2; ++i )
 						{
-							if( i & 1 )
+							if(hidden[i]||hidden[i+1]||hidden[i+2])continue;
+                            if( i & 1 )
 							{
 								batch.indices.push_back( tmp[i + 1] );
 								batch.indices.push_back( tmp[i] );
@@ -2502,22 +2525,27 @@ static int R_StudioPoseBudget( )
 		static_cast<int>( dx_studio_update_budget.value ) ) );
 }
 
-static bool R_StudioPoseBudgetOK( bool isViewModel,
-	const studio_cache_t &cache )
-{
+static uint64_t g_studioPoseFrame = 0;
+void R_BeginStudioPoseFrame() {
+ ++g_studioPoseFrame;g_studioPoseUpdatesThisFrame=0;
+}
 
-	if( cache.gpuSkinningBufferMode && dx_studio_gpu_smooth.value != 0.0f )
-		return true;
-	if( isViewModel && dx_studio_viewmodel_throttle.value == 0.0f )
-		return true;
-	if( !cache.poseUploaded )
-		return true;
+static bool R_StudioPoseBudgetOK( bool isViewModel,
+	studio_cache_t &cache )
+{
 	const int budget = R_StudioPoseBudget( );
-	if( budget <= 0 )
-		return true;
-	if( g_studioPoseUpdatesThisFrame >= budget )
+	const bool exempt=(cache.gpuSkinningBufferMode && dx_studio_gpu_smooth.value!=0.f)||
+        (isViewModel && dx_studio_viewmodel_throttle.value==0.f)||!cache.poseUploaded||budget<=0;
+    // The quota is soft: draw order must never starve a cached animation.
+    // A deferred pose gets an update on its next visible render frame. Extra
+    // passes within the same frame cannot spend this recovery allowance.
+    const bool overdue=cache.poseBudgetDeferred && cache.poseBudgetDeferredFrame!=g_studioPoseFrame;
+	if( !exempt && !overdue && g_studioPoseUpdatesThisFrame >= budget ) {
+        if(!cache.poseBudgetDeferred){cache.poseBudgetDeferred=true;cache.poseBudgetDeferredFrame=g_studioPoseFrame;}
 		return false;
-	++g_studioPoseUpdatesThisFrame;
+    }
+    cache.poseBudgetDeferred=false;
+	if(!exempt)++g_studioPoseUpdatesThisFrame;
 	return true;
 }
 
@@ -2561,6 +2589,7 @@ static void R_DestroyStudioGpuCache( studio_cache_t &cache )
 	R_FreeStudioBuffers( cache );
 	cache.batches.clear( );
 	cache.model = nullptr;
+	cache.physicsPoseUploaded = false;
 	cache.body = 0;
 	cache.skin = 0;
 	cache.topologyValid = false;
@@ -2842,7 +2871,7 @@ static studio_batch_t &R_FindStudioGpuBatch(
 }
 
 static bool R_BuildStudioTopology( studio_cache_t &cache,
-	model_t *mod, studiohdr_t *hdr, int entityBody, int entitySkin )
+	model_t *mod, studiohdr_t *hdr, int entityBody, int entitySkin, int hiddenArm = 0 )
 {
 	R_DestroyStudioGpuCache( cache );
 	if( !mod || !R_StudioHeaderValid( hdr ) )
@@ -2851,6 +2880,7 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 	cache.model = mod;
 	cache.body = entityBody;
 	cache.skin = entitySkin;
+    cache.hiddenArm = hiddenArm;
 	cache.gpuSkinningBoneCount = std::max( 0, std::min( MAXSTUDIOBONES, hdr->numbones ) );
 
 	auto *bodyparts = reinterpret_cast<mstudiobodyparts_t *>(
@@ -2940,6 +2970,7 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 					break;
 
 				DWORD polygon[256];
+                bool hidden[256]{};
 				for( int vertexInPolygon = 0; vertexInPolygon < count; ++vertexInPolygon )
 				{
 					const int vertexIndex = command[0];
@@ -2952,7 +2983,8 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 						count = 0; break;
 					}
 
-					const mesh_vertex_key_t key{ vertexIndex, normalIndex, s, t };
+					hidden[vertexInPolygon]=R_CofArmHidden(hdr,vertexBones[vertexIndex],hiddenArm);
+                    const mesh_vertex_key_t key{ vertexIndex, normalIndex, s, t };
 					auto found = remap.find( key );
 					if( found != remap.end( ) )
 					{
@@ -3007,7 +3039,8 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 				{
 					for( int triangle = 1; triangle < count - 1; ++triangle )
 					{
-						batch.indices.push_back( polygon[0] );
+						if(hidden[0]||hidden[triangle]||hidden[triangle+1])continue;
+                        batch.indices.push_back( polygon[0] );
 						batch.indices.push_back( polygon[triangle] );
 						batch.indices.push_back( polygon[triangle + 1] );
 					}
@@ -3016,7 +3049,8 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 				{
 					for( int triangle = 0; triangle < count - 2; ++triangle )
 					{
-						if( triangle & 1 )
+						if(hidden[triangle]||hidden[triangle+1]||hidden[triangle+2])continue;
+                        if( triangle & 1 )
 						{
 							batch.indices.push_back( polygon[triangle + 1] );
 							batch.indices.push_back( polygon[triangle] );
@@ -3278,6 +3312,7 @@ static void R_StudioCommitPose( studio_cache_t &cache,
 	cache.poseUploaded = true;
 	cache.lastSequence = sequence;
 	cache.lastFrame = frame;
+	cache.poseBudgetDeferred = false;
 	cache.lastGaitSequence = gaitSequence;
 	cache.lastGaitFrame = gaitFrame;
 	cache.lastGaitYaw = gaitYaw;
@@ -3480,7 +3515,7 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 	float frame, int gaitSequence, float gaitFrame, float gaitYaw,
 	float renderTime, D3DCOLOR diffuse, const float studioWorldLightDir[3],
 	float directScale, const D3DMATRIX *worldMatrix, bool isViewModel,
-	const BoneMat34 *precomputedBoneMatrices = nullptr )
+	const BoneMat34 *precomputedBoneMatrices = nullptr, bool physicsPose = false )
 {
 	float worldLightDir[3];
 	if( studioWorldLightDir )
@@ -3504,7 +3539,12 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 	const bool localLightsChanged = !R_StudioLocalLightsEqual(
 		cache.localLights, cache.localLightCount, localLights, localLightCount );
 
-	const bool poseCached = R_StudioPoseCached( cache, ent,
+	// Re-evaluate user settings and device capability before a pose-cache hit
+	// can return. Static props must also switch between CPU and GPU buffers.
+	if( !R_CreateStudioBuffers( cache ) )
+		return false;
+
+	const bool poseCached = !physicsPose && cache.physicsPoseUploaded == physicsPose && R_StudioPoseCached( cache, ent,
 		sequence, frame, gaitSequence, gaitFrame, gaitYaw, diffuse,
 		directScale, localLightDir ) &&
 		( cache.gpuSkinningBufferMode || !localLightsChanged );
@@ -3518,6 +3558,17 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 		return true;
 	}
 
+	DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_CACHE_MISS, 1 );
+	if( !physicsPose && !cache.physicsPoseUploaded && !R_StudioPoseBudgetOK( isViewModel, cache ) )
+	{
+        static unsigned debugBudget=120;
+        if(dx_studio_anim_debug.value!=0.f && debugBudget && gEngfuncs.Con_Printf){
+            --debugBudget;gEngfuncs.Con_Printf("STUDIO ANIM: deferred model=%s seq=%d frame=%.3f time=%.4f budget=%d recovery=next-visible-frame\n",mod->name,sequence,frame,renderTime,R_StudioPoseBudget());
+        }
+		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BUDGET_SKIP, 1 );
+		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_CACHE_HIT, 1 );
+		return true;
+	}
 	BoneMat34 localBoneMatrices[MAXSTUDIOBONES];
 	const BoneMat34 *boneMatrices = precomputedBoneMatrices;
 	if( !boneMatrices )
@@ -3527,21 +3578,11 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 		boneMatrices = localBoneMatrices;
 	}
 
-	DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_CACHE_MISS, 1 );
-	if( !R_StudioPoseBudgetOK( isViewModel, cache ) )
-	{
-		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BUDGET_SKIP, 1 );
-		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_CACHE_HIT, 1 );
-		return true;
-	}
-	if( !R_CreateStudioBuffers( cache ) )
-		return false;
-
 	const int cachedBoneCount = std::max( 0, std::min( MAXSTUDIOBONES, hdr->numbones ) );
-	memcpy( cache.gpuSkinningBoneMatrices, boneMatrices,
-		static_cast<size_t>( cachedBoneCount ) * sizeof( BoneMat34 ) );
-	cache.gpuSkinningBoneCount = cachedBoneCount;
-	cache.gpuSkinningPoseValid = cachedBoneCount > 0;
+	R_StudioCopyFinalPalette( cache, boneMatrices, cachedBoneCount, physicsPose );
+	if( physicsPose ) DX_RagdollPaletteProof( ent, boneMatrices,
+		cache.gpuSkinningBoneMatrices, cachedBoneCount,
+		cache.gpuSkinningBufferMode ? "gpu" : "cpu" );
 
 	D3DMATRIX chromeWorld;
 	if( cache.containsChrome )
@@ -3586,6 +3627,8 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 	R_StudioCommitPose( cache, ent, sequence, frame, gaitSequence,
 		gaitFrame, gaitYaw, diffuse, directScale, localLightDir,
 		localLights, localLightCount );
+	cache.physicsPoseUploaded = physicsPose;
+    if(physicsPose) DX_RagdollSubmitted(ent,cache,boneMatrices,cachedBoneCount,worldMatrix,"cpu-vb");
 	return true;
 }
 
@@ -3774,8 +3817,9 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 			dst[3] = cache.gpuSkinningBoneMatrices[bone][row][3];
 		}
 	}
-	device->SetVertexShaderConstantF( DX_STUDIO_GPU_SKIN_CONST_BONES,
+	const HRESULT paletteResult=device->SetVertexShaderConstantF( DX_STUDIO_GPU_SKIN_CONST_BONES,
 		boneConstants, cache.gpuSkinningBoneCount * 3 );
+    if(SUCCEEDED(paletteResult)) DX_RagdollSubmitted(ent,cache,reinterpret_cast<const BoneMat34*>(boneConstants),cache.gpuSkinningBoneCount,&d3dWorld,"gpu-constants");
 
 	if( glowShellPass )
 	{
@@ -3960,7 +4004,18 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 		return false;
 	}
 
-	// Clip hidden viewmodel geometry before Remix consumes it.
+	// Use immutable source vertices/indices whenever GPU skinning is available.
+	// R_DrawViewModel already sets the weapon projection and near plane. Let
+	// hardware clip after skinning rather than changing the submitted topology.
+	if( R_DrawStudioSkinBatches( cache, ent, false ) )
+	{
+		if( R_StudioGlowShellEnabled( ent ) )
+			R_DrawStudioSkinBatches( cache, ent, true );
+		return true;
+	}
+
+	// Unsupported hardware, oversized skeletons and an explicit opt-out retain
+	// the compatibility path. Its CPU-skinned geometry is inherently dynamic.
 	const float nearClip = std::max( 0.01f,
 		std::min( 16.0f, r_viewmodel_near.value ) );
 	const bool studioNormals = R_StudioNormalsEnabled( );
@@ -4531,6 +4586,20 @@ static void R_SetStudioWorld( const cl_entity_s *ent,
 	R_ApplyEntityScale( ent, out );
 }
 
+// Static map fixtures use exactly the same pitch convention and scale as
+// studio submission, without touching animation or rendering state.
+void R_StudioFixtureTransform(const float* origin,const float* angles,float scale,D3DMATRIX* world)
+{
+	cl_entity_s entity{};model_t model{};model.type=mod_studio;entity.model=&model;
+	VectorCopy(origin,entity.origin);VectorCopy(angles,entity.angles);entity.curstate.scale=scale;
+	R_SetStudioWorld(&entity,0,world);
+}
+
+void R_StudioFixtureBone(const float* pose,float (*matrix)[4])
+{
+	float quaternion[4];AngleQuaternion(pose+3,quaternion);QuaternionMatrix(quaternion,pose,matrix);
+}
+
 static void R_SetPlayerGaitWorldTransform( const cl_entity_s *ent,
 	float gaitYaw, D3DMATRIX *out )
 {
@@ -4550,6 +4619,43 @@ static void R_SetPlayerGaitWorldTransform( const cl_entity_s *ent,
 	R_BoneMatToWorld( entityMatrix, out );
 	R_ApplyEntityScale( ent, out );
 }
+
+static float R_StudioQuantizePoseTime( const cl_entity_s *ent, float renderTime, bool viewModel );
+// CPU-only query for mods whose camera follows an animated studio attachment.
+// It must work before scene submission, including when the model is culled.
+static int DX_CameraAttachments( cl_entity_s *ent, float renderTime, float *point, int count )
+{
+	if( count < 1 || count > 4 || !ent || !ent->model || ent->model->type != mod_studio || !point ||
+		!std::isfinite( renderTime ) ) return 0;
+	R_RegisterModelCvars( );
+	studiohdr_t *hdr = static_cast<studiohdr_t *>(
+		gEngfuncs.Mod_Extradata( mod_studio, ent->model ) );
+	if( !R_StudioHeaderValid( hdr ) || hdr->numattachments < count ||
+		hdr->attachmentindex <= 0 || hdr->numbones > MAXSTUDIOBONES ||
+		!R_StudioRangeValid( hdr, hdr->attachmentindex, count * sizeof( mstudioattachment_t ) ) ) return 0;
+	const auto *attachment = reinterpret_cast<const mstudioattachment_t *>(
+		reinterpret_cast<const byte *>( hdr ) + hdr->attachmentindex );
+	for( int i=0; i<count; ++i )
+		if( attachment[i].bone < 0 || attachment[i].bone >= hdr->numbones ) return 0;
+	BoneMat34 bones[MAXSTUDIOBONES]{};
+	const float poseTime = R_StudioCanSmoothGpuPose( hdr ) ? renderTime :
+		R_StudioQuantizePoseTime( ent, renderTime, false );
+	StudioCalcBoneTransformsInternal( ent->model, hdr, ent->curstate.sequence,
+		StudioFrameAdvance( hdr, ent, poseTime ), bones, -1, 0.0f, 0.0f, ent, poseTime );
+	D3DMATRIX world;
+	R_SetStudioWorld( ent, renderTime, &world );
+	float result[12]{};
+	for( int i=0; i<count; ++i ) R_StudioAttachmentPoint( hdr, bones, world, i, result+i*3 );
+	for( int i = 0; i < count*3; ++i ) if( !std::isfinite( result[i] ) ) return 0;
+	memcpy( point, result, count*3*sizeof(float) );
+	return 1;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraAttachment(
+	cl_entity_s *ent, float renderTime, float *point ) { return DX_CameraAttachments(ent,renderTime,point,1); }
+extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraAttachmentsV2(
+	cl_entity_s *ent, float renderTime, float *points ) { return DX_CameraAttachments(ent,renderTime,points,4); }
+extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraAttachmentsV3(
+	cl_entity_s *ent, float renderTime, float *points, int count ) { return DX_CameraAttachments(ent,renderTime,points,count); }
 
 void R_TransformPoint( const D3DMATRIX &matrix, float x, float y, float z, vec3_t out )
 {
@@ -5331,6 +5437,15 @@ static D3DCOLOR R_StudioEntityLight( const cl_entity_s *ent,
 {
 	const int directionSign = ( ent && ( ent->curstate.effects & EF_INVLIGHT ) )
 		? 1 : -1;
+	// CoF's native model lighting uses renderfx 101..200 as fixed intensity.
+	// The combination puzzle uses 125 in an otherwise unlit room.
+	if( ent && ent->model && ent->curstate.renderfx == 125 &&
+		!Q_stricmp( ent->model->name, "models/items/padlock.mdl" ) )
+	{
+		if( outLightDir ) VectorSet( outLightDir, 0.0f, 0.0f, -1.0f );
+		if( outDirectFraction ) *outDirectFraction = 0.0f;
+		return D3DCOLOR_ARGB( 255, 64, 64, 64 );
+	}
 	if( !ent )
 	{
 		if( outLightDir ) VectorSet( outLightDir, 0.0f, 0.0f, static_cast<float>( directionSign ) );
@@ -5414,7 +5529,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 	float renderTime, D3DCOLOR studioLight, const float studioLightDir[3],
 	float studioDirectLightScale, bool forceOverlayDepth, const D3DMATRIX *currentWorldMatrix,
 	const BoneMat34 *forcedPoseBoneMatrices = nullptr,
-	bool processRendererMuzzleEvents = true )
+	bool processRendererMuzzleEvents = true, int hiddenArm = 0 )
 {
 	DX_MODEL_PROFILE_SCOPE( studioProfileScope, DX_PROFILE_PHASE_STUDIOMODEL );
 	model_drawdata_t *mdd = R_FindStudioModelDrawData( mod );
@@ -5429,7 +5544,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 	studio_cache_t &cache = R_GetStudioEntityGpuCache( ent );
 
 	const bool topologyMatches = cache.topologyValid && cache.model == mod &&
-		cache.body == ent->curstate.body && cache.skin == ent->curstate.skin;
+		cache.body == ent->curstate.body && cache.skin == ent->curstate.skin && cache.hiddenArm == hiddenArm;
 
 	BoneMat34 precomputedMuzzleBones[MAXSTUDIOBONES];
 	const BoneMat34 *precomputedPoseBones = nullptr;
@@ -5439,6 +5554,22 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 
 	if( forcedPoseBoneMatrices )
 		precomputedPoseBones = forcedPoseBoneMatrices;
+
+	// Physics supplies the same model-space palette as animation. Immutable
+	// source vertices, index buffers, materials and the GPU palette cap stay put.
+	BoneMat34 ragdollBones[MAXSTUDIOBONES];
+	bool physicsPose = false;
+	if( !forceOverlayDepth && !forcedPoseBoneMatrices && DX_RagdollCandidate( ent ) )
+	{
+		StudioCalcBoneTransformsInternal( mod, hdr, sequence, frame,
+			ragdollBones, gaitSeq, gaitFrame, gaitYaw, ent, renderTime );
+		precomputedPoseBones = ragdollBones;
+		if( DX_RagdollPose( ent, hdr, muzzleWorld, ragdollBones, static_cast<float>( gp_cl->time ) ) )
+		{
+			precomputedPoseBones = ragdollBones;
+			physicsPose = true;
+		}
+	}
 
 	if( processRendererMuzzleEvents &&
 		forceOverlayDepth && dx_muzzleflash_sprite.value != 0.0f )
@@ -5456,10 +5587,10 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 		: studioLight;
 
 	if( ( topologyMatches || R_BuildStudioTopology( cache, mod, hdr,
-		ent->curstate.body, ent->curstate.skin ) ) &&
+		ent->curstate.body, ent->curstate.skin, hiddenArm ) ) &&
 		R_UpdateStudioVertices( cache, mod, hdr, ent, sequence, frame,
 			gaitSeq, gaitFrame, gaitYaw, renderTime, effectiveStudioLight,
-			studioLightDir, studioDirectLightScale, currentWorldMatrix, forceOverlayDepth, precomputedPoseBones ) )
+			studioLightDir, studioDirectLightScale, currentWorldMatrix, forceOverlayDepth, precomputedPoseBones, physicsPose ) )
 	{
 		if( processRendererMuzzleEvents && !muzzleEventsProcessedBeforeDraw )
 		{
@@ -5510,7 +5641,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 		gaitSeq, gaitFrame, gaitYaw,
 		ent->curstate.body, ent->curstate.skin, ent, renderTime,
 		effectiveStudioLight, studioLightDir, studioDirectLightScale,
-		currentWorldMatrix, forcedPoseBoneMatrices );
+		currentWorldMatrix, precomputedPoseBones, hiddenArm );
 
 	if( processRendererMuzzleEvents && !muzzleEventsProcessedBeforeDraw &&
 		dx_muzzleflash_sprite.value != 0.0f )
@@ -5712,8 +5843,36 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
 		return;
+	if( !R_CofPlayerDrawAllowed( ent ) )
+		return;
 
 	model_t *mod = ent->model;
+	// Remix relights geometry, so vertex intensity alone cannot reproduce the
+	// puzzle's native self lighting. A draw-scoped fill serves only its close-up.
+	struct PuzzleFill {
+		D3DLIGHT9 previous{}; BOOL enabled=FALSE; bool active=false, hadLight=false;
+		~PuzzleFill() {
+			if( !active ) return;
+			if( hadLight ) device->SetLight( 0, &previous );
+			device->LightEnable( 0, enabled );
+		}
+	} fill;
+	const bool puzzle = ent->curstate.renderfx == 125 &&
+		!Q_stricmp( mod->name, "models/items/padlock.mdl" );
+	if( puzzle && dx_remix.value != 0.0f &&
+		fabsf( ent->origin[0]-g_vOrigin[0] ) < 160.0f &&
+		fabsf( ent->origin[1]-g_vOrigin[1] ) < 160.0f &&
+		fabsf( ent->origin[2]-g_vOrigin[2] ) < 160.0f )
+	{
+		fill.hadLight=SUCCEEDED( device->GetLight( 0, &fill.previous ) );
+		device->GetLightEnable( 0, &fill.enabled );
+		D3DLIGHT9 light{}; light.Type=D3DLIGHT_POINT;
+		light.Diffuse.r=light.Diffuse.g=light.Diffuse.b=0.25f;
+		light.Position={g_vOrigin[0],g_vOrigin[1],g_vOrigin[2]};
+		light.Range=256.0f; light.Attenuation0=1.0f;
+		fill.active=SUCCEEDED( device->SetLight(0,&light) );
+		if( fill.active ) device->LightEnable(0,TRUE);
+	}
 
 	if( !R_FindStudioModelDrawData( mod ) )
 		R_LoadStudioModel( mod );
@@ -5760,19 +5919,9 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 
 }
 
-void R_DrawStudioViewModel( cl_entity_s *ent,
-	const vec3_t viewOrigin, const vec3_t viewAngles,
-	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
-	float forwardOffset, float rightOffset, float upOffset )
+static void R_BuildViewModelWorld(const cl_entity_s* ent,const float* viewOrigin,const float* viewAngles,
+ const float* viewForward,const float* viewRight,const float* viewUp,float forwardOffset,float rightOffset,float upOffset,D3DMATRIX& viewModelWorld,bool mirror=false)
 {
-	R_RegisterModelCvars( );
-	if( !ent || !ent->model || ent->model->type != mod_studio ||
-		!viewOrigin || !viewAngles || !viewForward || !viewRight || !viewUp )
-	{
-		return;
-	}
-
-	D3DMATRIX viewModelWorld;
 
 	vec3_t modelOrigin;
 	vec3_t modelAngles;
@@ -5818,8 +5967,75 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 
 	BoneMat34 cameraTransform;
 	GoldSrcEntityAngleMatrix( modelAngles, modelOrigin, cameraTransform );
+	if(mirror)for(int row=0;row<3;++row)cameraTransform[row][1]=-cameraTransform[row][1];
 	R_BoneMatToWorld( cameraTransform, &viewModelWorld );
 	R_ApplyEntityScale( ent, &viewModelWorld );
+}
+
+int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror) {
+ if(!ent||!ent->model||ent->model->type!=mod_studio||!viewOrigin||!viewAngles||!offsets||!points||!std::isfinite(time)||!gEngfuncs.Mod_Extradata)return 0;
+ if(ent->curstate.effects&EF_NODRAW)return 0;
+ for(int i=0;i<3;++i)if(!std::isfinite(viewOrigin[i])||!std::isfinite(viewAngles[i])||!std::isfinite(offsets[i])||!std::isfinite(ent->origin[i])||!std::isfinite(ent->angles[i]))return 0;
+ auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
+ if(!R_StudioHeaderValid(hdr)||hdr->numattachments<2||hdr->numbones>MAXSTUDIOBONES||
+  !R_StudioRangeValid(hdr,hdr->attachmentindex,2*sizeof(mstudioattachment_t)))return 0;
+ const auto attachments=reinterpret_cast<const mstudioattachment_t*>(reinterpret_cast<const byte*>(hdr)+hdr->attachmentindex);
+ for(int i=0;i<2;++i)if(attachments[i].bone<0||attachments[i].bone>=hdr->numbones)return 0;
+ R_RegisterModelCvars();
+ const float poseTime=R_StudioQuantizePoseTime(ent,time,true);
+ BoneMat34 bones[MAXSTUDIOBONES]{};
+ StudioCalcBoneTransformsInternal(ent->model,hdr,ent->curstate.sequence,StudioFrameAdvance(hdr,ent,poseTime),bones,-1,0,0,ent,poseTime);
+ vec3_t forward,right,up;AngleVectors(viewAngles,forward,right,up);
+ D3DMATRIX world;R_BuildViewModelWorld(ent,viewOrigin,viewAngles,forward,right,up,offsets[0],offsets[1],offsets[2],world,mirror);
+ float result[6];
+ for(int i=0;i<2;++i){float local[3];VectorTransform(attachments[i].org,bones[attachments[i].bone],local);R_StudioTransformPointByWorld(world,local,result+i*3);}
+ float length=0;for(int i=0;i<6;++i)if(!std::isfinite(result[i]))return 0;
+ for(int i=0;i<3;++i){const float d=result[3+i]-result[i];length+=d*d;}
+ if(!std::isfinite(length)||length<1e-8f)return 0;
+ memcpy(points,result,sizeof(result));return 1;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_StudioViewModelLightAttachmentsV1(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points) {
+ return R_StudioViewModelLightAttachments(ent,time,viewOrigin,viewAngles,offsets,points);
+}
+
+int R_StudioCameraFlashPoint(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point) {
+ if(!ent||!ent->model||ent->model->type!=mod_studio||!origin||!angles||!offsets||!point||
+    !std::isfinite(time)||!gEngfuncs.Mod_Extradata||(ent->curstate.effects&EF_NODRAW)||
+    Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return 0;
+ for(int i=0;i<3;++i)if(!std::isfinite(origin[i])||!std::isfinite(angles[i])||!std::isfinite(offsets[i])||
+    !std::isfinite(ent->origin[i])||!std::isfinite(ent->angles[i]))return 0;
+ auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
+ if(!R_StudioHeaderValid(hdr)||hdr->numbones<=0||hdr->numbones>MAXSTUDIOBONES||
+    !R_StudioRangeValid(hdr,hdr->boneindex,hdr->numbones*sizeof(mstudiobone_t)))return 0;
+ const int flash=R_StudioFindBoneByName(hdr,"flash");if(flash<0)return 0;
+ R_RegisterModelCvars();const float poseTime=R_StudioQuantizePoseTime(ent,time,true);
+ BoneMat34 bones[MAXSTUDIOBONES]{};
+ StudioCalcBoneTransformsInternal(ent->model,hdr,ent->curstate.sequence,StudioFrameAdvance(hdr,ent,poseTime),bones,-1,0,0,ent,poseTime);
+ vec3_t forward,right,up;AngleVectors(angles,forward,right,up);
+ D3DMATRIX world;R_BuildViewModelWorld(ent,origin,angles,forward,right,up,offsets[0],offsets[1],offsets[2],world);
+ const float local[3]={bones[flash][0][3],bones[flash][1][3],bones[flash][2][3]};float result[3];
+ R_StudioTransformPointByWorld(world,local,result);
+ for(float value:result)if(!std::isfinite(value))return 0;
+ memcpy(point,result,sizeof result);return 1;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraFlashPointV1(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point) {
+ return R_StudioCameraFlashPoint(ent,time,origin,angles,offsets,point);
+}
+
+void R_DrawStudioViewModel( cl_entity_s *ent,
+	const vec3_t viewOrigin, const vec3_t viewAngles,
+	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
+	float forwardOffset, float rightOffset, float upOffset, bool mirror, bool muzzleEvents, int hiddenArm )
+{
+	R_RegisterModelCvars( );
+	if( !ent || !ent->model || ent->model->type != mod_studio ||
+		!viewOrigin || !viewAngles || !viewForward || !viewRight || !viewUp )
+	{
+		return;
+	}
+
+	D3DMATRIX viewModelWorld;
+    R_BuildViewModelWorld(ent,viewOrigin,viewAngles,viewForward,viewRight,viewUp,forwardOffset,rightOffset,upOffset,viewModelWorld,mirror);
 	device->SetTransform( D3DTS_WORLD, &viewModelWorld );
 
 	studiohdr_t *hdr = static_cast<studiohdr_t *>(
@@ -5833,7 +6049,7 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 		ent, viewOrigin, studioLightDir, &studioDirectLightScale );
 	R_DrawStudioEntityModel( ent->model, ent, ent->curstate.sequence,
 		renderFrame, -1, 0.0f, 0.0f, studioPoseTime,
-		studioLight, studioLightDir, studioDirectLightScale, true, &viewModelWorld );
+		studioLight, studioLightDir, studioDirectLightScale, true, &viewModelWorld, nullptr, muzzleEvents, hiddenArm );
 
 	D3DMATRIX identity;
 	DX_MatrixIdentity( identity );

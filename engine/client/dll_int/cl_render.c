@@ -15,8 +15,11 @@ GNU General Public License for more details.
 
 #include "common.h"
 #include "client.h"
+#include "server.h"
 #include "library.h"
 #include "platform/platform.h"
+
+#include "cl_ragdoll_retained.h"
 
 int R_FatPVS( const vec3_t org, float radius, byte *visbuffer, qboolean merge, qboolean fullvis )
 {
@@ -178,6 +181,47 @@ intptr_t CL_RenderGetParm( const int parm, const int arg, const qboolean checkRe
 			return pfnNumberOfEntities();
 		case PARM_GET_CLIENT_PTR:
 			return (intptr_t)&cl.time; // with the offset
+		case PARM_GET_RAGDOLL_RETAINED:
+            if(arg==-2) return REF_RAGDOLL_RETAIN_VERSION;
+            if(arg==-1) return svs.spawncount;
+            if(arg==-3) return CL_RagdollRetainedCount();
+            if(arg<=-65536) return (intptr_t)CL_RagdollRetainedSlot(-arg-65536);
+            return (intptr_t)CL_RagdollRetained(arg<=-4?-arg-3:arg,arg>0);
+        case PARM_RAGDOLL_CLAIM:
+            if(arg==-2) return REF_RAGDOLL_CLAIM_VERSION;
+            return sv.state==ss_active && !cls.demoplayback?(intptr_t)SV_RagdollClaim(arg):0;
+        case PARM_RAGDOLL_ACK:
+            return sv.state==ss_active && !cls.demoplayback?(intptr_t)SV_RagdollAck(arg):0;
+        case PARM_GET_RAGDOLL_ENTITY:
+		{
+			static ref_ragdoll_entity_t snapshot;
+			const edict_t *ed;
+			if( sv.state != ss_active || !svgame.edicts || cls.demoplayback ) return 0;
+			if( arg == -2 ) return REF_RAGDOLL_SNAPSHOT_VERSION;
+			if( arg == -1 ) return svgame.numEntities;
+			if( arg <= 0 || arg >= svgame.numEntities ) return 0;
+			ed = &svgame.edicts[arg];
+			if( ed->free ) return 0;
+			memset( &snapshot, 0, sizeof( snapshot ));
+			snapshot.serial = ed->serialnumber;
+            snapshot.generation=svs.spawncount;
+			snapshot.modelindex = ed->v.modelindex;
+			// CoF can clear FL_MONSTER while completing a regular monster death.
+			snapshot.monster = !!FBitSet( ed->v.flags, FL_MONSTER ) ||
+				!Q_strncmp( SV_GetString( ed->v.classname ), "monster_", 8 );
+			snapshot.dead = ed->v.deadflag != DEAD_NO;
+			snapshot.solid = ed->v.solid;
+			snapshot.effects = ed->v.effects;
+			VectorCopy( ed->v.velocity, snapshot.velocity );
+			snapshot.health = ed->v.health;
+			snapshot.deadflag = ed->v.deadflag;
+			snapshot.sequence = ed->v.sequence;
+			snapshot.server_time = (float)sv.time;
+			snapshot.grounded = !!FBitSet( ed->v.flags, FL_ONGROUND );
+			Q_strncpy( snapshot.classname, SV_GetString( ed->v.classname ), sizeof( snapshot.classname ));
+			SV_RagdollReadImpact( arg, &snapshot );
+			return (intptr_t)&snapshot;
+		}
 		case PARM_GET_HOST_PTR:
 			return (intptr_t)&host.realtime; // with the offset
 		case PARM_GET_WORLD_PTR:

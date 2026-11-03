@@ -342,6 +342,8 @@ convar_t dx_studio_viewmodel_throttle =
 
 convar_t dx_studio_update_budget =
 { (char *)"dx_studio_update_budget", (char *)"8", 0 };
+convar_t dx_studio_anim_debug =
+{ (char *)"dx_studio_anim_debug", (char *)"0", 0 };
 
 convar_t dx_studio_gpu_skinning =
 { (char *)"dx_studio_gpu_skinning", (char *)"1", 0 };
@@ -379,6 +381,13 @@ convar_t dx_muzzleflash_viewmodel_light =
 { (char *)"dx_muzzleflash_viewmodel_light", (char *)"1", 0 };
 convar_t dx_muzzleflash_viewmodel_light_scale =
 { (char *)"dx_muzzleflash_viewmodel_light_scale", (char *)"1", 0 };
+
+convar_t dx_cof_flashlight = { (char*)"dx_cof_flashlight", (char*)"1", 0 };
+convar_t dx_cof_flashlight_brightness = { (char*)"dx_cof_flashlight_brightness", (char*)"0.25", 0 };
+convar_t dx_cof_camera_flash = { (char*)"dx_cof_camera_flash", (char*)"1", 0 };
+convar_t dx_cof_camera_flash_brightness = { (char*)"dx_cof_camera_flash_brightness", (char*)"0.8", 0 };
+convar_t dx_cof_light_debug = { (char*)"dx_cof_light_debug", (char*)"0", 0 };
+convar_t dx_cof_light_test = { (char*)"dx_cof_light_test", (char*)"0", 0 };
 
 convar_t dx_dlights =
 { (char *)"dx_dlights", (char *)"1", 0 };
@@ -509,6 +518,7 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_stagger_updates );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_viewmodel_throttle );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_update_budget );
+	gEngfuncs.Cvar_RegisterVariable( &dx_studio_anim_debug );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_skinning );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_chrome );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_max_bones );
@@ -523,6 +533,12 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_muzzleflash_before_viewmodel );
 	gEngfuncs.Cvar_RegisterVariable( &dx_muzzleflash_viewmodel_light );
 	gEngfuncs.Cvar_RegisterVariable( &dx_muzzleflash_viewmodel_light_scale );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_flashlight );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_flashlight_brightness );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_camera_flash );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_camera_flash_brightness );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_light_debug );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_light_test );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlights );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_fixed );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_engine );
@@ -1163,6 +1179,7 @@ static bool R_UploadScratchIndices( const void *indices, UINT bytes,
 bool R_DrawScratchPrimitive( D3DPRIMITIVETYPE type, UINT primitiveCount,
 	UINT vertexCount, const void *vertices, UINT stride )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !vertices || primitiveCount == 0 || vertexCount == 0 )
 		return false;
 	UINT vertexBytes = 0;
@@ -1181,6 +1198,7 @@ bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount,
 	UINT primitiveCount, const void *indices, D3DFORMAT indexFormat,
 	const void *vertices, UINT stride )
 {
+	DX_TriBatchBarrier(DX_TRI_FLUSH_INCOMPATIBLE);
 	if( !device || !vertices || !indices || vertexCount == 0 || primitiveCount == 0 )
 		return false;
 	UINT vertexBytes = 0, indexCount = 0, indexBytes = 0;
@@ -1209,7 +1227,7 @@ void R_BeginModelsFrame( void )
 	R_RegisterModelCvars( );
 	g_scratchVertexOffset = 0;
 	g_scratchIndexOffset = 0;
-	g_studioPoseUpdatesThisFrame = 0;
+	R_BeginStudioPoseFrame();
 	R_CheckLightmapBakeParams( );
 }
 
@@ -1333,6 +1351,8 @@ static bool R_DecalHasDynamicStyle( const msurface_t *surface )
 	return false;
 }
 
+#include "dx_cof_decal.h"
+
 struct dx_decal_vertex_t
 {
 	float x, y, z;
@@ -1359,6 +1379,7 @@ struct dx_decal_t
 	const msurface_t *surface = nullptr;
 	int lightStyleRevision = -1;
 	bool dynamicLightStyles = false;
+	bool cofCustom = false;
 	std::vector<dx_decal_vertex_t> vertices;
 };
 
@@ -1388,13 +1409,13 @@ static void R_ClearRemixDecalTextures( )
 	g_remixDecalTextures.clear( );
 }
 
-static IDirect3DTexture9 *R_RemixLegacyDecalTexture( int textureIndex )
+static IDirect3DTexture9 *R_RemixLegacyDecalTexture( int textureIndex, bool cofCustom = false )
 {
 	if( !device || textureIndex <= 0 || textureIndex > g_texcount )
 		return nullptr;
 
 	dxtexture_t &sourceTexture = g_Textures[textureIndex];
-	if( !sourceTexture.tex || ( sourceTexture.flags & TF_HAS_ALPHA ) != 0 )
+	if( !sourceTexture.tex || ( !cofCustom && ( sourceTexture.flags & TF_HAS_ALPHA ) != 0 ) )
 		return sourceTexture.tex;
 
 	if( g_remixDecalTextures.size( ) <= static_cast<size_t>( textureIndex ) )
@@ -1443,12 +1464,7 @@ static IDirect3DTexture9 *R_RemixLegacyDecalTexture( int textureIndex )
 			const int b = source[0];
 			const int g = source[1];
 			const int r = source[2];
-			const int deviation = std::max( abs( r * 2 - 255 ),
-				std::max( abs( g * 2 - 255 ), abs( b * 2 - 255 ) ) );
-
-			// Legacy decals use ~127 RGB as the neutral multiplicative value.
-			const int alpha = std::max( 0, std::min( 255,
-				( deviation - 8 ) * 2 ) );
+			const int alpha = cof_decal::inkAlpha( r, g, b );
 			destination[0] = static_cast<byte>( b );
 			destination[1] = static_cast<byte>( g );
 			destination[2] = static_cast<byte>( r );
@@ -1957,6 +1973,94 @@ static void R_PruneDecalLimit( )
 	}
 }
 
+
+static std::vector<cof_decal::Message> g_cofPendingDecals, g_cofStaticDecals;
+static std::vector<cof_decal::Group> g_cofDecalGroups;
+static bool g_cofDefinitionsLoaded = false;
+static unsigned g_cofVariantSerial = 0;
+static void R_LoadCofDecalDefinitions( )
+{
+ if( g_cofDefinitionsLoaded ) return;
+ g_cofDefinitionsLoaded = true;
+ const fs_api_t *fs = gEngfuncs.fsapi;
+ if( !fs || !fs->Open || !fs->Read || !fs->Close || !fs->FileLength ) return;
+ file_t *file = fs->Open( "gfx/decals/decalinfo.txt", "rb", false );
+ if( !file ) return;
+ const fs_offset_t size = fs->FileLength( file );
+ if( size > 0 && size <= 1024 * 1024 ) {
+  std::vector<char> text( static_cast<size_t>( size ) );
+  if( fs->Read( file, text.data( ), text.size( ) ) == size )
+   g_cofDecalGroups = cof_decal::parse( text.data( ), text.size( ) );
+ }
+ fs->Close( file );
+}
+static int R_AddCofDecal( const cof_decal::Message &message )
+{
+ if( !g_dxDecalMapReady || !g_worldmodel || g_worldmodel->type != mod_brush ) {
+  if( g_cofPendingDecals.size( ) >= 256 ) return 0;
+  g_cofPendingDecals.push_back( message ); return 1;
+ }
+ R_LoadCofDecalDefinitions( );
+ const cof_decal::Group *group = nullptr;
+ for( const auto &candidate : g_cofDecalGroups )
+  if( candidate.name == message.group ) { group = &candidate; break; }
+ if( !group || group->variants.empty( ) ) return 0;
+ if( message.flags ) for( const auto &previous : g_cofStaticDecals )
+  if( previous.group == message.group && previous.origin == message.origin && previous.normal == message.normal ) return 1;
+ const auto &variant = group->variants[g_cofVariantSerial++ % group->variants.size( )];
+ const std::string path = "gfx/decals/" + variant.texture + ".tga";
+ const int texture = DX_LoadTexture( path.c_str( ), nullptr, 0, TF_CLAMP | TF_NOMIPMAP );
+ if( texture <= 0 ) return 0;
+ cof_decal::Vec tangent, bitangent;
+ cof_decal::axes( message.normal, tangent, bitangent );
+ const float radius = sqrtf( variant.halfWidth * variant.halfWidth + variant.halfHeight * variant.halfHeight );
+ if( !message.flags ) {
+  const float distance = radius * variant.overlap * 2.0f;
+  g_dxDecals.erase( std::remove_if( g_dxDecals.begin( ), g_dxDecals.end( ), [&]( const dx_decal_t &d ) {
+   const cof_decal::Vec delta{d.position[0]-message.origin[0],d.position[1]-message.origin[1],d.position[2]-message.origin[2]};
+   return d.cofCustom && !(d.flags & FDECAL_PERMANENT) && d.textureIndex == texture && cof_decal::dot(delta,delta)<distance*distance;
+  }),g_dxDecals.end( ) );
+ }
+ int firstSurface = 0, surfaceCount = 0;
+ if( !R_GetBrushSurfaceRange(g_worldmodel,firstSurface,surfaceCount) ) return 0;
+ const size_t before = g_dxDecals.size( );
+ for( int i=0; i<surfaceCount; ++i ) {
+  const msurface_t *surface = &g_worldmodel->surfaces[firstSurface+i];
+  if( !R_SurfaceCanReceiveDecal(surface) || surface->numedges>4096 ) continue;
+  cof_decal::Vec normal{surface->plane->normal[0],surface->plane->normal[1],surface->plane->normal[2]};
+  const float planeDistance = cof_decal::dot(message.origin,normal)-surface->plane->dist;
+  if( surface->flags & SURF_PLANEBACK ) for( float &v : normal ) v=-v;
+  if( cof_decal::dot(normal,message.normal)<0.7f || fabsf(planeDistance)>radius ) continue;
+  std::vector<dx_decal_clip_vertex_t> polygon;
+  polygon.reserve(surface->numedges);
+  for( int edge=0; edge<surface->numedges; ++edge ) {
+   const mvertex_t *v=R_GetBrushSurfaceVertex(g_worldmodel,surface,edge);
+   if(!v){polygon.clear();break;}
+   const cof_decal::Vec delta{v->position[0]-message.origin[0],v->position[1]-message.origin[1],v->position[2]-message.origin[2]};
+   polygon.push_back({{v->position[0],v->position[1],v->position[2]},cof_decal::dot(delta,tangent),cof_decal::dot(delta,bitangent)});
+  }
+  R_DecalClipAgainstPlane(polygon,0,-variant.halfWidth,false);
+  R_DecalClipAgainstPlane(polygon,0,variant.halfWidth,true);
+  R_DecalClipAgainstPlane(polygon,1,-variant.halfHeight,false);
+  R_DecalClipAgainstPlane(polygon,1,variant.halfHeight,true);
+  if(polygon.size()<3)continue;
+  dx_decal_t decal;decal.textureIndex=texture;decal.cofCustom=true;
+  decal.flags=static_cast<byte>(FDECAL_DONTSAVE|(message.flags?FDECAL_PERMANENT:0));decal.surface=surface;
+  for(int j=0;j<3;++j){decal.position[j]=message.origin[j];decal.normal[j]=normal[j];}
+  const auto vertex=[&](const dx_decal_clip_vertex_t &v){return dx_decal_vertex_t{v.position[0],v.position[1],v.position[2],D3DCOLOR_ARGB(255,255,255,255),0.5f+v.s/(2*variant.halfWidth),0.5f+v.t/(2*variant.halfHeight)};};
+  for(size_t j=2;j<polygon.size();++j){decal.vertices.push_back(vertex(polygon[0]));decal.vertices.push_back(vertex(polygon[j-1]));decal.vertices.push_back(vertex(polygon[j]));}
+  g_dxDecals.push_back(std::move(decal));
+ }
+ const bool produced=g_dxDecals.size()>before;
+ if(produced&&message.flags&&g_cofStaticDecals.size()<4096)g_cofStaticDecals.push_back(message);
+ R_PruneDecalLimit();return produced?1:0;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofCustomDecalV1(const void *data,int size)
+{
+ cof_decal::Message message;
+ return cof_decal::decode(data,size,message)?R_AddCofDecal(message):0;
+}
+
 void R_AddDecal( int textureIndex, int entityIndex, int modelIndex,
 	vec3_t position, int flags, float scale )
 {
@@ -2186,6 +2290,9 @@ void R_AddDecal( int textureIndex, int entityIndex, int modelIndex,
 void R_ActivateDecals( )
 {
 	g_dxDecalMapReady = true;
+ std::vector<cof_decal::Message> custom;
+ custom.swap(g_cofPendingDecals);
+ for(const auto &message:custom)R_AddCofDecal(message);
 	if( g_dxPendingDecals.empty( ) )
 		return;
 
@@ -2214,6 +2321,8 @@ void R_ActivateDecals( )
 
 void R_ClearDecals( )
 {
+ g_cofPendingDecals.clear();g_cofStaticDecals.clear();g_cofDecalGroups.clear();
+ g_cofDefinitionsLoaded=false;g_cofVariantSerial=0;
 	g_dxDecals.clear( );
 	g_dxPendingDecals.clear( );
 	R_ClearRemixDecalTextures( );
@@ -2384,7 +2493,7 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 			continue;
 		}
 
-		R_RefreshDecalLight( decal );
+		if( !decal.cofCustom ) R_RefreshDecalLight( decal );
 		decalDrawList.push_back( &decal );
 	}
 
@@ -2455,9 +2564,11 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 	for( size_t first = 0; first < decalDrawList.size( ); )
 	{
 		const int textureIndex = decalDrawList[first]->textureIndex;
+		const bool cofCustom = decalDrawList[first]->cofCustom;
 		size_t last = first + 1;
 		while( last < decalDrawList.size( ) &&
-			decalDrawList[last]->textureIndex == textureIndex )
+			decalDrawList[last]->textureIndex == textureIndex &&
+			decalDrawList[last]->cofCustom == cofCustom )
 		{
 			++last;
 		}
@@ -2502,10 +2613,12 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 
 		const bool hasAlpha = ( decalTexture.flags & TF_HAS_ALPHA ) != 0;
 		IDirect3DTexture9 *remixLegacyCutout = nullptr;
-		if( remixDecalCutout && !hasAlpha )
-			remixLegacyCutout = R_RemixLegacyDecalTexture( textureIndex );
-		const bool remixCutout = remixDecalCutout &&
-			( hasAlpha || remixLegacyCutout != nullptr );
+		if( ( remixDecal && cofCustom ) || ( remixDecalCutout && !hasAlpha ) )
+			remixLegacyCutout = R_RemixLegacyDecalTexture( textureIndex, cofCustom );
+		const bool remixCutout = ( remixDecalCutout || ( remixDecal && cofCustom ) ) &&
+			( ( hasAlpha && !cofCustom ) || remixLegacyCutout != nullptr );
+		// An unconverted gray card must never enter a ray-traced capture.
+		if( remixDecal && cofCustom && !remixLegacyCutout ) { first = last; continue; }
 		if( remixCutout )
 		{
 			const DWORD alphaRef = static_cast<DWORD>( std::max( 0.0f,
@@ -2522,8 +2635,10 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 			DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
 			DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
 			DX_SetRenderStateCached( D3DRS_SRCBLEND,
-				premultiplied ? D3DBLEND_ONE : D3DBLEND_SRCALPHA );
-			DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
+				cofCustom ? D3DBLEND_DESTCOLOR :
+				( premultiplied ? D3DBLEND_ONE : D3DBLEND_SRCALPHA ) );
+			DX_SetRenderStateCached( D3DRS_DESTBLEND,
+				cofCustom ? D3DBLEND_SRCCOLOR : D3DBLEND_INVSRCALPHA );
 		}
 
 		if( remixDecal )
@@ -3464,7 +3579,7 @@ bool R_UploadWorldBatch( world_material_batch_t &batch )
 	if( dx_dlight_world.value == 0.0f )
 	{
 		std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
-		std::vector<DWORD>( ).swap( batch.indices );
+		if(batch.surfaceRanges.empty()) std::vector<DWORD>( ).swap( batch.indices );
 	}
 	return true;
 }
@@ -3582,7 +3697,7 @@ bool R_UploadWorldBatches( world_model_draw_t &model )
 		for( auto &batch : model.batches )
 		{
 			std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
-			std::vector<DWORD>( ).swap( batch.indices );
+			if(batch.surfaceRanges.empty()) std::vector<DWORD>( ).swap( batch.indices );
 		}
 	}
 

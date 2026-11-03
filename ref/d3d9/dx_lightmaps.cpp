@@ -1,5 +1,84 @@
+#include "dx_batching.h"
 
 #include "dx_local.h"
+#include "dx_geometry_stability.h"
+#include "dx_camera_flash.h"
+#include "dx_effect_timing.h"
+#include "dx_cof_light_render.h"
+#include <cstdarg>
+
+static unsigned g_cofLightFlags=0;
+static float g_cofLightUpdate=-99999.f;
+static dx_cof_light_bridge_t g_cofLightBridge;
+static bool g_cofV2=false;
+static bool g_cofClientPresent=false;
+static dx_camera_flash_t g_cameraFlash;
+static bool R_CofCameraFlashDescription(D3DLIGHT9& light) {
+ const float now=R_CurrentRenderTime(0.f),fade=g_cameraFlash.fade(now);
+ if(fade<=0)return false;
+ if(dx_cof_camera_flash.value==0.f||dx_dlights.value==0.f||dx_dlight_fixed.value==0.f||
+    !g_cofV2||!g_cofLightBridge.published||!DX_CofFresh(g_cofLightBridge.packet.time,now)||
+    g_cofLightBridge.packet.reasons!=0){g_cameraFlash.clear();return false;}
+ auto pose=g_cofLightBridge.packet;
+ if(!R_CofCameraFlashPose(pose)){g_cameraFlash.clear();return false;}
+ const float brightness=dx_cof_camera_flash_brightness.value;
+ if(!std::isfinite(brightness)||brightness<=0){g_cameraFlash.clear();return false;}
+ light={};light.Type=D3DLIGHT_SPOT;
+ light.Position={pose.origin[0],pose.origin[1],pose.origin[2]};
+ const float length=sqrtf(pose.direction[0]*pose.direction[0]+pose.direction[1]*pose.direction[1]+pose.direction[2]*pose.direction[2]);
+ light.Direction={pose.direction[0]/length,pose.direction[1]/length,pose.direction[2]/length};
+ light.Diffuse.r=light.Diffuse.g=light.Diffuse.b=std::min(4.f,brightness)*R_DynamicLightIntensityScale()*fade;
+ light.Diffuse.a=1;light.Range=600;light.Attenuation0=1;
+ light.Attenuation2=3.f/(light.Range*light.Range);light.Theta=DEG2RAD(65.f);light.Phi=DEG2RAD(90.f);light.Falloff=1;
+ return light.Diffuse.r>0;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashV1(float time) {
+ D3DLIGHT9 check;
+ if(!std::isfinite(time)||!DX_CofFresh(time,R_CurrentRenderTime(0.f))){g_cameraFlash.clear();return 0;}
+ if(!g_cameraFlash.trigger(time))return 0;
+ const bool valid=R_CofCameraFlashDescription(check);
+ if(valid)R_CofLightDebug("camera photo pulse t=%.4f duration=%.3f",time,dx_camera_flash_t::duration);
+ return valid?1:0;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashDescriptionV1(D3DLIGHT9* light) {
+ return light&&R_CofCameraFlashDescription(*light)?1:0;
+}
+bool R_CofClientPresent(){return g_cofClientPresent;}
+void R_CofLightDebug(const char* format,...) {
+ static unsigned budget=240;static bool enabled=false;
+ if(dx_cof_light_debug.value==0.f){enabled=false;return;}
+ if(!enabled){enabled=true;budget=240;}
+ if(!budget||!gEngfuncs.Con_Printf)return;
+ --budget;char message[1024];va_list args;va_start(args,format);
+ vsnprintf(message,sizeof(message),format,args);va_end(args);
+ gEngfuncs.Con_Printf("COF LIGHT: %s\n",message);
+}
+void R_ResetCofLights() {
+ g_cameraFlash.clear();
+ if(device)for(int i=0;i<g_dxFixedLightCount;++i)device->LightEnable(i,FALSE);
+ g_dxFixedLightCount=0;
+ g_cofLightFlags=0;g_cofLightUpdate=-99999.f;g_cofLightBridge={};g_cofV2=false;g_cofClientPresent=false;
+}
+extern "C" __declspec(dllexport) void __cdecl DX_CofLightStateV1(unsigned flags) {
+ g_cofClientPresent=true;g_cofV2=false;g_cofLightFlags=flags&DX_COF_SUPPORTED_FLAGS;g_cofLightUpdate=R_CurrentRenderTime(0.f);
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofLightStateV2(const dx_cof_light_state_v2* source) {
+ g_cofClientPresent=true;g_cofV2=true;
+ const bool valid=g_cofLightBridge.publish(source);
+ static unsigned lastRaw=~0u,lastFlags=~0u,lastReasons=~0u;
+ static bool lastDebug=false;const bool debug=dx_cof_light_debug.value!=0.f;
+ const auto& p=g_cofLightBridge.packet;
+ if(debug!=lastDebug||!valid||lastRaw!=p.rawFlags||lastFlags!=p.eligibleFlags||lastReasons!=p.reasons) {
+  R_CofLightDebug("publication valid=%d raw=%u eligible=%u reasons=0x%x t=%.4f origin=(%.2f %.2f %.2f) direction=(%.3f %.3f %.3f)",
+   valid,p.rawFlags,p.eligibleFlags,p.reasons,p.time,p.origin[0],p.origin[1],p.origin[2],p.direction[0],p.direction[1],p.direction[2]);
+  lastRaw=p.rawFlags;lastFlags=p.eligibleFlags;lastReasons=p.reasons;lastDebug=debug;
+ }
+ return valid?1:0;
+}
+static unsigned R_CofLightFlags() {
+ const float now=R_CurrentRenderTime(0.f);
+ return g_cofV2?g_cofLightBridge.flags(now):(DX_CofFresh(g_cofLightUpdate,now)?g_cofLightFlags:0);
+}
 
 namespace
 {
@@ -2685,9 +2764,7 @@ static void R_CollectDynamicLightArray( const dlight_t *lights, int count,
 	for( int i = 0; i < count; ++i )
 	{
 		const dlight_t &light = lights[i];
-		if( light.radius <= 1.0f || light.dark )
-			continue;
-		if( light.die > 0.0f && light.die < now )
+		if( !DX_LightAlive(light.radius,light.die,now) || light.dark )
 			continue;
 
 		// Remix replaces the legacy flashlight point light with a cone.
@@ -2724,7 +2801,7 @@ void R_CollectMuzzleLights( void )
 	const float now = R_CurrentRenderTime( 0.0f );
 	for( const muzzleflash_t &flash : g_rendererMuzzleFlashes )
 	{
-		if( flash.dieTime <= now )
+		if( !DX_FlashAlive(flash.startTime,flash.dieTime,now) || (flash.viewModel && flash.entity && flash.model!=flash.entity->model) )
 			continue;
 
 		const float life = std::max( 0.0f, flash.dieTime - now );
@@ -2889,30 +2966,107 @@ static void R_FillRemixFlashlight( const cl_entity_s *entity, D3DLIGHT9 &light )
 	light.Falloff = 1.0f;
 }
 
+static void R_ApplyCofLightShape(unsigned flags,D3DLIGHT9 &light) {
+    auto profile=DX_CofLightProfile(flags);
+    if(flags&DX_COF_HANDHELD)profile.intensity*=std::isfinite(dx_cof_flashlight_brightness.value)?std::max(0.f,std::min(4.f,dx_cof_flashlight_brightness.value)):.25f;
+    light.Range=700.f;
+    light.Theta=DEG2RAD(profile.innerDegrees);
+    light.Phi=DEG2RAD(profile.outerDegrees);
+    light.Attenuation2=3.f/(light.Range*light.Range);
+    light.Diffuse.r*=profile.intensity;
+    light.Diffuse.g*=profile.intensity;
+    light.Diffuse.b*=profile.intensity;
+}
+// CPU descriptor query also exercises the production builder without a device.
+static bool R_CofLightDescription(D3DLIGHT9& light) {
+ unsigned flags=R_CofLightFlags();
+ // Native holster/network flags can outlive the equipped handheld model.
+ // Remove only that source; phone and weapon-mounted lights remain eligible.
+ if(!R_CofHandheldLightEquipped())flags&=~DX_COF_HANDHELD;
+ if(dx_cof_light_test.value!=0.f)flags=1;
+ if(dx_cof_flashlight.value==0.f||!flags)return false;
+ if(g_cofV2 && g_cofLightBridge.published) {
+  auto p=g_cofLightBridge.packet;
+  if(dx_cof_light_test.value!=0.f && gpGlobals) {
+   VectorCopy(gpGlobals->vieworg,p.origin);AngleVectors(gpGlobals->viewangles,p.direction,nullptr,nullptr);
+  }
+  const bool handheld=(flags&DX_COF_HANDHELD)&&dx_cof_light_test.value==0.f;
+  const bool phone=dx_cof_light_test.value==0.f&&R_CofPhoneLightActive(flags);
+  if(handheld&&!R_CofHandheldLightPose(p))return false;
+  if(phone&&!R_CofPhoneLightPose(p))return false;
+  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light,
+   dx_cof_flashlight_brightness.value,(handheld||phone)?0.f:4.f);
+ }
+ // V1 supports old client proxies and the reference test can run without a player lookup.
+ if(dx_cof_light_test.value!=0.f && gpGlobals) {
+  dx_cof_light_state_v2 p;
+  VectorCopy(gpGlobals->vieworg,p.origin);AngleVectors(gpGlobals->viewangles,p.direction,nullptr,nullptr);
+  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light);
+ }
+ if(!gp_cl||!gEngfuncs.R_BeamGetEntity)return false;
+ auto entity=gEngfuncs.R_BeamGetEntity(gp_cl->playernum+1);
+ if(!entity)return false;
+ if((flags&DX_COF_HANDHELD)||R_CofPhoneLightActive(flags)) {
+  dx_cof_light_state_v2 p;p.time=R_CurrentRenderTime(0.f);
+  VectorCopy(g_vForward,p.direction);
+  if(flags&DX_COF_HANDHELD){if(!R_CofHandheldLightPose(p))return false;}
+  else if(!R_CofPhoneLightPose(p))return false;
+  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light,dx_cof_flashlight_brightness.value,0.f);
+ }
+ R_FillRemixFlashlight(entity,light);R_ApplyCofLightShape(flags,light);return true;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofLightDescriptionV1(D3DLIGHT9* light) {
+ return light&&R_CofLightDescription(*light)?1:0;
+}
+
 static int R_EmitRemixFlashlights( int maxLights )
 {
-	if( dx_remix.value == 0.0f || maxLights <= 0 || !gp_cl ||
-		!gEngfuncs.R_BeamGetEntity ||
-		( dx_dlight_engine.value == 0.0f && dx_dlight_entities.value == 0.0f ) )
+	if(!DX_CofEmissionEnabled(dx_remix.value!=0.f,dx_dlights.value!=0.f,dx_dlight_fixed.value!=0.f,true,maxLights)||!gp_cl||!device)
 	{
 		return 0;
 	}
 
 	int emitted = 0;
+    D3DLIGHT9 local{};
+    const bool haveLocal=R_CofLightDescription(local);
+    if(haveLocal) {
+        HRESULT setResult=D3D_OK,enableResult=D3D_OK;
+        const bool ok=DX_CofSubmit(0,local,
+            [&](unsigned slot,const D3DLIGHT9& light){setResult=device->SetLight(slot,&light);return static_cast<long>(setResult);},
+            [&](unsigned slot,bool on){const auto result=device->LightEnable(slot,on?TRUE:FALSE);if(on)enableResult=result;return static_cast<long>(result);});
+        if(ok)++emitted;
+        static unsigned previous=~0u;const unsigned state=R_CofLightFlags()|(ok?256u:0u)|(dx_cof_light_debug.value!=0.f?512u:0u);
+        if(state!=previous||!ok) {
+            R_CofLightDebug("submit flags=%u test=%d pose=%s slot=0 SetLight=0x%08x LightEnable=0x%08x range=%.1f rgb=(%.3f %.3f %.3f) origin=(%.2f %.2f %.2f) dir=(%.3f %.3f %.3f)",
+                R_CofLightFlags(),dx_cof_light_test.value!=0.f,((R_CofLightFlags()&DX_COF_HANDHELD)&&dx_cof_light_test.value==0.f)?"lens":"camera",static_cast<unsigned>(setResult),static_cast<unsigned>(enableResult),
+                local.Range,local.Diffuse.r,local.Diffuse.g,local.Diffuse.b,local.Position.x,local.Position.y,local.Position.z,local.Direction.x,local.Direction.y,local.Direction.z);previous=state;
+        }
+    }
+    D3DLIGHT9 photo{};
+    if(R_CofCameraFlashDescription(photo)&&emitted<maxLights) {
+        HRESULT setResult=D3D_OK,enableResult=D3D_OK;
+        const bool ok=DX_CofSubmit(static_cast<unsigned>(emitted),photo,
+            [&](unsigned slot,const D3DLIGHT9& light){setResult=device->SetLight(slot,&light);return static_cast<long>(setResult);},
+            [&](unsigned slot,bool on){const auto result=device->LightEnable(slot,on?TRUE:FALSE);if(on)enableResult=result;return static_cast<long>(result);});
+        if(ok)++emitted;
+        R_CofLightDebug("camera flash submit SetLight=0x%08x LightEnable=0x%08x rgb=%.3f origin=(%.2f %.2f %.2f)",
+            static_cast<unsigned>(setResult),static_cast<unsigned>(enableResult),photo.Diffuse.r,photo.Position.x,photo.Position.y,photo.Position.z);
+    }
+    if(!gEngfuncs.R_BeamGetEntity || (dx_dlight_engine.value==0.f && dx_dlight_entities.value==0.f))return emitted;
 	const int localIndex = gp_cl->playernum + 1;
 	auto emitPlayer = [&]( int playerIndex )
 	{
 		if( emitted >= maxLights )
 			return;
 		cl_entity_s *entity = nullptr;
-		if( !R_RemixPlayerFlashlightEntity( playerIndex, &entity ) )
-			return;
+		if(playerIndex==localIndex && (haveLocal || R_CofLightFlags()))return;
+		if(!R_RemixPlayerFlashlightEntity(playerIndex,&entity))return;
+		if( !entity ) return;
 
 		D3DLIGHT9 light{};
 		R_FillRemixFlashlight( entity, light );
-		device->SetLight( emitted, &light );
-		device->LightEnable( emitted, TRUE );
-		++emitted;
+		if(SUCCEEDED(device->SetLight( emitted, &light )) &&
+			SUCCEEDED(device->LightEnable( emitted, TRUE ))) ++emitted;
 	};
 
 	if( localIndex > 0 && localIndex <= gp_cl->maxclients )
@@ -2930,8 +3084,23 @@ void R_ApplyDLights( void )
 	if( !device )
 		return;
 
+    static unsigned previousStatus=~0u;
+    static int previousMax=-1;static float previousIntensity=-1,previousBrightness=-1;
+    // Low four bits belong to native lights; diagnostic gates start at bit4.
+    const unsigned status=R_CofLightFlags() | (dx_remix.value!=0.f?16u:0u) |
+        (dx_dlights.value!=0.f?32u:0u) | (dx_dlight_fixed.value!=0.f?64u:0u) |
+        (dx_cof_flashlight.value!=0.f?128u:0u) | (dx_cof_light_test.value!=0.f?256u:0u) |
+        (dx_cof_light_debug.value!=0.f?512u:0u);
+    if(status!=previousStatus||previousMax!=R_DynamicLightsMax()||previousIntensity!=dx_dlight_intensity.value||previousBrightness!=dx_cof_flashlight_brightness.value) {
+        R_CofLightDebug("gates flags=%u remix=%g global=%g fixed=%g cof=%g test=%g intensity=%g handheldBrightness=%g max=%d publicationAge=%.4f v2=%d",
+            R_CofLightFlags(),dx_remix.value,dx_dlights.value,dx_dlight_fixed.value,dx_cof_flashlight.value,
+            dx_cof_light_test.value,dx_dlight_intensity.value,dx_cof_flashlight_brightness.value,R_DynamicLightsMax(),R_CurrentRenderTime(0.f)-(g_cofV2?g_cofLightBridge.packet.time:g_cofLightUpdate),g_cofV2);
+        previousStatus=status;previousMax=R_DynamicLightsMax();previousIntensity=dx_dlight_intensity.value;previousBrightness=dx_cof_flashlight_brightness.value;
+    }
+
 	if( !R_DynamicLightsEnabled( ) || dx_dlight_fixed.value == 0.0f )
 	{
+		g_cameraFlash.clear();
 		for( int i = 0; i < g_dxFixedLightCount; ++i )
 			device->LightEnable( i, FALSE );
 		g_dxFixedLightCount = 0;
@@ -3406,6 +3575,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 
 	muzzleflash_t flash;
 	flash.entity = ent;
+	flash.model = ent?ent->model:nullptr;
 	VectorCopy( origin, flash.origin );
 
 	const float forwardOffset = std::max( -16.0f,
@@ -4158,33 +4328,7 @@ static bool R_BrushEntityUsesLightmap( const world_model_draw_t &model,
 static bool R_RemixGlassSurfaceFacesView(
 	const world_surface_draw_range_t &range, const D3DMATRIX &world )
 {
-	const float normalLengthSq = range.normal[0] * range.normal[0] +
-		range.normal[1] * range.normal[1] + range.normal[2] * range.normal[2];
-	if( normalLengthSq <= 1e-12f )
-		return true;
-
-	const float localX = range.normal[0] * range.planeDist;
-	const float localY = range.normal[1] * range.planeDist;
-	const float localZ = range.normal[2] * range.planeDist;
-
-	const float worldX = localX * world._11 + localY * world._21 +
-		localZ * world._31 + world._41;
-	const float worldY = localX * world._12 + localY * world._22 +
-		localZ * world._32 + world._42;
-	const float worldZ = localX * world._13 + localY * world._23 +
-		localZ * world._33 + world._43;
-
-	const float normalX = range.normal[0] * world._11 +
-		range.normal[1] * world._21 + range.normal[2] * world._31;
-	const float normalY = range.normal[0] * world._12 +
-		range.normal[1] * world._22 + range.normal[2] * world._32;
-	const float normalZ = range.normal[0] * world._13 +
-		range.normal[1] * world._23 + range.normal[2] * world._33;
-
-	const float toEyeX = g_vOrigin[0] - worldX;
-	const float toEyeY = g_vOrigin[1] - worldY;
-	const float toEyeZ = g_vOrigin[2] - worldZ;
-	return normalX * toEyeX + normalY * toEyeY + normalZ * toEyeZ > 0.01f;
+	return DX_GlassFacesView(range.normal,range.planeDist,&world._11,g_vOrigin);
 }
 
 void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
@@ -4331,50 +4475,50 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		const bool filterRemixGlassSurfaces = remixSingleSidedGlass &&
 			!batch.surfaceRanges.empty( );
 
-		if( filterRemixGlassSurfaces )
-		{
-			if( batch.vertexBuffer && batch.indexBuffer && !useSharedGeometry )
-			{
-				device->SetStreamSource( 0, batch.vertexBuffer, 0,
-					sizeof( lightmap_vertex_t ) );
-				device->SetIndices( batch.indexBuffer );
-			}
-
-			for( const world_surface_draw_range_t &range : batch.surfaceRanges )
-			{
-				if( range.indexCount < 3 ||
-					!R_RemixGlassSurfaceFacesView( range, remixGlassWorld ) )
-				{
-					continue;
-				}
-
-				const UINT primitiveCount = range.indexCount / 3;
-				DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
-
-				if( useSharedGeometry )
-				{
-					DX_ProfileDraw( true, primitiveCount );
-					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
-						static_cast<INT>( batch.sharedBaseVertex ), 0,
-						batch.vertexCount, batch.sharedStartIndex + range.firstIndex,
-						primitiveCount );
-				}
-				else if( batch.vertexBuffer && batch.indexBuffer )
-				{
-					DX_ProfileDraw( true, primitiveCount );
-					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0,
-						batch.vertexCount, range.firstIndex, primitiveCount );
-				}
-				else if( !batch.vertices.empty( ) && !batch.indices.empty( ) &&
-					range.firstIndex + range.indexCount <= batch.indices.size( ) )
-				{
-					R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
-						static_cast<UINT>( batch.vertices.size( ) ), primitiveCount,
-						batch.indices.data( ) + range.firstIndex, D3DFMT_INDEX32,
-						batch.vertices.data( ), sizeof( lightmap_vertex_t ) );
-				}
-			}
-		}
+        if( filterRemixGlassSurfaces )
+        {
+            const size_t total=static_cast<size_t>(batch.primitiveCount)*3;
+            std::vector<dx_index_span_t> visible;
+            DX_ForEachStableGlassSpan(batch.surfaceRanges,total,
+                dx_remix_glass_batch.value!=0.f,
+                [&](const world_surface_draw_range_t& plane,size_t first,size_t count) {
+                    DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_SURFACE,1);
+                    if(!R_RemixGlassSurfaceFacesView(plane,remixGlassWorld)) {
+                        DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_CULLED,1); return;
+                    }
+                    visible.push_back({first,count});
+                });
+            const bool gpu=useSharedGeometry || (batch.vertexBuffer && batch.indexBuffer);
+            auto bindOriginal=[&]() {
+                if(gpu) {
+                    device->SetStreamSource(0,useSharedGeometry?model.sharedVertexBuffer:batch.vertexBuffer,
+                        0,sizeof(lightmap_vertex_t));
+                    device->SetIndices(useSharedGeometry?model.sharedIndexBuffer:batch.indexBuffer);
+                }
+            };
+            auto recordDraw=[]() {
+                DX_ProfileEvent(DX_PROFILE_EVENT_WORLD_BATCH_DRAWN,1);
+                DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_DRAW,1);
+            };
+            auto drawRange=[&](const dx_index_span_t& span) {
+                bindOriginal();
+                if(gpu) {
+                    DX_ProfileDraw(true,static_cast<UINT>(span.count/3));
+                    device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
+                        useSharedGeometry?static_cast<INT>(batch.sharedBaseVertex):0,0,batch.vertexCount,
+                        (useSharedGeometry?batch.sharedStartIndex:0)+static_cast<UINT>(span.first),
+                        static_cast<UINT>(span.count/3));
+                    recordDraw();
+                } else if(!batch.vertices.empty() && batch.indices.size()>=total) {
+                    if(R_DrawScratchIndexedPrimitive(D3DPT_TRIANGLELIST,
+                        static_cast<UINT>(batch.vertices.size()),static_cast<UINT>(span.count/3),
+                        batch.indices.data()+span.first,D3DFMT_INDEX32,batch.vertices.data(),sizeof(lightmap_vertex_t)))
+                        recordDraw();
+                }
+            };
+            // Submit original fixed ranges, never a camera-dependent merged IB.
+            for(const auto& span:visible) drawRange(span);
+        }
 		else if( useSharedGeometry )
 		{
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );

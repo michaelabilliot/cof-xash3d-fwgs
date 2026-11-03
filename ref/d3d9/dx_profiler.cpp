@@ -64,7 +64,13 @@ static const char *g_dxProfileEventNames[DX_PROFILE_EVENT_COUNT] =
 	"studio local light candidates",
 	"studio sky probes used",
 	"2D quads queued",
-	"2D batches drawn"
+	"2D batches drawn",
+	"TriangleAPI source submissions",
+	"TriangleAPI batched draws",
+	"glass surfaces considered",
+	"glass surfaces culled",
+	"glass output draws",
+	"glass index upload bytes"
 };
 
 struct dx_profile_stats_t

@@ -725,4 +725,12 @@ static inline qboolean SV_CheckGroupTrace( const edict_t *e1, const edict_t *e2 
 	return true;
 }
 
+struct ref_ragdoll_claim_s;
+struct ref_ragdoll_claim_s *SV_RagdollClaim(int index);
+qboolean SV_RagdollOwnsPlayerCollision(int index,int modelindex);
+struct ref_ragdoll_entity_s;
+void SV_RagdollReadImpact( int index, struct ref_ragdoll_entity_s *snapshot );
+int SV_RagdollTraceBone(edict_t *ent,const vec3_t start,const vec3_t end,float fraction,vec3_t local);
+void SV_RagdollConfirmImpacts( void );
+unsigned int *SV_RagdollAck(int index);
 #endif//SERVER_H

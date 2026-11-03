@@ -2094,15 +2094,31 @@ pfnTraceLine
 
 =================
 */
+#if defined(_MSC_VER) && defined(_M_IX86)
+#pragma optimize("y", off)
+#endif
+#include "sv_ragdoll_source.h"
+#include "sv_ragdoll_hits.h"
 static void GAME_EXPORT pfnTraceLine( const float *v1, const float *v2, int fNoMonsters, edict_t *pentToSkip, TraceResult *ptr )
 {
 	trace_t	trace;
+    ragdoll_native_shot_t context;
+    uintptr_t frame=0;
+#if defined(_MSC_VER) && defined(_M_IX86)
+    frame=(uintptr_t)_AddressOfReturnAddress()-sizeof(uintptr_t);
+#endif
+    qboolean bullet=SV_RagdollBulletContext(pentToSkip,frame,&context);
 
 	trace = SV_Move( v1, vec3_origin, vec3_origin, v2, fNoMonsters, pentToSkip, false );
 	if( !SV_IsValidEdict( trace.ent ))
 		trace.ent = svgame.edicts;
 	SV_ConvertTrace( ptr, &trace );
+	if(bullet) SV_RagdollRecordTrace(v1,v2,pentToSkip,ptr,&context);
+    else SV_RagdollRejectTrace(pentToSkip,ptr,context.rejected);
 }
+#if defined(_MSC_VER) && defined(_M_IX86)
+#pragma optimize("", on)
+#endif
 
 /*
 =================
@@ -5183,7 +5199,8 @@ void SV_UnloadProgs( void )
 	Mod_ResetStudioAPI ();
 
 	COM_FreeLibrary( svgame.hInstance );
-	Mem_FreePool( &svgame.mempool );
+	ragdoll_hits=NULL;ragdoll_hit_capacity=0;memset(&ragdoll_shot,0,sizeof(ragdoll_shot));
+    Mem_FreePool( &svgame.mempool );
 	memset( &svgame, 0, sizeof( svgame ));
 }
 
@@ -5238,7 +5255,8 @@ qboolean SV_LoadProgs( const char *name )
 		COM_FreeLibrary( svgame.hInstance );
 		Con_Printf( S_ERROR "%s: failed to get address of GetEntityAPI proc\n", __func__ );
 		svgame.hInstance = NULL;
-		Mem_FreePool( &svgame.mempool );
+		ragdoll_hits=NULL;ragdoll_hit_capacity=0;memset(&ragdoll_shot,0,sizeof(ragdoll_shot));
+    Mem_FreePool( &svgame.mempool );
 		return false;
 	}
 
@@ -5250,7 +5268,8 @@ qboolean SV_LoadProgs( const char *name )
 		COM_FreeLibrary( svgame.hInstance );
 		Con_Printf( S_ERROR "%s: failed to get address of GiveFnptrsToDll proc\n", __func__ );
 		svgame.hInstance = NULL;
-		Mem_FreePool( &svgame.mempool );
+		ragdoll_hits=NULL;ragdoll_hit_capacity=0;memset(&ragdoll_shot,0,sizeof(ragdoll_shot));
+    Mem_FreePool( &svgame.mempool );
 		return false;
 	}
 
@@ -5293,7 +5312,8 @@ qboolean SV_LoadProgs( const char *name )
 		COM_FreeLibrary( svgame.hInstance );
 		Con_Printf( S_ERROR "%s: couldn't get entity API\n", __func__ );
 		svgame.hInstance = NULL;
-		Mem_FreePool( &svgame.mempool );
+		ragdoll_hits=NULL;ragdoll_hit_capacity=0;memset(&ragdoll_shot,0,sizeof(ragdoll_shot));
+    Mem_FreePool( &svgame.mempool );
 		return false;
 	}
 
@@ -5313,6 +5333,7 @@ qboolean SV_LoadProgs( const char *name )
 	svgame.globals->maxEntities = GI->max_edicts;
 	svgame.globals->maxClients = svs.maxclients;
 	svgame.edicts = Mem_Calloc( svgame.mempool, sizeof( edict_t ) * GI->max_edicts );
+    SV_RagdollInitHits(GI->max_edicts);
 	svs.static_entities = Z_Calloc( sizeof( entity_state_t ) * MAX_STATIC_ENTITIES );
 	svs.baselines = Z_Calloc( sizeof( entity_state_t ) * GI->max_edicts );
 	svgame.numEntities = svs.maxclients + 1; // clients + world

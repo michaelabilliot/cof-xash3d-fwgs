@@ -1,3 +1,5 @@
+#include "dx_cof_light.h"
+#include "dx_muzzle_policy.h"
 #pragma once
 
 #include <string.h>
@@ -317,6 +319,10 @@ struct attachment_cache_t
 
 struct muzzleflash_state_t
 {
+	const model_t *model = nullptr;
+	dx_muzzle_cursor_t cursor;
+	unsigned visibilityGeneration=0;
+	bool modelHasMuzzleEvents=false;
 	int lastSequence = -999999;
 
 	float lastFrame = -1.0f;
@@ -397,6 +403,7 @@ struct dx_line_light_t
 struct muzzleflash_t
 {
 	const cl_entity_s *entity;
+	const model_t *model;
 	vec3_t origin;
 	int textureId;
 	float scale;
@@ -521,6 +528,7 @@ struct studio_cache_t
 	model_t *model = nullptr;
 	int body = 0;
 	int skin = 0;
+	int hiddenArm = 0;
 	std::vector<studio_batch_t> batches;
 	IDirect3DVertexBuffer9 *combinedVertexBuffer = nullptr;
 	UINT combinedVertexCount = 0;
@@ -529,6 +537,7 @@ struct studio_cache_t
 	UINT gpuSkinSourceVertexCount = 0;
 	bool gpuSkinningBufferMode = false;
 	bool gpuSkinningPoseValid = false;
+	bool physicsPoseUploaded = false;
 	int gpuSkinningBoneCount = 0;
 	BoneMat34 gpuSkinningBoneMatrices[MAXSTUDIOBONES];
 
@@ -553,6 +562,8 @@ struct studio_cache_t
 	byte lastController[4] = {};
 	byte lastBlending[2] = {};
 	byte lastMouth = 0;
+	bool poseBudgetDeferred = false;
+	uint64_t poseBudgetDeferredFrame = 0;
 };
 
 struct studio_light_result_t
@@ -682,6 +693,12 @@ enum dx_profile_event_t
 	DX_PROFILE_EVENT_STUDIO_SKY_PROBE_USED,
 	DX_PROFILE_EVENT_2D_QUAD_QUEUED,
 	DX_PROFILE_EVENT_2D_BATCH_DRAWN,
+	DX_PROFILE_EVENT_TRI_SOURCE_DRAW,
+	DX_PROFILE_EVENT_TRI_BATCH_DRAWN,
+	DX_PROFILE_EVENT_GLASS_SURFACE,
+	DX_PROFILE_EVENT_GLASS_CULLED,
+	DX_PROFILE_EVENT_GLASS_DRAW,
+	DX_PROFILE_EVENT_GLASS_INDEX_BYTES,
 	DX_PROFILE_EVENT_COUNT
 };
 
@@ -764,6 +781,11 @@ enum dx_profile_event_t
 #endif
 
 void DX_AllowFog( qboolean allowed );
+enum dx_tri_flush_t { DX_TRI_FLUSH_STATE, DX_TRI_FLUSH_TEXTURE, DX_TRI_FLUSH_INCOMPATIBLE,
+    DX_TRI_FLUSH_CAPACITY, DX_TRI_FLUSH_PASS, DX_TRI_FLUSH_COUNT };
+void DX_TriBatchBarrier(int reason);
+bool R_DrawBoundVertexIndices(INT baseVertex,UINT vertexCount,const DWORD* indices,UINT count);
+extern convar_t dx_remix_glass_batch;
 void DX_BindRawTexture( int tmu, IDirect3DBaseTexture9 *texture );
 int DX_FindTexture( const char *name );
 void DX_InvalidateD3DStateCache( void );
@@ -812,6 +834,7 @@ void R_CollectBeamLights( void );
 void R_CollectEngineDLights( void );
 void R_CollectEntityDLight( const cl_entity_s *ent );
 void R_CollectMuzzleLights( void );
+void R_AddDLight(const vec3_t origin,float radius,int red,int green,int blue,float dieTime,int key);
 int R_CreateDecalList( struct decallist_s *pList );
 float R_CurrentRenderTime( float fallback );
 float R_DistancePointToSegmentSq( const vec3_t point, const vec3_t start, const vec3_t end, float &outFraction );
@@ -827,7 +850,7 @@ bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount, UIN
 bool R_DrawScratchPrimitive( D3DPRIMITIVETYPE type, UINT primitiveCount, UINT vertexCount, const void *vertices, UINT stride );
 void R_DrawSpriteImmediate( cl_entity_s *ent );
 void R_DrawStudioEntity( cl_entity_s *ent );
-void R_DrawStudioViewModel( cl_entity_s *ent, const vec3_t viewOrigin, const vec3_t viewAngles, const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp, float forwardOffset, float rightOffset, float upOffset );
+void R_DrawStudioViewModel( cl_entity_s *ent, const vec3_t viewOrigin, const vec3_t viewAngles, const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp, float forwardOffset, float rightOffset, float upOffset, bool mirror=false, bool muzzleEvents=true, int hiddenArm=0 );
 void R_DrawWaterIndexed( world_water_batch_t &batch );
 bool R_DrawWorldBrushes( model_t *mod );
 void R_DrawWorldWater( model_t *mod );
@@ -1064,6 +1087,8 @@ extern convar_t dx_studio_normal_lighting;
 extern convar_t dx_studio_normals;
 extern convar_t dx_studio_stagger_updates;
 extern convar_t dx_studio_update_budget;
+extern convar_t dx_studio_anim_debug;
+void R_BeginStudioPoseFrame();
 extern convar_t dx_studio_update_hz;
 extern convar_t dx_studio_upload_normals;
 extern convar_t dx_studio_viewmodel_throttle;
@@ -1080,3 +1105,21 @@ extern convar_t r_viewmodel_near;
 void CL_DrawParticles( double frametime, particle_t *particles, float partsize );
 void CL_DrawTracers( double frametime, particle_t *tracers );
 void CL_DrawBeams( int fTrans, BEAM *beams );
+
+extern convar_t dx_cof_flashlight,dx_cof_light_debug,dx_cof_light_test;
+void R_ResetCofLights();
+void R_CofLightDebug(const char* format,...);
+void R_RetireViewmodelFlashes(const cl_entity_s* entity);
+
+bool R_CofClientPresent();
+bool R_CofPlayerDrawAllowed(const cl_entity_s* entity);
+
+extern convar_t dx_cof_flashlight_brightness;
+extern convar_t dx_cof_camera_flash,dx_cof_camera_flash_brightness;
+bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose);
+int R_StudioCameraFlashPoint(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point);
+bool R_CofHandheldLightPose(dx_cof_light_state_v2& pose);
+bool R_CofHandheldLightEquipped();
+bool R_CofPhoneLightActive(unsigned flags);
+bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose);
+int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror=false);

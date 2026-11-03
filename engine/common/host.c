@@ -1262,6 +1262,9 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 #ifdef _WIN32
 		Wcon_ShowConsole( false ); // hide console
 #endif
+		// Apply commandline cvars after configs even when the mod has no .rc
+		// script (or its script omits stuffcmds).
+		host.stuffcmds_pending = true;
 		// execute startup config and cmdline
 		if( FS_FileExists( va( "%s.rc", progname ), false )) // e.g. valve.rc
 			Cbuf_AddTextf( "exec %s.rc\n", progname );

@@ -228,7 +228,10 @@ static void SV_AddLinksToPmove( areanode_t *node, const vec3_t pmove_mins, const
 
 		if( check == pl ) continue;	// himself
 
-		// nehahra collision flags
+		if( SV_RagdollOwnsPlayerCollision( NUM_FOR_EDICT( check ), check->v.modelindex ))
+            continue;
+
+        // nehahra collision flags
 		if( check->v.movetype != MOVETYPE_PUSH )
 		{
 			if(( FBitSet( check->v.flags, FL_CLIENT|FL_FAKECLIENT ) && check->v.health <= 0.0f ) || check->v.deadflag == DEAD_DEAD )
@@ -995,6 +998,9 @@ void SV_RunCmd( sv_client_t *cl, usercmd_t *ucmd, int random_seed )
 	// run post-think
 	svgame.dllFuncs.pfnPlayerPostThink( clent );
 	svgame.dllFuncs.pfnCmdEnd( clent );
+	// Weapons finish TraceAttack/ApplyMultiDamage synchronously in PostThink.
+	// Observe evidence before NPC think/removal or a later command can alter it.
+	SV_RagdollConfirmImpacts();
 
 	if( !FBitSet( cl->flags, FCL_FAKECLIENT ))
 	{
