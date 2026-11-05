@@ -201,6 +201,11 @@ def build(bld):
 		defines=['NOMINMAX'], use=['engine_includes','sdk_includes','public'],
 		cxxflags=bld.env.D3D9_CXXFLAGS+['/EHsc','/W4'],includes=['.'],subsystem='console')
 	if bld.options.verify_camera:
+		bld.program(source='verify_attachments.cpp', target='verify_attachments',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
 		bld.program(source='verify_viewmodel_units.cpp', target='verify_viewmodel_units',
 			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
 			use=['engine_includes', 'sdk_includes', 'public', 'werror'],

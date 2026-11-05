@@ -1200,7 +1200,7 @@ bool R_GetAttachmentPoint( const cl_entity_s *ent, int attachmentIndex, vec3_t o
 	return true;
 }
 
-static void R_StudioStoreAttachments( const cl_entity_s *ent,
+static void R_StudioStoreAttachments( cl_entity_s *ent,
 	studiohdr_t *hdr, const BoneMat34 *boneMatrices, const D3DMATRIX &world,
 	float renderTime )
 {
@@ -1228,6 +1228,11 @@ static void R_StudioStoreAttachments( const cl_entity_s *ent,
 		R_StudioTransformPointByWorld( world, localPoint, cache.points[i] );
 		cache.valid[i] = true;
 	}
+	// Client effects (including CoF's Aurora particles) read the public entity
+	// attachments directly, rather than going through R_GetAttachmentPoint.
+	for( int i = 0; i < count; ++i )
+		if( cache.valid[i] )
+			VectorCopy( cache.points[i], ent->attachment[i] );
 	if( count > 0 && cache.valid[0] )
 	{
 		for( int i = count; i < MAXSTUDIOATTACHMENTS; ++i )
@@ -1239,7 +1244,7 @@ static void R_StudioStoreAttachments( const cl_entity_s *ent,
 }
 
 static void R_StudioUpdateAttachments( studiohdr_t *hdr,
-	const cl_entity_s *ent, const BoneMat34 *boneMatrices, const D3DMATRIX &world,
+	cl_entity_s *ent, const BoneMat34 *boneMatrices, const D3DMATRIX &world,
 	bool viewModel, float renderTime )
 {
 	R_StudioStoreAttachments( ent, hdr, boneMatrices, world, renderTime );
@@ -5604,7 +5609,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 					frame, cache.gpuSkinningBoneMatrices, muzzleWorld,
 					forceOverlayDepth, renderTime );
 			}
-			else if( dx_muzzleflash_sprite.value != 0.0f )
+			else if( dx_muzzleflash_sprite.value != 0.0f || hdr->numattachments > 0 )
 			{
 				BoneMat34 muzzleBones[MAXSTUDIOBONES];
 				StudioCalcBoneTransformsInternal( mod, hdr, sequence, frame,
@@ -5650,7 +5655,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 		currentWorldMatrix, precomputedPoseBones, hiddenArm );
 
 	if( processRendererMuzzleEvents && !muzzleEventsProcessedBeforeDraw &&
-		dx_muzzleflash_sprite.value != 0.0f )
+		( dx_muzzleflash_sprite.value != 0.0f || hdr->numattachments > 0 ) )
 	{
 		BoneMat34 muzzleBones[MAXSTUDIOBONES];
 		StudioCalcBoneTransformsInternal( mod, hdr, sequence, frame,
