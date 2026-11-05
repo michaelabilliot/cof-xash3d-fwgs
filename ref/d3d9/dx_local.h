@@ -96,7 +96,6 @@ extern float g_dxCullTanX, g_dxCullTanY, g_dxCullNear, g_dxCullFar;
 
 struct studio_cache_t;
 float R_CofPhotoTime();
-float R_CofPhotoFlash();
 void R_ResetNightmarePhoto();
 void R_QueueNightmarePhoto(const cl_entity_s*,const studio_cache_t&,const D3DMATRIX&);
 void R_QueueNightmarePhotoCpu(const cl_entity_s*,const model_drawdata_t&,const D3DMATRIX&);
@@ -1125,7 +1124,19 @@ bool R_CofPlayerDrawAllowed(const cl_entity_s* entity);
 
 extern convar_t dx_cof_flashlight_brightness;
 extern convar_t dx_cof_camera_flash,dx_cof_camera_flash_brightness;
+namespace camera_socket {struct Area;}
+bool R_CofCameraFlashArea(camera_socket::Area&);
+bool R_StudioCameraFlashArea(cl_entity_s*,float,const float*,const float*,const float*,camera_socket::Area&);
+float R_CofCameraConversionFactor();
+float R_CofCameraLegacyRadius();
 bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose);
+unsigned R_CofCameraFlashBlockers();
+void R_BeginCofCameraFlashView();
+void R_EndCofCameraFlashView();
+bool R_CofCameraFlashShadowActive();
+bool R_StudioCameraFlashSocket(cl_entity_s*,float,const float*,const float*,const float*,float*,float*);
+bool R_CofCameraViewModelCorrection(const float*,const float*,D3DMATRIX&);
+void R_RefreshCofCameraViewModelSettings();
 int R_StudioCameraFlashPoint(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point);
 bool R_CofHandheldLightPose(dx_cof_light_state_v2& pose);
 bool R_CofHandheldLightEquipped();

@@ -1,5 +1,6 @@
 #include "dx_local.h"
 #include "dx_cof_dual.h"
+#include "dx_camera_flash.h"
 #include <dbghelp.h>
 #include <fstream>
 #include <stdexcept>
@@ -375,18 +376,50 @@ int main(int argc,char** argv)try {
  shadowVmModel=nullptr;shadowVmBytes.clear();player.curstate.usehull=0;strcpy_s(scope.name,"models/weapons/unknown/v_unknown.mdl");
  puts("PASS: actual VM-to-police idle/fire/dry-fire/reload/melee/heal aliases, FAMAS/M16, shotgun phases, revolver inserts, sprint/jump and layered weapon hands across walking/crouching; missing actions retain weapon stance. One mesh throughout.");
  #include "verify_cof_shadow_motion.inl"
+ // The actual private Simon body must stop casting hand silhouettes only
+ // during a successfully rendered camera flash. The visible VM is separate.
+ const auto fullShadowIndices=shadowSurfaceIndices,fullShadowBones=shadowBoneIndices;
+ const auto bodyHeader=reinterpret_cast<studiohdr_t*>(bytes.data());
+ const auto flashBodyBones=reinterpret_cast<mstudiobone_t*>(bytes.data()+bodyHeader->boneindex);
+ const auto arm=[&](uint32_t bone){
+  int parent=int(bone);for(int budget=0;parent>=0&&budget<bodyHeader->numbones;++budget){
+   require(parent<bodyHeader->numbones,"shadow bone bounds");
+   if(!strcmp(flashBodyBones[parent].name,"Bip01 L Arm")||!strcmp(flashBodyBones[parent].name,"Bip01 R Arm"))return true;
+   parent=flashBodyBones[parent].parent;
+  }return false;
+ };
+ std::vector<uint32_t> expectedShadowIndices;bool fullHasArms=false;
+ for(size_t i=0;i<fullShadowIndices.size();i+=3){bool remove=false;
+  for(int j=0;j<3;++j)if(arm(fullShadowBones[fullShadowIndices[i+j]]))remove=true;
+  if(remove)fullHasArms=true;else expectedShadowIndices.insert(expectedShadowIndices.end(),{fullShadowIndices[i],fullShadowIndices[i+1],fullShadowIndices[i+2]});
+ }
+ require(fullHasArms&&!expectedShadowIndices.empty()&&expectedShadowIndices.size()<fullShadowIndices.size(),"actual Simon model contains removable arms and preserved torso/legs");
+ auto photoPulse=symbol<dx_camera_flash_t*>("g_cameraFlash");auto renderedPhoto=symbol<bool*>("g_cameraFlashRendered");
+ auto photoShadow=symbol<bool(*)()>("R_CofCameraFlashShadowActive");
+ const float exposure=float(client.time+.001);client.time=exposure;require(photoPulse->trigger(exposure)&&photoPulse->beginView(exposure),"camera shadow exposure fixture");*renderedPhoto=true;
+ const auto fullHash=shadowHash;const auto beforeMaskDestroys=shadowDestroys;
+ shadow(&player,&police,&donorModel,&viewmodel);
+ require(photoShadow()&&*symbol<bool*>("g_cofShadowArmsOmitted"),"actual camera exposure selects arm-free shadow topology");
+ require(shadowSurfaceIndices==expectedShadowIndices,"every arm/hand triangle removed; every other triangle preserved exactly");
+ require(shadowHash!=fullHash&&shadowDestroys==beforeMaskDestroys+1,"full shadow mesh retired before arm-free replacement");
+ const auto maskedHash=shadowHash;client.time=exposure+.05;shadow(&player,&police,&donorModel,&viewmodel);require(shadowHash==maskedHash,"same arm-free topology throughout flash");
+ client.time=exposure+.11;shadow(&player,&police,&donorModel,&viewmodel);
+ require(!photoShadow()&&!*symbol<bool*>("g_cofShadowArmsOmitted")&&shadowSurfaceIndices==fullShadowIndices,"complete original shadow topology restored immediately after100ms");
+ require(shadowHash!=maskedHash,"restored shadow uses fresh resource lifetime, no retained hand ghosts");
+ photoPulse->clear();*renderedPhoto=false;
+ printf("PASS CAMERA HAND SHADOW: %u arm/hand triangles omitted during100ms photo; %u head/torso/leg triangles preserved; exact original topology restored after flash; old meshes retired. Visible viewmodel untouched.\n",unsigned((fullShadowIndices.size()-expectedShadowIndices.size())/3),unsigned(expectedShadowIndices.size()/3));
  const auto beforeDebug=shadowCreates;
  symbol<convar_t*>("dx_cof_player_shadow")->value=2;client.time+=.1;shadow(&player,&police,&donorModel,&viewmodel);
  require(shadowInstance.categoryFlags==0&&shadowCreates==beforeDebug,"visible debug body uses existing animated mesh");
  symbol<convar_t*>("dx_cof_player_shadow")->value=1;client.time+=.1;shadow(&player,&police,&donorModel,&viewmodel);
  require(shadowInstance.categoryFlags==(REMIXAPI_INSTANCE_CATEGORY_BIT_THIRD_PERSON_PLAYER_MODEL|REMIXAPI_INSTANCE_CATEGORY_BIT_THIRD_PERSON_PLAYER_BODY),"normal mode restores primary-hidden shadow categories");
- const auto oldHash=shadowHash;symbol<void(*)()>("R_ResetCofShadow")();require(shadowDestroys==1,"shadow teardown releases mesh");
- client.time=201;shadow(&player,&police,&donorModel,&viewmodel);require(shadowHash!=oldHash&&shadowCreates==2,"map reset creates one replacement with new lifetime");
+ const auto oldHash=shadowHash;const auto beforeResetDestroys=shadowDestroys;symbol<void(*)()>("R_ResetCofShadow")();require(shadowDestroys==beforeResetDestroys+1,"shadow teardown releases mesh");
+ client.time=201;shadow(&player,&police,&donorModel,&viewmodel);require(shadowHash!=oldHash&&shadowCreates==beforeDebug+1,"map reset creates one replacement with new lifetime");
  symbol<convar_t*>("dx_cof_player_shadow")->value=0;
  const unsigned oldDraws=shadowDraws;shadow(&player,&police,&donorModel,&viewmodel);shadow(&player,&police,&donorModel,&viewmodel);
  require(shadowDraws==oldDraws&&!mesh->available(),"disabled cvar retires mesh and skips submissions");
  symbol<convar_t*>("dx_cof_player_shadow")->value=1;client.time=202;
- shadow(&player,&police,&donorModel,&viewmodel);require(shadowDraws==oldDraws+1&&shadowCreates==3,"cvar re-enable builds one mesh");
+ shadow(&player,&police,&donorModel,&viewmodel);require(shadowDraws==oldDraws+1&&shadowCreates==beforeDebug+2,"cvar re-enable builds one mesh");
  symbol<void(*)()>("R_ResetCofShadow")();rejectShadowMesh=true;
  shadow(&player,&police,&donorModel,&viewmodel);const auto failedCalls=shadowCreates;
  for(int i=0;i<100;++i){client.time=203+i*.05;shadow(&player,&police,&donorModel,&viewmodel);}

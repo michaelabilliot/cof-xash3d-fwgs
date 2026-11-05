@@ -10,16 +10,16 @@ struct dx_camera_flash_t {
   if(active&&time==requested)return false;
   requested=started=time;active=pending=true;return true;
  }
+ bool beginView(float now){
+  if(!active||!std::isfinite(now))return false;
+  if(!pending)return false;
+  started=now;pending=false;return true;
+ }
  float fade(float now){
   if(!active)return 0;
   if(!std::isfinite(now)){clear();return 0;}
-  if(pending){
-   // Network messages arrive before the renderer advances its clock.
-   // Wait for the first matching view, then give it a complete exposure.
-   if(now<requested){if(requested-now>.25f)clear();return 0;}
-   if(now-requested>.25f){clear();return 0;}
-   started=now;pending=false;
-  }
+  // Only the main world pass starts exposure; descriptor queries cannot do it.
+  if(pending)return 0;
   if(now<started||now-started>=duration){clear();return 0;}
   // Bright shutter pulse followed by a short discharge tail.
   const float age=now-started;

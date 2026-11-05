@@ -149,7 +149,7 @@ static std::vector<cof_pickup::Span> R_NightmarePhotoSpans(){
  const float now=R_CurrentRenderTime(0.f);
  for(auto& echo:nightmare_photo::echoes){
   const float age=now-echo.photo;
-  if(!std::isfinite(age)||age<0||age>=1.25f){echo={};continue;}
+  if(!std::isfinite(age)||age<0||age>=.9375f){echo={};continue;}
   if(echo.vertices.empty())continue;
   D3DXVECTOR3 center(0,0,0);for(const auto& p:echo.vertices)center+=p;center/=float(echo.vertices.size());
   const float target[3]={center.x,center.y,center.z};
@@ -161,7 +161,7 @@ static std::vector<cof_pickup::Span> R_NightmarePhotoSpans(){
      float(g_sceneViewport.Y)+(1-clip.y/clip.w)*g_sceneViewport.Height*.5f,true};
    }points.push_back(point);
   }
-  const float fade=std::clamp((1.25f-age)/1.f,0.f,1.f);
+  const float fade=std::clamp((.9375f-age)/.75f,0.f,1.f);
   auto outline=cof_pickup::outline(points,echo.indices,float(g_sceneViewport.X),float(g_sceneViewport.Y),float(g_sceneViewport.Width),float(g_sceneViewport.Height),fade*fade,true);
   spans.insert(spans.end(),outline.begin(),outline.end());
  }return spans;
@@ -183,9 +183,6 @@ static void R_DrawNightmarePhoto(){
  if(!device||!g_sceneViewportValid||!R_NightmarePhotoMap()||FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
  R_UpdateNightmareVent();
  auto spans=R_NightmarePhotoSpans();
- dx_cof_light_state_v2 pose{};pose.time=R_CurrentRenderTime(0.f);
- const float flash=dx_cof_camera_flash.value!=0.f&&R_CofCameraFlashPose(pose)?R_CofPhotoFlash():0.f;
- if(flash>0)spans.push_back({float(g_sceneViewport.X),float(g_sceneViewport.Y),float(g_sceneViewport.Width),float(g_sceneViewport.Height),unsigned(65.f*flash)});
  if(spans.empty())return;
  R_Set2DMode(true);R_Flush2DBatch();R_Apply2DNeutralState();DX_BindRawTexture(0,nullptr);
  DX_SetTextureStageStateCached(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);DX_SetTextureStageStateCached(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);

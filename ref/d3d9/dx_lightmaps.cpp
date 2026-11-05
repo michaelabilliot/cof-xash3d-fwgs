@@ -6,6 +6,7 @@
 #include "dx_cof_native_light.h"
 #include "dx_effect_timing.h"
 #include "dx_cof_light_render.h"
+#include "dx_camera_area_light.h"
 #include <cstdarg>
 
 static unsigned g_cofLightFlags=0;
@@ -14,37 +15,70 @@ static dx_cof_light_bridge_t g_cofLightBridge;
 static bool g_cofV2=false;
 static bool g_cofClientPresent=false;
 static dx_camera_flash_t g_cameraFlash;
+static CameraFlashAreaLight g_cameraAreaLight;
+static camera_socket::Area g_cameraFlashArea;
+static float g_cameraFlashFade=0;
+static bool g_cameraFlashRendered=false;
+static bool g_cameraFlashWorldPass=false;
+static dx_cof_light_state_v2 g_cameraFlashPose;
+static unsigned g_cameraFlashReasons=~0u;
 static float g_cofPhotoTime=-99999.f;
 float R_CofPhotoTime(){return g_cofPhotoTime;}
-float R_CofPhotoFlash(){return g_cameraFlash.fade(R_CurrentRenderTime(0.f));}
 static dx_cof_native_lights g_cofNativeLights;
 extern "C" __declspec(dllexport) int __cdecl DX_CofNativeLightV1(const dx_cof_native_light* light){
  return light&&g_cofNativeLights.publish(*light)?1:0;
 }
+void R_BeginCofCameraFlashView() {
+ g_cameraFlashWorldPass=false;
+ if(!g_cameraFlash.active){g_cameraAreaLight.retire();return;}
+ if(!(g_currentViewFlags&RF_DRAW_WORLD)||FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ unsigned blocked=R_CofCameraFlashBlockers();
+ if(dx_remix.value==0.f||dx_cof_camera_flash.value==0.f||dx_dlights.value==0.f||dx_dlight_fixed.value==0.f)blocked|=256u;
+ if(!std::isfinite(dx_cof_camera_flash_brightness.value)||dx_cof_camera_flash_brightness.value<=0.f)blocked|=512u;
+ if(blocked!=g_cameraFlashReasons){
+  g_cameraFlashReasons=blocked;
+  R_CofLightDebug("camera main-view blockers=0x%x (missingModel=1 wrongWeapon=2 sceneHidden=4 noClient=8 external=16 dead=32 thirdPerson=64 invalidPose=128 disabled=256 brightness=512)",blocked);
+ }
+ if(blocked){
+  // Model publication/scene visibility can lag the accepted message. Wait
+  // for the eligible view; an actual weapon/camera change cancels the shot.
+  if(blocked&(2u|16u|32u|64u|128u|256u|512u))g_cameraFlash.clear();
+  g_cameraAreaLight.retire();
+  return;
+ }
+ const float now=R_CurrentRenderTime(0.f);
+ const float fade=g_cameraFlash.pending?1.f:g_cameraFlash.fade(now);
+ if(fade<=0){g_cameraAreaLight.retire();return;}
+ camera_socket::Area area;
+ if(!R_CofCameraFlashArea(area)){g_cameraAreaLight.retire();return;}
+ const float brightness=1.4f*std::clamp(dx_cof_camera_flash_brightness.value,0.f,4.f)*R_DynamicLightIntensityScale()*fade;
+ const float radiance=camera_area::radiance(area,brightness,R_CofCameraConversionFactor(),R_CofCameraLegacyRadius());
+ if(!g_cameraAreaLight.configure(area,radiance))return;
+ g_cameraFlashArea=area;g_cameraFlashFade=fade;
+ dx_cof_light_state_v2 tip{};tip.time=now;for(int i=0;i<3;++i){tip.origin[i]=area.source[i];tip.direction[i]=area.normal[i];}
+ if(g_cameraFlash.beginView(now))R_CofLightDebug("camera first world frame t=%.4f message=%.4f duration=%.2f",now,g_cameraFlash.requested,dx_camera_flash_t::duration);
+ g_cameraFlashPose=tip;g_cameraFlashWorldPass=true;
+}
+void R_EndCofCameraFlashView(){g_cameraFlashWorldPass=false;}
+bool R_CofCameraFlashShadowActive(){
+ const float now=R_CurrentRenderTime(0.f);
+ return g_cameraFlashRendered&&g_cameraFlash.active&&!g_cameraFlash.pending&&
+  std::isfinite(now)&&now>=g_cameraFlash.started&&now-g_cameraFlash.started<dx_camera_flash_t::duration;
+}
+
 static bool R_CofCameraFlashDescription(D3DLIGHT9& light) {
- const float now=R_CurrentRenderTime(0.f),fade=g_cameraFlash.fade(now);
- if(fade<=0)return false;
- if(dx_cof_camera_flash.value==0.f||dx_dlights.value==0.f||dx_dlight_fixed.value==0.f){g_cameraFlash.clear();return false;}
- dx_cof_light_state_v2 pose{};pose.time=now;
- if(!R_CofCameraFlashPose(pose)){g_cameraFlash.clear();return false;}
- const float brightness=dx_cof_camera_flash_brightness.value;
- if(!std::isfinite(brightness)||brightness<=0){g_cameraFlash.clear();return false;}
- light={};light.Type=D3DLIGHT_SPOT;
- light.Position={pose.origin[0],pose.origin[1],pose.origin[2]};
- const float length=sqrtf(pose.direction[0]*pose.direction[0]+pose.direction[1]*pose.direction[1]+pose.direction[2]*pose.direction[2]);
- light.Direction={pose.direction[0]/length,pose.direction[1]/length,pose.direction[2]/length};
- light.Diffuse.r=light.Diffuse.g=light.Diffuse.b=std::min(4.f,brightness)*R_DynamicLightIntensityScale()*fade;
- light.Diffuse.a=1;light.Range=600;light.Attenuation0=1;
- light.Attenuation2=3.f/(light.Range*light.Range);light.Theta=DEG2RAD(65.f);light.Phi=DEG2RAD(90.f);light.Falloff=1;
- return light.Diffuse.r>0;
+ if(!g_cameraFlashWorldPass)return false;
+ const auto& pose=g_cameraFlashPose;
+ if(!DX_CofBuildLight(pose,DX_COF_HANDHELD,R_DynamicLightIntensityScale()*g_cameraFlashFade,light,dx_cof_camera_flash_brightness.value,0.f))return false;
+ light.Theta=DEG2RAD(100.f);light.Phi=DEG2RAD(120.f);light.Falloff=0;return true;
 }
 extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashV1(float time) {
- const float now=R_CurrentRenderTime(time);
- if(!std::isfinite(time)||!std::isfinite(now)||fabsf(time-now)>.25f){g_cameraFlash.clear();return 0;}
- if(!g_cameraFlash.trigger(time))return 0;
+ if(!std::isfinite(time)){R_CofLightDebug("camera message rejected: nonfinite time");return 0;}
+ if(!g_cameraFlash.trigger(time)){R_CofLightDebug("camera message rejected: duplicate time=%.4f",time);return 0;}
+ g_cameraFlashReasons=~0u;g_cameraFlashRendered=false;g_cameraAreaLight.retire();
+ R_RefreshCofCameraViewModelSettings();
  g_cofPhotoTime=time;
- // Pose/publication belongs to the next view callback, not message dispatch.
- R_CofLightDebug("camera photo queued t=%.4f duration=%.3f",time,dx_camera_flash_t::duration);
+ R_CofLightDebug("camera message accepted t=%.4f render=%.4f pending main world frame",time,R_CurrentRenderTime(time));
  return 1;
 }
 extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashDescriptionV1(D3DLIGHT9* light) {
@@ -61,9 +95,9 @@ void R_CofLightDebug(const char* format,...) {
  gEngfuncs.Con_Printf("COF LIGHT: %s\n",message);
 }
 void R_ResetCofLights() {
- g_cofNativeLights.clear();
+ g_cofNativeLights.clear();g_cameraAreaLight.retire();g_cameraFlashRendered=false;
  g_cofPhotoTime=-99999.f;R_ResetNightmarePhoto();
- g_cameraFlash.clear();
+ g_cameraFlash.clear();g_cameraFlashWorldPass=false;g_cameraFlashReasons=~0u;
  if(device)for(int i=0;i<g_dxFixedLightCount;++i)device->LightEnable(i,FALSE);
  g_dxFixedLightCount=0;
  g_cofLightFlags=0;g_cofLightUpdate=-99999.f;g_cofLightBridge={};g_cofV2=false;g_cofClientPresent=false;
@@ -3049,15 +3083,9 @@ static int R_EmitRemixFlashlights( int maxLights )
                 local.Range,local.Diffuse.r,local.Diffuse.g,local.Diffuse.b,local.Position.x,local.Position.y,local.Position.z,local.Direction.x,local.Direction.y,local.Direction.z);previous=state;
         }
     }
-    D3DLIGHT9 photo{};
-    if(R_CofCameraFlashDescription(photo)&&emitted<maxLights) {
-        HRESULT setResult=D3D_OK,enableResult=D3D_OK;
-        const bool ok=DX_CofSubmit(static_cast<unsigned>(emitted),photo,
-            [&](unsigned slot,const D3DLIGHT9& light){setResult=device->SetLight(slot,&light);return static_cast<long>(setResult);},
-            [&](unsigned slot,bool on){const auto result=device->LightEnable(slot,on?TRUE:FALSE);if(on)enableResult=result;return static_cast<long>(result);});
-        if(ok)++emitted;
-        R_CofLightDebug("camera flash submit SetLight=0x%08x LightEnable=0x%08x rgb=%.3f origin=(%.2f %.2f %.2f)",
-            static_cast<unsigned>(setResult),static_cast<unsigned>(enableResult),photo.Diffuse.r,photo.Position.x,photo.Position.y,photo.Position.z);
+    if(g_cameraFlashWorldPass){
+        if(g_cameraAreaLight.draw())g_cameraFlashRendered=true;
+        else if(!g_cameraFlashRendered)g_cameraFlash.pending=true;
     }
     if(dx_dlight_entities.value!=0.f)g_cofNativeLights.visit(R_CurrentRenderTime(0.f),[&](const dx_cof_native_light& p){
         if(emitted>=maxLights)return;
@@ -3121,7 +3149,7 @@ void R_ApplyDLights( void )
 
 	if( !R_DynamicLightsEnabled( ) || dx_dlight_fixed.value == 0.0f )
 	{
-		g_cameraFlash.clear();
+		g_cameraFlash.clear();g_cameraAreaLight.retire();
 		for( int i = 0; i < g_dxFixedLightCount; ++i )
 			device->LightEnable( i, FALSE );
 		g_dxFixedLightCount = 0;

@@ -5548,20 +5548,30 @@ bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose) {
 }
 
 static bool g_sceneViewModelHidden=false;
-bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose) {
- auto ent=R_CurrentViewModel();
- const auto drawViewModel=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("r_drawviewmodel"):nullptr;
- if(!ent||!ent->model||g_sceneViewModelHidden||!gp_cl||gp_cl->viewentity!=gp_cl->playernum+1||
-    ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0||ENGINE_GET_PARM(PARM_THIRDPERSON)||
-    (drawViewModel&&drawViewModel->value==0.f)||
-    Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return false;
- const float offsets[3]={
-  std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
-  std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
-  std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
- if(!R_StudioCameraFlashPoint(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,pose.origin))return false;
- for(int i=0;i<3;++i){pose.direction[i]=g_vForward[i];pose.origin[i]+=g_vForward[i]*8.f;}
- return DX_CofValid(pose);
+#include "dx_camera_viewmodel.h"
+unsigned R_CofCameraFlashBlockers() {
+ unsigned blocked=0;const auto ent=R_EngineViewModelEntity();
+ if(!ent||!ent->model)blocked|=1u;
+ else if(ent->model->type!=mod_studio||Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))blocked|=2u;
+ if(g_sceneViewModelHidden)blocked|=4u;
+ if(!gp_cl)blocked|=8u;
+ else if(gp_cl->viewentity!=gp_cl->playernum+1)blocked|=16u;
+ if(ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0)blocked|=32u;
+ if(ENGINE_GET_PARM(PARM_THIRDPERSON))blocked|=64u;
+ dx_cof_light_state_v2 pose{};pose.time=R_CurrentRenderTime(0.f);
+ for(int i=0;i<3;++i){pose.origin[i]=g_vOrigin[i];pose.direction[i]=g_vForward[i];}
+ if(!DX_CofValid(pose))blocked|=128u;
+ return blocked;
+}
+#include "dx_camera_socket.h"
+bool R_CofCameraFlashArea(camera_socket::Area& area){
+ if(R_CofCameraFlashBlockers())return false;
+ const float offsets[3]={std::clamp(r_viewmodel_offset_x.value,-128.f,128.f),std::clamp(r_viewmodel_offset_y.value,-128.f,128.f),std::clamp(r_viewmodel_offset_z.value,-128.f,128.f)};
+ return R_StudioCameraFlashArea(R_EngineViewModelEntity(),R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,area);
+}
+bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose){
+ camera_socket::Area area;if(!R_CofCameraFlashArea(area))return false;
+ for(int i=0;i<3;++i){pose.origin[i]=area.source[i];pose.direction[i]=area.normal[i];}return DX_CofValid(pose);
 }
 extern "C" __declspec(dllexport) void __cdecl DX_SceneViewModelHiddenV1( int hidden )
 {
@@ -5720,6 +5730,11 @@ static void R_DrawViewModel( void )
 
 	viewModelViewport.MinZ = 0.0f;
 	viewModelViewport.MaxZ = 0.30f;
+ // The flash excludes viewmodels through Remix's light mask. Mark this
+ // camera draw explicitly using its documented max-depth classification,
+ // independent of FOV heuristics; retain every other weapon's viewport.
+ if(dx_remix.value!=0.f&&viewModel&&viewModel->model&&
+    !Q_stricmp(viewModel->model->name,"models/weapons/camera/v_camera.mdl"))viewModelViewport.MaxZ=0.f;
 	device->SetViewport( &viewModelViewport );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
@@ -6209,6 +6224,11 @@ void R_DrawEnts( const vec3_t view_origin )
 		return;
 
 	DX_PROFILE_SCOPE( drawEntsScope, DX_PROFILE_DRAWENTS );
+ struct PhotoWorldPass {
+  PhotoWorldPass(){R_BeginCofCameraFlashView();}
+  ~PhotoWorldPass(){R_EndCofCameraFlashView();}
+ } photoWorldPass;
+
 
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );

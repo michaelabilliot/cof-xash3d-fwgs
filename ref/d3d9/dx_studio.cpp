@@ -5937,9 +5937,21 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 
 }
 
-static bool R_BuildCofShadowMesh(studiohdr_t* hdr,CofShadowMesh& mesh) {
+static bool R_BuildCofShadowMeshFiltered(studiohdr_t* hdr,CofShadowMesh& mesh,bool omitArms) {
  if(!R_StudioHeaderValid(hdr)||hdr->numbones<=0||hdr->numbones>MAXSTUDIOBONES||hdr->numbodyparts<=0||hdr->numbodyparts>1024||
     !R_StudioRangeValid(hdr,hdr->bodypartindex,size_t(hdr->numbodyparts)*sizeof(mstudiobodyparts_t)))return mesh.fail("invalid player geometry");
+ std::array<bool,MAXSTUDIOBONES> omitted{};
+ if(omitArms){
+  const int left=R_StudioFindBoneByName(hdr,"Bip01 L Arm"),right=R_StudioFindBoneByName(hdr,"Bip01 R Arm");
+  if(left<0||right<0)return mesh.fail("camera shadow arm roots missing");
+  const auto bones=reinterpret_cast<const mstudiobone_t*>(reinterpret_cast<const byte*>(hdr)+hdr->boneindex);
+  for(int i=0;i<hdr->numbones;++i){int parent=i;
+   for(int budget=0;parent>=0&&budget<hdr->numbones;++budget){
+    if(parent>=hdr->numbones)return mesh.fail("invalid camera shadow bone hierarchy");
+    if(parent==left||parent==right){omitted[i]=true;break;}parent=bones[parent].parent;
+   }
+  }
+ }
  std::vector<remixapi_HardcodedVertex> vertices;std::vector<uint32_t> indices,boneIndices;
  auto base=reinterpret_cast<const byte*>(hdr);
  auto parts=reinterpret_cast<const mstudiobodyparts_t*>(base+hdr->bodypartindex);
@@ -5969,9 +5981,9 @@ static bool R_BuildCofShadowMesh(studiohdr_t* hdr,CofShadowMesh& mesh) {
     }
     for(int i=0;i<count-2;++i) {
      if(indices.size()+3>600000)return mesh.fail("player triangle limit");
-     if(fan)indices.insert(indices.end(),{first,first+uint32_t(i+1),first+uint32_t(i+2)});
-     else if(i&1)indices.insert(indices.end(),{first+uint32_t(i+1),first+uint32_t(i),first+uint32_t(i+2)});
-     else indices.insert(indices.end(),{first+uint32_t(i),first+uint32_t(i+1),first+uint32_t(i+2)});
+     const uint32_t ia=fan?first:first+uint32_t(i+(i&1)),ib=first+uint32_t(fan?i+1:i+1-(i&1)),ic=first+uint32_t(i+2);
+     if(omitArms&&(omitted[boneIndices[ia]]||omitted[boneIndices[ib]]||omitted[boneIndices[ic]]))continue;
+     indices.insert(indices.end(),{ia,ib,ic});
     }
     offset+=count*4*sizeof(short);
    }
@@ -5980,6 +5992,8 @@ static bool R_BuildCofShadowMesh(studiohdr_t* hdr,CofShadowMesh& mesh) {
  }
  return mesh.create(vertices,indices,boneIndices,static_cast<unsigned>(hdr->numbones));
 }
+
+static bool R_BuildCofShadowMesh(studiohdr_t* hdr,CofShadowMesh& mesh){return R_BuildCofShadowMeshFiltered(hdr,mesh,false);}
 
 struct cof_shadow_rig_t {
  BoneMat34 bodyLocal[MAXSTUDIOBONES]{},bodyBind[MAXSTUDIOBONES]{},donorInverse[MAXSTUDIOBONES]{};
@@ -6074,6 +6088,7 @@ static int R_CofShadowSequence(const studiohdr_t* hdr,const char* wanted){
 static int g_cofShadowSequence=-1,g_cofShadowGaitSequence=-1;
 static float g_cofShadowGaitPhase=0.f,g_cofShadowVerticalSpeed=0.f;
 static CofShadowMesh g_cofShadowMesh;
+static bool g_cofShadowArmsOmitted=false;
 static CofShadowMesh g_cofShadowProbe(0x10000);
 static int g_cofShadowProbeKind=0;static bool g_cofShadowProbePlayer=false;
 static unsigned g_cofShadowTraceBudget=0,g_cofShadowDraws=0;
@@ -6103,6 +6118,7 @@ static float g_cofShadowMotionTime=-9999.f,g_cofShadowSpeed=0;
 static float g_cofShadowLastOrigin[3]{};
 static std::array<remixapi_Transform,MAXSTUDIOBONES> g_cofShadowBones{};
 void R_ResetCofShadow() {
+ g_cofShadowArmsOmitted=false;
  g_cofShadowMotion.clear();g_cofShadowMotionRig={};g_cofShadowVelocity[0]=g_cofShadowVelocity[1]=0;g_cofShadowRestSoleValid=false;
  g_cofShadowProbe.reset();g_cofShadowMesh.reset();g_cofShadowEntity={};g_cofShadowDonor=nullptr;g_cofShadowRig={};g_cofShadowPoseTime=-9999.f;g_cofShadowPhase=0;g_cofShadowSequence=-1;g_cofShadowGaitSequence=-1;g_cofShadowGaitPhase=0;g_cofShadowVerticalSpeed=0;g_cofShadowMotionTime=-9999.f;g_cofShadowSpeed=0;g_cofShadowCrouched=false;
 }
@@ -6182,9 +6198,13 @@ void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_
  VectorCopy(gp_cl->simorg,g_cofShadowEntity.origin);VectorCopy(gp_cl->simorg,g_cofShadowEntity.curstate.origin);
  g_cofShadowEntity.angles[0]=g_cofShadowEntity.angles[2]=0;g_cofShadowEntity.angles[1]=g_vAngles[YAW];
  VectorCopy(g_cofShadowEntity.angles,g_cofShadowEntity.curstate.angles);
+ // This private world-space body, rather than the visible camera hands,
+ // can cast giant finger silhouettes in the short camera exposure.
+ const bool omitArms=R_CofCameraFlashShadowActive();
+ if(omitArms!=g_cofShadowArmsOmitted){g_cofShadowMesh.reset();g_cofShadowArmsOmitted=omitArms;}
  D3DMATRIX world;
  if(!g_cofShadowMesh.available()||sequence!=g_cofShadowSequence||gaitSequence!=g_cofShadowGaitSequence||now-g_cofShadowPoseTime>=1.f/30.f) {
-  if(!g_cofShadowMesh.available()&&!R_BuildCofShadowMesh(hdr,g_cofShadowMesh))return;
+  if(!g_cofShadowMesh.available()&&!(omitArms?R_BuildCofShadowMeshFiltered(hdr,g_cofShadowMesh,true):R_BuildCofShadowMesh(hdr,g_cofShadowMesh)))return;
   const float elapsed=std::clamp(now-g_cofShadowPoseTime,0.f,.1f);
   cof_shadow_motion::Input motion;
   motion.now=now;motion.dt=elapsed;motion.yaw=g_vAngles[YAW];motion.pitch=g_vAngles[PITCH];
@@ -6344,25 +6364,87 @@ extern "C" __declspec(dllexport) int __cdecl DX_StudioViewModelLightAttachmentsV
  return R_StudioViewModelLightAttachments(ent,time,viewOrigin,viewAngles,offsets,points);
 }
 
-int R_StudioCameraFlashPoint(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point) {
- if(!ent||!ent->model||ent->model->type!=mod_studio||!origin||!angles||!offsets||!point||
-    !std::isfinite(time)||!gEngfuncs.Mod_Extradata||(ent->curstate.effects&EF_NODRAW)||
-    Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return 0;
+#include "dx_camera_socket.h"
+static bool R_BuildCameraFlashGeometry(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,camera_socket::Geometry& geometry) {
+ using namespace camera_socket;
+ const auto reject=[](const char* reason){R_CofLightDebug("camera socket geometry rejected: %s",reason);return false;};
+ if(!ent||!ent->model||ent->model->type!=mod_studio||!origin||!angles||!offsets||
+    !std::isfinite(time)||!gEngfuncs.Mod_Extradata||Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return reject("camera/view arguments");
  for(int i=0;i<3;++i)if(!std::isfinite(origin[i])||!std::isfinite(angles[i])||!std::isfinite(offsets[i])||
-    !std::isfinite(ent->origin[i])||!std::isfinite(ent->angles[i]))return 0;
+    !std::isfinite(ent->origin[i])||!std::isfinite(ent->angles[i]))return reject("nonfinite view transform");
  auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
- if(!R_StudioHeaderValid(hdr)||hdr->numbones<=0||hdr->numbones>MAXSTUDIOBONES||
-    !R_StudioRangeValid(hdr,hdr->boneindex,hdr->numbones*sizeof(mstudiobone_t)))return 0;
- const int flash=R_StudioFindBoneByName(hdr,"flash");if(flash<0)return 0;
+ if(!R_StudioHeaderValid(hdr)||hdr->numbones<=0||hdr->numbones>MAXSTUDIOBONES||hdr->numbodyparts>64||
+    !R_StudioRangeValid(hdr,hdr->boneindex,hdr->numbones*sizeof(mstudiobone_t)))return reject("invalid model header");
+ const int flash=R_StudioFindBoneByName(hdr,"flash");if(flash<0)return reject("missing flash bone");
  R_RegisterModelCvars();const float poseTime=R_StudioQuantizePoseTime(ent,time,true);
  BoneMat34 bones[MAXSTUDIOBONES]{};
  StudioCalcBoneTransformsInternal(ent->model,hdr,ent->curstate.sequence,StudioFrameAdvance(hdr,ent,poseTime),bones,-1,0,0,ent,poseTime);
  vec3_t forward,right,up;AngleVectors(angles,forward,right,up);
  D3DMATRIX world;R_BuildViewModelWorld(ent,origin,angles,forward,right,up,offsets[0],offsets[1],offsets[2],world);
- const float local[3]={bones[flash][0][3],bones[flash][1][3],bones[flash][2][3]};float result[3];
- R_StudioTransformPointByWorld(world,local,result);
- for(float value:result)if(!std::isfinite(value))return 0;
- memcpy(point,result,sizeof result);return 1;
+ const auto transform=[&](const float* local,int bone){
+  V posed{},result{};for(int row=0;row<3;++row){posed[row]=bones[bone][row][3];for(int a=0;a<3;++a)posed[row]+=local[a]*bones[bone][row][a];}
+  R_StudioTransformPointByWorld(world,posed.data(),result.data());return result;
+ };
+ auto data=reinterpret_cast<byte*>(hdr);auto parts=reinterpret_cast<mstudiobodyparts_t*>(data+hdr->bodypartindex);
+ bool found=false;Geometry candidate;
+ for(int b=0;b<hdr->numbodyparts;++b){
+  auto model=StudioGetSelectedBodypartModel(hdr,&parts[b],ent->curstate.body);
+  if(!model||!R_StudioModelValid(hdr,model)||model->numverts>8192)return reject("invalid selected bodypart");
+  auto positions=reinterpret_cast<const vec3_t*>(data+model->vertindex);auto boneIndices=data+model->vertinfoindex;
+  unsigned count=0;for(int i=0;i<model->numverts;++i)if(boneIndices[i]==flash)++count;
+  const bool cameraPart=count!=0;
+  if(cameraPart){if(count!=4||found)return reject("ambiguous flash face");found=true;}
+  auto& triangles=cameraPart?candidate.housing:candidate.hands;
+  std::vector<V> posed;posed.reserve(model->numverts);count=0;
+  for(int i=0;i<model->numverts;++i){
+   if(boneIndices[i]>=hdr->numbones)return reject("invalid vertex bone");
+   const V p=transform(positions[i],boneIndices[i]);if(!finite(p))return reject("nonfinite posed vertex");
+   posed.push_back(p);if(boneIndices[i]==flash)candidate.face[count++]=p;
+  }
+  const float zero[3]={};if(cameraPart)candidate.pivot=transform(zero,flash);
+  auto meshes=reinterpret_cast<mstudiomesh_t*>(data+model->meshindex);
+  for(int m=0;m<model->nummesh;++m){
+   short* command=nullptr;const short* commandEnd=nullptr;
+   if(!R_StudioCommandSpan(hdr,meshes[m].triindex,command,commandEnd))return reject("invalid triangle commands");
+   bool terminated=false;unsigned primitives=0;
+   while(command<commandEnd&&primitives++<20000){
+    const int signedCount=*command++;if(!signedCount){terminated=true;break;}
+    const bool fan=signedCount<0;const int n=fan?-signedCount:signedCount;
+    if(n<3||n>256||size_t(commandEnd-command)<size_t(n)*4)return reject("invalid triangle primitive");
+    int indices[256]{};
+    for(int i=0;i<n;++i){indices[i]=command[0];command+=4;if(indices[i]<0||indices[i]>=model->numverts)return reject("invalid triangle index");}
+    for(int i=2;i<n;++i){
+     const int a=fan?indices[0]:indices[i-2],bidx=indices[i-1],c=indices[i];
+     // The flash quad is an emitting reference, never an opaque occluder.
+     if(boneIndices[a]==flash||boneIndices[bidx]==flash||boneIndices[c]==flash)continue;
+     if(triangles.size()>=20000)return reject("camera/hand triangle limit");
+     triangles.push_back({posed[a],posed[bidx],posed[c]});
+    }
+   }
+   if(!terminated)return reject("unterminated triangle commands");
+  }
+ }
+ if(!found||candidate.housing.empty())return reject("missing flash face or housing");
+ D3DMATRIX correction;if(!R_CofCameraViewModelCorrection(origin,angles,correction))return reject("missing viewmodel projection context");
+ const auto correct=[&](V& v){D3DXVECTOR3 input(v[0],v[1],v[2]),output;D3DXVec3TransformCoord(&output,&input,reinterpret_cast<D3DXMATRIX*>(&correction));v={output.x,output.y,output.z};};
+ for(auto& p:candidate.face)correct(p);
+ for(auto* triangles:{&candidate.housing,&candidate.hands})for(auto& triangle:*triangles)for(auto& p:triangle)correct(p);
+ correct(candidate.pivot);
+ geometry=std::move(candidate);return true;
+}
+bool R_StudioCameraFlashArea(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,camera_socket::Area& area) {
+ camera_socket::Geometry geometry;if(!R_BuildCameraFlashGeometry(ent,time,origin,angles,offsets,geometry))return false;
+ vec3_t forward;AngleVectors(angles,forward,nullptr,nullptr);
+ if(!camera_socket::resolveArea(geometry,{forward[0],forward[1],forward[2]},area)){R_CofLightDebug("camera rectangle rejected: face/camera/hand clearance");return false;}
+ return true;
+}
+bool R_StudioCameraFlashSocket(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point,float* direction) {
+ if(!point||!direction)return false;camera_socket::Area area;
+ if(!R_StudioCameraFlashArea(ent,time,origin,angles,offsets,area))return false;
+ for(int i=0;i<3;++i){point[i]=area.source[i];direction[i]=area.normal[i];}return true;
+}
+int R_StudioCameraFlashPoint(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point) {
+ float direction[3];return R_StudioCameraFlashSocket(ent,time,origin,angles,offsets,point,direction)?1:0;
 }
 extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraFlashPointV1(cl_entity_s* ent,float time,const float* origin,const float* angles,const float* offsets,float* point) {
  return R_StudioCameraFlashPoint(ent,time,origin,angles,offsets,point);
