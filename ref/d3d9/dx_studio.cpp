@@ -4,6 +4,10 @@
 #include "dx_ragdoll.h"
 #include "dx_effect_timing.h"
 #include "dx_studio_shader.h"
+#include "dx_cof_features.h"
+#include "dx_cof_shadow.h"
+#include "dx_cof_shadow_animation.h"
+#include "dx_cof_shadow_motion.h"
 
 constexpr float DX_STUDIO_SHADE_LAMBERT = 1.4953241f;
 
@@ -5627,6 +5631,8 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 			R_DrawStudioGpuBatches( cache, ent );
 		}
 
+        R_QueueNightmarePhoto(ent,cache,muzzleWorld);
+
 		if( normalRenderMode )
 			R_RestoreOpaqueEntityBaseline( );
 		else
@@ -5665,6 +5671,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 	if( drawMuzzleBeforeModel )
 		R_DrawMuzzleFlashes( ent );
 	R_DrawStudioBatches( temporaryDrawData, ent );
+ R_QueueNightmarePhotoCpu(ent,temporaryDrawData,muzzleWorld);
 
 	if( R_StudioGlowShellEnabled( ent ) )
 	{
@@ -5913,10 +5920,344 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 	R_DrawStudioEntityModel( mod, ent, ent->curstate.sequence,
 		renderFrame, gaitSeq, gaitFrame, gaitBoneYaw, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, false, &entityWorld );
+	const float pickupStrength=R_CofPickupStrength(ent);
+	if(pickupStrength>0.f) {
+		const auto& pickupCache=R_GetStudioEntityGpuCache(ent);
+		if(pickupCache.model==mod&&pickupCache.body==ent->curstate.body&&pickupCache.skin==ent->curstate.skin)
+			R_QueueCofPickupOutline(pickupCache,entityWorld,pickupStrength);
+	}
 	R_DrawPlayerWeapon( mod, hdr, ent, ent->curstate.sequence,
 		renderFrame, gaitSeq, gaitFrame, gaitBoneYaw, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, entityWorld );
 
+}
+
+static bool R_BuildCofShadowMesh(studiohdr_t* hdr,CofShadowMesh& mesh) {
+ if(!R_StudioHeaderValid(hdr)||hdr->numbones<=0||hdr->numbones>MAXSTUDIOBONES||hdr->numbodyparts<=0||hdr->numbodyparts>1024||
+    !R_StudioRangeValid(hdr,hdr->bodypartindex,size_t(hdr->numbodyparts)*sizeof(mstudiobodyparts_t)))return mesh.fail("invalid player geometry");
+ std::vector<remixapi_HardcodedVertex> vertices;std::vector<uint32_t> indices,boneIndices;
+ auto base=reinterpret_cast<const byte*>(hdr);
+ auto parts=reinterpret_cast<const mstudiobodyparts_t*>(base+hdr->bodypartindex);
+ for(int b=0;b<hdr->numbodyparts;++b) {
+  auto model=StudioGetSelectedBodypartModel(hdr,const_cast<mstudiobodyparts_t*>(&parts[b]),0);
+  if(!model||!R_StudioModelValid(hdr,model))return mesh.fail("invalid player bodypart");
+  auto positions=reinterpret_cast<const vec3_t*>(base+model->vertindex);
+  auto normals=reinterpret_cast<const vec3_t*>(base+model->normindex);
+  const byte* bones=base+model->vertinfoindex;
+  auto meshes=reinterpret_cast<const mstudiomesh_t*>(base+model->meshindex);
+  for(int m=0;m<model->nummesh;++m) {
+   int offset=meshes[m].triindex;bool terminated=false;
+   while(R_StudioRangeValid(hdr,offset,sizeof(short))) {
+    const int countSigned=*reinterpret_cast<const short*>(base+offset);offset+=sizeof(short);
+    if(countSigned==0){terminated=true;break;}
+    const bool fan=countSigned<0;const int count=fan?-countSigned:countSigned;
+    if(count<3||count>8192||vertices.size()+size_t(count)>100000||
+       !R_StudioRangeValid(hdr,offset,size_t(count)*4*sizeof(short)))return mesh.fail("invalid player triangle commands");
+    const auto commands=reinterpret_cast<const short*>(base+offset);const uint32_t first=static_cast<uint32_t>(vertices.size());
+    for(int i=0;i<count;++i) {
+     const int v=commands[i*4],n=commands[i*4+1];
+     if(v<0||v>=model->numverts||n<0||n>=model->numnorms||bones[v]>=hdr->numbones)return mesh.fail("invalid player vertex");
+     remixapi_HardcodedVertex vertex{};vertex.color=0xffffffff;
+     for(int axis=0;axis<3;++axis){vertex.position[axis]=positions[v][axis];vertex.normal[axis]=normals[n][axis];
+      if(!std::isfinite(vertex.position[axis])||!std::isfinite(vertex.normal[axis]))return mesh.fail("non-finite player vertex");}
+     vertices.push_back(vertex);boneIndices.push_back(bones[v]);
+    }
+    for(int i=0;i<count-2;++i) {
+     if(indices.size()+3>600000)return mesh.fail("player triangle limit");
+     if(fan)indices.insert(indices.end(),{first,first+uint32_t(i+1),first+uint32_t(i+2)});
+     else if(i&1)indices.insert(indices.end(),{first+uint32_t(i+1),first+uint32_t(i),first+uint32_t(i+2)});
+     else indices.insert(indices.end(),{first+uint32_t(i),first+uint32_t(i+1),first+uint32_t(i+2)});
+    }
+    offset+=count*4*sizeof(short);
+   }
+   if(!terminated)return mesh.fail("unterminated player triangles");
+  }
+ }
+ return mesh.create(vertices,indices,boneIndices,static_cast<unsigned>(hdr->numbones));
+}
+
+struct cof_shadow_rig_t {
+ BoneMat34 bodyLocal[MAXSTUDIOBONES]{},bodyBind[MAXSTUDIOBONES]{},donorInverse[MAXSTUDIOBONES]{};
+ int map[MAXSTUDIOBONES]{},parents[MAXSTUDIOBONES]{};int count=0,mapped=0;
+ bool initialize(const studiohdr_t* body,const studiohdr_t* donor) {
+  *this={};
+  if(!R_StudioHeaderValid(body)||!R_StudioHeaderValid(donor)||body->numbones<=0||body->numbones>MAXSTUDIOBONES||
+     donor->numbones<=0||donor->numbones>MAXSTUDIOBONES||
+     !R_StudioRangeValid(body,body->boneindex,size_t(body->numbones)*sizeof(mstudiobone_t))||
+     !R_StudioRangeValid(donor,donor->boneindex,size_t(donor->numbones)*sizeof(mstudiobone_t)))return false;
+  const auto bodyBones=reinterpret_cast<const mstudiobone_t*>(reinterpret_cast<const byte*>(body)+body->boneindex);
+  const auto donorBones=reinterpret_cast<const mstudiobone_t*>(reinterpret_cast<const byte*>(donor)+donor->boneindex);
+  BoneMat34 donorBind[MAXSTUDIOBONES]{};
+  const auto bind=[](const mstudiobone_t* bones,int n,BoneMat34* local,BoneMat34* world) {
+   for(int i=0;i<n;++i) {
+    if(bones[i].parent>=i||bones[i].parent< -1)return false;
+    for(float v:bones[i].value)if(!std::isfinite(v))return false;
+    float rotation[4];AngleQuaternion(bones[i].value+3,rotation);QuaternionMatrix(rotation,bones[i].value,local[i]);
+    if(bones[i].parent>=0)ConcatTransforms(world[bones[i].parent],local[i],world[i]);else memcpy(world[i],local[i],sizeof(BoneMat34));
+   }
+   return true;
+  };
+  BoneMat34 donorLocal[MAXSTUDIOBONES]{};
+  if(!bind(bodyBones,body->numbones,bodyLocal,bodyBind)||!bind(donorBones,donor->numbones,donorLocal,donorBind))return false;
+  for(int j=0;j<donor->numbones;++j)for(int row=0;row<3;++row) {
+   for(int col=0;col<3;++col)donorInverse[j][row][col]=donorBind[j][col][row];
+   donorInverse[j][row][3]=0;for(int col=0;col<3;++col)donorInverse[j][row][3]-=donorBind[j][col][row]*donorBind[j][col][3];
+  }
+  count=body->numbones;
+  for(int i=0;i<count;++i){parents[i]=bodyBones[i].parent;map[i]=-1;
+   for(int j=0;j<donor->numbones;++j)if(!strncmp(bodyBones[i].name,donorBones[j].name,32)){map[i]=j;++mapped;break;}
+   if(map[i]<0&&parents[i]<0)return false;
+  }
+  return mapped>0;
+ }
+ void apply(const BoneMat34* donorPose,BoneMat34* result)const {
+  for(int i=0;i<count;++i) {
+   if(map[i]>=0){BoneMat34 delta;ConcatTransforms(donorPose[map[i]],donorInverse[map[i]],delta);ConcatTransforms(delta,bodyBind[i],result[i]);}
+   else ConcatTransforms(result[parents[i]],bodyLocal[i],result[i]);
+  }
+ }
+};
+static cof_shadow_rig_t g_cofShadowRig;
+static cof_shadow_motion::Rig g_cofShadowMotionRig;
+static cof_shadow_motion::State g_cofShadowMotion;
+static float g_cofShadowVelocity[2]{};
+static float g_cofShadowRestSole=0;static bool g_cofShadowRestSoleValid=false;
+static bool R_InitCofShadowMotion(const studiohdr_t* hdr) {
+ using namespace cof_shadow_motion;
+ g_cofShadowMotionRig={};auto& rig=g_cofShadowMotionRig;rig.count=hdr->numbones;
+ if(rig.count<=0||rig.count>Limit)return false;
+ const auto bones=reinterpret_cast<const mstudiobone_t*>(reinterpret_cast<const byte*>(hdr)+hdr->boneindex);
+ for(int i=0;i<rig.count;++i)rig.parents[i]=bones[i].parent;
+ const auto find=[&](const char* name){for(int i=0;i<rig.count;++i)if(!strncmp(bones[i].name,name,32))return i;return -1;};
+ rig.root=find("Bip01");rig.pelvis=find("Bip01 Pelvis");rig.neck=find("Bip01 Neck");rig.head=find("Bip01 Head");
+ const char* spines[]={"Bip01 Spine","Bip01 Spine1","Bip01 Spine2","Bip01 Spine3"};
+ const char* leftLeg[]={"Bip01 L Leg","Bip01 L Leg1","Bip01 L Foot","Bip01 L Toe0"};
+ const char* rightLeg[]={"Bip01 R Leg","Bip01 R Leg1","Bip01 R Foot","Bip01 R Toe0"};
+ const char* left[]={"Bip01 L Arm","Bip01 L Arm1","Bip01 L Arm2","Bip01 L Hand","Bip01 L Finger0","Bip01 L Finger01","Bip01 L Finger1","Bip01 L Finger11"};
+ const char* right[]={"Bip01 R Arm","Bip01 R Arm1","Bip01 R Arm2","Bip01 R Hand","Bip01 R Finger0","Bip01 R Finger01","Bip01 R Finger1","Bip01 R Finger11"};
+ for(int i=0;i<4;++i){rig.spine[i]=find(spines[i]);rig.leftLeg[i]=find(leftLeg[i]);rig.rightLeg[i]=find(rightLeg[i]);}
+ if(rig.spine[3]>=0)std::memcpy(rig.torsoInverseBind,g_cofShadowRig.donorInverse[rig.spine[3]],sizeof(BoneMat34));
+ for(int i=0;i<8;++i){rig.left[i]=find(left[i]);rig.right[i]=find(right[i]);}
+ return rig.valid()&&rig.pelvis>=0&&rig.spine[0]>=0;
+}
+struct cof_shadow_view_t {cof_shadow_animation::Selection choice;float frame=0;bool timed=false;uint64_t key=0;};
+static cof_shadow_view_t R_CofShadowView(cl_entity_s* vm,float now) {
+ cof_shadow_view_t out;
+ if(!vm||!vm->model||vm->model->type!=mod_studio||(vm->curstate.effects&EF_NODRAW))return out;
+ const std::string_view path(vm->model->name,strnlen_s(vm->model->name,sizeof(vm->model->name)));
+ std::string_view label;auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,vm->model));
+ if(R_StudioHeaderValid(hdr)&&hdr->numseq>0&&hdr->numseq<=4096&&vm->curstate.sequence>=0&&vm->curstate.sequence<hdr->numseq&&
+    R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t))) {
+  const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+  const auto& clip=seqs[vm->curstate.sequence];label=std::string_view(clip.label,strnlen_s(clip.label,sizeof clip.label));
+  if(clip.numframes>0&&clip.numframes<65536&&std::isfinite(vm->curstate.frame)&&std::isfinite(vm->curstate.animtime)&&std::isfinite(vm->curstate.framerate)){
+   out.frame=StudioFrameAdvance(hdr,vm,now);out.timed=std::isfinite(out.frame);out.frame=out.timed?std::clamp(out.frame,0.f,255.999f):0.f;
+  }
+ }
+ out.choice=cof_shadow_animation::select(path,label);out.key=cof_shadow_motion::key(path);return out;
+}
+static model_t* g_cofShadowDonor=nullptr;
+static int R_CofShadowSequenceExact(const studiohdr_t* hdr,const char* wanted) {
+ if(!hdr||!wanted||hdr->numseq<=0||hdr->numseq>4096||!R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t)))return -1;
+ const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ for(int i=0;i<hdr->numseq;++i)if(!strncmp(seqs[i].label,wanted,32))return i;
+ return -1;
+}
+static int R_CofShadowSequence(const studiohdr_t* hdr,const char* wanted){
+ const int selected=R_CofShadowSequenceExact(hdr,wanted);return selected>=0?selected:R_CofShadowSequenceExact(hdr,"idle");
+}
+static int g_cofShadowSequence=-1,g_cofShadowGaitSequence=-1;
+static float g_cofShadowGaitPhase=0.f,g_cofShadowVerticalSpeed=0.f;
+static CofShadowMesh g_cofShadowMesh;
+static CofShadowMesh g_cofShadowProbe(0x10000);
+static int g_cofShadowProbeKind=0;static bool g_cofShadowProbePlayer=false;
+static unsigned g_cofShadowTraceBudget=0,g_cofShadowDraws=0;
+static bool g_cofShadowCrouched=false;
+bool R_CofShadowCrouchPose(int hull,float cameraDelta,bool previous){
+ if(hull!=0)return true;
+ if(!std::isfinite(cameraDelta)||cameraDelta<0.f||cameraDelta>64.f)return false;
+ if(cameraDelta<18.f)return true;if(cameraDelta>22.f)return false;return previous;
+}
+static const char* g_cofShadowStage="not entered";
+static float g_cofShadowLo[3]{},g_cofShadowHi[3]{};
+void R_CofShadowProbeCmd(){
+ const int kind=gEngfuncs.Cmd_Argc()>1?atoi(gEngfuncs.Cmd_Argv(1)):0;
+ if(kind<0||kind>3){gEngfuncs.Con_Printf("dx_cof_shadow_probe <0=off|1=box|2=CPU Simon|3=skinned Simon> [player_categories 0|1]\n");return;}
+ g_cofShadowProbe.reset();g_cofShadowProbeKind=kind;g_cofShadowProbePlayer=gEngfuncs.Cmd_Argc()>2&&atoi(gEngfuncs.Cmd_Argv(2))!=0;g_cofShadowTraceBudget=8;
+}
+void R_CofShadowTraceCmd(){g_cofShadowTraceBudget=32;}
+void R_CofShadowStudioStatus(){
+ gEngfuncs.Con_Printf("SHADOW stage=%s draws=%u probe=%d probePlayer=%d sequence=%d gait=%d bounds=(%.2f %.2f %.2f)..(%.2f %.2f %.2f)\n",g_cofShadowStage,g_cofShadowDraws,g_cofShadowProbeKind,int(g_cofShadowProbePlayer),g_cofShadowSequence,g_cofShadowGaitSequence,g_cofShadowLo[0],g_cofShadowLo[1],g_cofShadowLo[2],g_cofShadowHi[0],g_cofShadowHi[1],g_cofShadowHi[2]);
+ gEngfuncs.Con_Printf("SHADOW motion blend=%.3f duration=%.2f crouch=%d hips=%.1f reverse=%.0f aim=%.1f bodyYaw=%.1f traversal=%d dual=%d\n",g_cofShadowMotion.transition,g_cofShadowMotion.duration,int(g_cofShadowMotion.crouched),g_cofShadowMotion.hipYaw,g_cofShadowMotion.reverse,g_cofShadowMotion.aimPitch,g_cofShadowMotion.bodyYaw,g_cofShadowMotion.traversal,int(g_cofShadowMotion.secondary!=0));
+ g_cofShadowMesh.status();if(g_cofShadowProbeKind)g_cofShadowProbe.status();
+}
+
+static cl_entity_s g_cofShadowEntity{};
+static float g_cofShadowPoseTime=-9999.f,g_cofShadowPhase=0.f;
+static float g_cofShadowMotionTime=-9999.f,g_cofShadowSpeed=0;
+static float g_cofShadowLastOrigin[3]{};
+static std::array<remixapi_Transform,MAXSTUDIOBONES> g_cofShadowBones{};
+void R_ResetCofShadow() {
+ g_cofShadowMotion.clear();g_cofShadowMotionRig={};g_cofShadowVelocity[0]=g_cofShadowVelocity[1]=0;g_cofShadowRestSoleValid=false;
+ g_cofShadowProbe.reset();g_cofShadowMesh.reset();g_cofShadowEntity={};g_cofShadowDonor=nullptr;g_cofShadowRig={};g_cofShadowPoseTime=-9999.f;g_cofShadowPhase=0;g_cofShadowSequence=-1;g_cofShadowGaitSequence=-1;g_cofShadowGaitPhase=0;g_cofShadowVerticalSpeed=0;g_cofShadowMotionTime=-9999.f;g_cofShadowSpeed=0;g_cofShadowCrouched=false;
+}
+void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_entity_s* viewmodel) {
+ g_cofShadowStage="disabled by cvar";
+ if(dx_cof_player_shadow.value==0.f){if(g_cofShadowEntity.model||g_cofShadowMesh.available())R_ResetCofShadow();return;}
+ g_cofShadowStage="missing device/client/player";
+ if(!device||!gp_cl||!player)return;
+ g_cofShadowStage="private models";
+ if(!model||!donor||model->type!=mod_studio||donor->type!=mod_studio){g_cofShadowMesh.fail("private Simon shadow models unavailable");return;}
+ g_cofShadowStage="API initialization";
+ if(!g_cofShadowMesh.ready())return;
+ g_cofShadowStage="Simon header";
+ auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,model));
+ if(!R_StudioHeaderValid(hdr)||hdr->numseq<=0||hdr->numseq>4096||
+    !R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t)))return;
+ auto animationHdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,donor));
+ if(!R_StudioHeaderValid(animationHdr)||animationHdr->numseq<=0||animationHdr->numseq>4096||
+    !R_StudioRangeValid(animationHdr,animationHdr->seqindex,size_t(animationHdr->numseq)*sizeof(mstudioseqdesc_t))) {
+  g_cofShadowMesh.fail("invalid private animation donor");return;
+ }
+ const float now=R_CurrentRenderTime(0.f);
+ if(g_cofShadowEntity.model!=model||g_cofShadowDonor!=donor||now<g_cofShadowPoseTime||now-g_cofShadowPoseTime>.5f){
+  R_ResetCofShadow();g_cofShadowEntity.model=model;g_cofShadowDonor=donor;
+  if(!g_cofShadowRig.initialize(hdr,animationHdr)||!R_InitCofShadowMotion(animationHdr)){g_cofShadowMesh.fail("incompatible private Simon shadow skeleton");return;}
+  VectorCopy(gp_cl->simorg,g_cofShadowLastOrigin);g_cofShadowMotionTime=now;
+ }
+ const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(animationHdr)+animationHdr->seqindex);
+ const float motionElapsed=now-g_cofShadowMotionTime;
+ if(motionElapsed>0.f&&motionElapsed<=.2f) {
+  const float distance=std::hypot(gp_cl->simorg[0]-g_cofShadowLastOrigin[0],gp_cl->simorg[1]-g_cofShadowLastOrigin[1]);
+  g_cofShadowSpeed=distance<128.f?std::min(400.f,distance/motionElapsed):0.f;
+  for(int i=0;i<2;++i)g_cofShadowVelocity[i]=distance<128.f?std::clamp((gp_cl->simorg[i]-g_cofShadowLastOrigin[i])/motionElapsed,-400.f,400.f):0.f;
+  const float dz=gp_cl->simorg[2]-g_cofShadowLastOrigin[2];
+  g_cofShadowVerticalSpeed=std::isfinite(dz)&&std::fabs(dz)<128.f?std::clamp(dz/motionElapsed,-1200.f,1200.f):0.f;
+ } else if(motionElapsed<0.f||motionElapsed>.2f){g_cofShadowSpeed=0;g_cofShadowVerticalSpeed=0;g_cofShadowVelocity[0]=g_cofShadowVelocity[1]=0;}
+ if(motionElapsed!=0.f){VectorCopy(gp_cl->simorg,g_cofShadowLastOrigin);g_cofShadowMotionTime=now;}
+ const float speed=g_cofShadowSpeed;
+ // The local render entity can retain usehull=0 while the latest player
+ // snapshot already carries the crouched hull. Read the studio player state.
+ const auto playerState=gEngfuncs.pfnGetPlayerState?gEngfuncs.pfnGetPlayerState(gp_cl->playernum):nullptr;
+ const auto& movement=playerState?*playerState:player->curstate;
+ // CoF can duck its camera from 28 to 12 units without changing usehull.
+ // Hysteresis ignores ordinary standing head-bob and keeps the private pose stable.
+ bool duckHeld=false;float duckHeight=g_vOrigin[2]-gp_cl->simorg[2];
+ const bool nativeDuck=R_CofShadowCrouchInput(now,duckHeld,duckHeight);
+ // A bobbed/predicted camera can briefly return to standing height while
+ // crouch is still held. The raw usercmd keeps that from reversing the pose.
+ g_cofShadowCrouched=(nativeDuck&&duckHeld)||R_CofShadowCrouchPose(movement.usehull,duckHeight,g_cofShadowCrouched);
+ const bool crouched=g_cofShadowCrouched;
+ float hullBottom=movement.usehull!=0?-18.f:-36.f;
+ if(std::isfinite(movement.mins[2])&&std::isfinite(movement.maxs[2])&&movement.mins[2]<0.f&&movement.mins[2]>=-128.f&&movement.maxs[2]>0.f&&movement.maxs[2]<=128.f)
+  hullBottom=movement.mins[2];
+ const auto primary=R_CofShadowView(viewmodel,now);const auto& choice=primary.choice;
+ const float actionFrame=primary.frame;const bool vmAction=primary.timed;
+ auto secondaryVm=R_CofShadowSecondary(now);const auto secondary=R_CofShadowView(secondaryVm,now);
+ const int water=static_cast<int>(ENGINE_GET_PARM(PARM_WATER_LEVEL));
+ const bool swimming=water>=3||(water>=2&&movement.onground==-1);
+ const bool climbing=movement.movetype==MOVETYPE_FLY&&!swimming;
+ const bool jumping=!crouched&&(choice.jump||(movement.onground==-1&&std::fabs(g_cofShadowVerticalSpeed)>40.f));
+ const bool sprinting=!crouched&&!jumping&&speed>150.f&&(choice.sprint||speed>240.f);
+ const char* gaitName=climbing||swimming?"idle":crouched?(speed>10.f?"crouch_crouch":"crouch_idle"):jumping?"jump":sprinting?"sprint":speed>150.f?"run":speed>10.f?"walk":"idle";
+ const int gaitSequence=R_CofShadowSequence(animationHdr,gaitName);
+ int sequence=R_CofShadowSequenceExact(animationHdr,choice.stance.c_str());
+ const int actionSequence=vmAction&&!choice.action.empty()?R_CofShadowSequenceExact(animationHdr,choice.action.c_str()):-1;
+ const bool action=actionSequence>=0;
+ if(action)sequence=actionSequence;
+ // Sprint uses its authored full-body pose unless an active weapon action needs
+ // the hands. All other armed motion layers gait below the spine.
+ bool layered=sequence>=0&&choice.stance!="idle";
+ if(!layered||(sprinting&&!action)){sequence=gaitSequence;layered=false;}
+ if(sequence<0){g_cofShadowMesh.fail("private donor has no supported idle sequence");return;}
+ g_cofShadowEntity=*player;g_cofShadowEntity.model=model;g_cofShadowEntity.player=false;
+ g_cofShadowEntity.curstate.effects=EF_NOINTERP;g_cofShadowEntity.curstate.renderfx=0;g_cofShadowEntity.curstate.rendermode=kRenderNormal;
+ g_cofShadowEntity.curstate.scale=1.f;g_cofShadowEntity.curstate.body=0;g_cofShadowEntity.curstate.skin=0;g_cofShadowEntity.curstate.sequence=sequence;g_cofShadowEntity.curstate.gaitsequence=gaitSequence;
+ g_cofShadowEntity.curstate.framerate=1.f;g_cofShadowEntity.curstate.animtime=now;
+ VectorCopy(gp_cl->simorg,g_cofShadowEntity.origin);VectorCopy(gp_cl->simorg,g_cofShadowEntity.curstate.origin);
+ g_cofShadowEntity.angles[0]=g_cofShadowEntity.angles[2]=0;g_cofShadowEntity.angles[1]=g_vAngles[YAW];
+ VectorCopy(g_cofShadowEntity.angles,g_cofShadowEntity.curstate.angles);
+ D3DMATRIX world;
+ if(!g_cofShadowMesh.available()||sequence!=g_cofShadowSequence||gaitSequence!=g_cofShadowGaitSequence||now-g_cofShadowPoseTime>=1.f/30.f) {
+  if(!g_cofShadowMesh.available()&&!R_BuildCofShadowMesh(hdr,g_cofShadowMesh))return;
+  const float elapsed=std::clamp(now-g_cofShadowPoseTime,0.f,.1f);
+  cof_shadow_motion::Input motion;
+  motion.now=now;motion.dt=elapsed;motion.yaw=g_vAngles[YAW];motion.pitch=g_vAngles[PITCH];
+  motion.vx=g_cofShadowVelocity[0];motion.vy=g_cofShadowVelocity[1];motion.vz=g_cofShadowVerticalSpeed;motion.speed=speed;
+  motion.crouched=crouched;motion.ladder=climbing;motion.swim=swimming;motion.action=action;motion.frame=actionFrame;motion.weapon=primary.key;motion.choice=choice;
+  g_cofShadowMotion.advance(motion);
+  if(sequence!=g_cofShadowSequence)g_cofShadowPhase=0;
+  else g_cofShadowPhase+=elapsed*seqs[sequence].fps;
+  const float frames=std::max(1.f,float(seqs[sequence].numframes-1));
+  g_cofShadowPhase=std::fmod(g_cofShadowPhase,frames);
+  if(gaitSequence!=g_cofShadowGaitSequence)g_cofShadowGaitPhase=0;
+  else if(gaitSequence>=0)g_cofShadowGaitPhase+=elapsed*seqs[gaitSequence].fps*(jumping?1.f:g_cofShadowMotion.reverse*std::clamp(speed>10.f?speed/120.f:1.f,.35f,2.f));
+  const float gaitFrames=gaitSequence>=0?std::max(1.f,float(seqs[gaitSequence].numframes-1)):1.f;
+  g_cofShadowGaitPhase=jumping?std::min(g_cofShadowGaitPhase,gaitFrames-.001f):std::fmod(g_cofShadowGaitPhase,gaitFrames);
+  if(g_cofShadowGaitPhase<0)g_cofShadowGaitPhase+=gaitFrames;
+  const float primaryFrame=action?actionFrame:layered?g_cofShadowPhase*256.f/frames:g_cofShadowGaitPhase*256.f/gaitFrames;
+  BoneMat34 bones[MAXSTUDIOBONES]{};
+  BoneMat34 donorPose[MAXSTUDIOBONES]{};
+  cl_entity_s animated=g_cofShadowEntity;animated.model=donor;
+  // The donor's crouch-walk rises almost to standing height. Keep the deep
+  // crouch base and animate short articulated steps on it instead.
+  const int sampledGait=crouched?R_CofShadowSequence(animationHdr,"crouch_idle"):gaitSequence;
+  StudioCalcBoneTransformsInternal(donor,animationHdr,crouched&&!layered?sampledGait:sequence,primaryFrame,donorPose,layered?sampledGait:-1,g_cofShadowGaitPhase*256.f/gaitFrames,0,&animated,now);
+  using ShadowProfile=cof_shadow_animation::Profile;
+  if(choice.profile==ShadowProfile::Phone||choice.profile==ShadowProfile::Flashlight||choice.profile==ShadowProfile::Lantern||choice.profile==ShadowProfile::Flare){
+   const int relaxed=R_CofShadowSequenceExact(animationHdr,"idle");
+   if(relaxed>=0){BoneMat34 neutral[MAXSTUDIOBONES]{};StudioCalcBoneTransformsInternal(donor,animationHdr,relaxed,0,neutral,-1,0,0,&animated,now);
+    cof_shadow_motion::copyBranch(g_cofShadowMotionRig,donorPose,neutral,g_cofShadowMotionRig.left[0]);}
+  }
+  g_cofShadowMotion.procedural(g_cofShadowMotionRig,donorPose,motion);
+  uint64_t secondaryPoseKey=0;
+  if(secondaryVm&&secondary.key&&!climbing&&!swimming) {
+   int otherSequence=secondary.timed&&!secondary.choice.action.empty()?R_CofShadowSequenceExact(animationHdr,secondary.choice.action.c_str()):-1;
+   const bool otherAction=otherSequence>=0;if(!otherAction)otherSequence=R_CofShadowSequence(animationHdr,secondary.choice.stance.c_str());
+   if(otherSequence>=0){
+    secondaryPoseKey=secondary.key^(uint64_t(otherSequence+1)<<32)^(uint64_t(secondary.choice.gesture)<<56);
+    BoneMat34 otherPose[MAXSTUDIOBONES]{};cl_entity_s otherEntity=animated;otherEntity.curstate.sequence=otherSequence;
+    StudioCalcBoneTransformsInternal(donor,animationHdr,otherSequence,otherAction?secondary.frame:primaryFrame,otherPose,-1,0,0,&otherEntity,now);
+    auto otherMotion=motion;otherMotion.choice=secondary.choice;otherMotion.frame=secondary.frame;otherMotion.action=otherAction;
+    g_cofShadowMotion.procedural(g_cofShadowMotionRig,otherPose,otherMotion);
+    cof_shadow_motion::mirrorLeft(g_cofShadowMotionRig,donorPose,otherPose,g_cofShadowRig.donorInverse);
+   }
+  }
+  if(!g_cofShadowMotion.resolve(g_cofShadowMotionRig,donorPose,motion,sequence,gaitSequence,secondaryPoseKey)){
+   g_cofShadowMesh.fail("invalid shadow motion pose");return;
+  }
+  g_cofShadowRig.apply(donorPose,bones);
+  for(int i=0;i<hdr->numbones;++i)for(int row=0;row<3;++row)for(int col=0;col<4;++col) {
+   const float value=bones[i][row][col];if(!std::isfinite(value)){g_cofShadowMesh.fail("non-finite shadow pose");return;}
+   g_cofShadowBones[i].matrix[row][col]=value;
+  }
+  g_cofShadowPoseTime=now;g_cofShadowSequence=sequence;g_cofShadowGaitSequence=gaitSequence;
+ }
+ g_cofShadowEntity.angles[1]=g_cofShadowMotion.bodyYaw;
+ VectorCopy(g_cofShadowEntity.angles,g_cofShadowEntity.curstate.angles);R_SetStudioWorld(&g_cofShadowEntity,now,&world);
+ float sole=0;
+ if(!g_cofShadowMesh.floor(g_cofShadowBones.data(),static_cast<unsigned>(hdr->numbones),sole)){
+  g_cofShadowMesh.fail("invalid shadow sole bounds");return;
+ }
+ // Use the native snapshot hull bounds when supplied; standard GoldSrc
+ // standing/ducked bounds are the fallback for missing network bounds.
+ if((climbing||swimming)&&!g_cofShadowRestSoleValid){
+  std::array<remixapi_Transform,MAXSTUDIOBONES> rest{};
+  for(int i=0;i<hdr->numbones;++i)std::memcpy(rest[i].matrix,g_cofShadowRig.bodyBind[i],sizeof(BoneMat34));
+  g_cofShadowRestSoleValid=g_cofShadowMesh.floor(rest.data(),unsigned(hdr->numbones),g_cofShadowRestSole);
+ }
+ world._43=gp_cl->simorg[2]+hullBottom-((climbing||swimming)&&g_cofShadowRestSoleValid?g_cofShadowRestSole:sole);
+ g_cofShadowMesh.bounds(world,g_cofShadowBones.data(),static_cast<unsigned>(hdr->numbones),g_cofShadowLo,g_cofShadowHi);
+ bool submitted=false;
+ if(g_cofShadowProbeKind){
+  if(g_cofShadowMesh.probe(g_cofShadowProbe,g_cofShadowProbeKind,g_cofShadowBones.data(),static_cast<unsigned>(hdr->numbones))){
+   world._41=g_vOrigin[0]+96.f*std::cos(DEG2RAD(g_vAngles[YAW]));world._42=g_vOrigin[1]+96.f*std::sin(DEG2RAD(g_vAngles[YAW]));
+   world._43=g_vOrigin[2]-36.f-(g_cofShadowProbeKind==1?0.f:sole);
+   submitted=g_cofShadowProbe.draw(world,g_cofShadowBones.data(),static_cast<unsigned>(hdr->numbones),!g_cofShadowProbePlayer,g_cofShadowProbeKind==3);
+  }
+ }else submitted=g_cofShadowMesh.draw(world,g_cofShadowBones.data(),static_cast<unsigned>(hdr->numbones),dx_cof_player_shadow.value>=2.f);
+ g_cofShadowStage=submitted?"submitted":"submission failed";if(submitted)++g_cofShadowDraws;
+ if(g_cofShadowTraceBudget){--g_cofShadowTraceBudget;gEngfuncs.Con_Printf("SHADOW movement snapshot=%d hull=%d hullBottom=%.2f cameraDelta=%.2f\n",int(playerState!=nullptr),movement.usehull,hullBottom,g_vOrigin[2]-gp_cl->simorg[2]);R_CofShadowStudioStatus();}
 }
 
 static void R_BuildViewModelWorld(const cl_entity_s* ent,const float* viewOrigin,const float* viewAngles,
@@ -6022,6 +6363,33 @@ extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraFlashPointV1(cl_enti
  return R_StudioCameraFlashPoint(ent,time,origin,angles,offsets,point);
 }
 
+// CoF consumes event 5051 to create the thrown server entity. Muzzle-only
+// dispatch drops it, leaving only the holster/removal animation.
+static void R_ProcessCofFlareEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,const D3DMATRIX& world,float now) {
+ auto& state=R_GetEntityCache(ent).flare;
+ if(!R_CofClientPresent()||!ent->model||!cof_features::flareModel(ent->model->name,true)) {state={};return;}
+ if(!R_StudioHeaderValid(hdr)||!gEngfuncs.pfnStudioEvent||ent->curstate.sequence<0||ent->curstate.sequence>=hdr->numseq)return;
+ if(state.model!=ent->model){state={};state.model=ent->model;}
+ auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ const auto& seq=seqs[ent->curstate.sequence];
+ if(seq.numevents<0||seq.numevents>4096||!R_StudioRangeValid(hdr,seq.eventindex,size_t(seq.numevents)*sizeof(mstudioevent_t)))return;
+ const float last=std::max(1.f,float(seq.numframes-1));
+ const float nativeFrame=std::clamp(frame*last/256.f,0.f,last);
+ const float window=std::clamp(float(gp_cl->time-gp_cl->oldtime),0.f,.1f)*std::fabs(ent->curstate.framerate)*seq.fps;
+ state.cursor.begin(ent->curstate.sequence,ent->curstate.animtime,now,nativeFrame,last,(seq.flags&STUDIO_LOOPING)!=0,window);
+ const auto events=reinterpret_cast<const mstudioevent_t*>(reinterpret_cast<const byte*>(hdr)+seq.eventindex);
+ bool attachmentsReady=false;
+ for(int i=0;i<seq.numevents;++i) {
+  if((events[i].event!=5050&&events[i].event!=5051)||!state.cursor.event(i,float(events[i].frame)))continue;
+  if(!attachmentsReady) {
+   BoneMat34 bones[MAXSTUDIOBONES]{};
+   StudioCalcBoneTransformsInternal(ent->model,hdr,ent->curstate.sequence,frame,bones,-1,0,0,ent,now);
+   R_StudioUpdateAttachments(hdr,ent,bones,world,true,now);attachmentsReady=true;
+  }
+  gEngfuncs.pfnStudioEvent(&events[i],ent);
+ }
+}
+
 void R_DrawStudioViewModel( cl_entity_s *ent,
 	const vec3_t viewOrigin, const vec3_t viewAngles,
 	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
@@ -6042,6 +6410,8 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 		gEngfuncs.Mod_Extradata( mod_studio, ent->model ) );
 	const float studioPoseTime = R_StudioQuantizePoseTime( ent, gp_cl->time, true );
 	const float renderFrame = StudioFrameAdvance( hdr, ent, studioPoseTime );
+
+ R_ProcessCofFlareEvents(hdr,ent,renderFrame,viewModelWorld,studioPoseTime);
 
 	vec3_t studioLightDir;
 	float studioDirectLightScale;

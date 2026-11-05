@@ -1,5 +1,6 @@
 #include "dx_local.h"
 #include "dx_camera_flash.h"
+#include "dx_cof_native_light.h"
 #include <dbghelp.h>
 #include <fstream>
 #include <stdexcept>
@@ -23,8 +24,8 @@ static void reg(convar_t* v){v->value=static_cast<float>(atof(v->string));}
 static cvar_t* cvar(const char*){return &shared;}
 static void* extra(int,model_t*){return modelBytes.data();}
 struct Device{void** methods;};static unsigned sets=0,on=0,off=0;static bool failSet=false,failEnable=false;static D3DLIGHT9 recorded{};
-static HRESULT STDMETHODCALLTYPE setLight(Device*,DWORD slot,const D3DLIGHT9* light){check(slot==0,"photo light slot");++sets;recorded=*light;return failSet?E_FAIL:S_OK;}
-static HRESULT STDMETHODCALLTYPE enable(Device*,DWORD slot,BOOL value){check(slot==0,"enable slot");if(value)++on;else ++off;return value&&failEnable?E_FAIL:S_OK;}
+static HRESULT STDMETHODCALLTYPE setLight(Device*,DWORD slot,const D3DLIGHT9* light){check(slot<2,"photo/native light slot");++sets;recorded=*light;return failSet?E_FAIL:S_OK;}
+static HRESULT STDMETHODCALLTYPE enable(Device*,DWORD slot,BOOL value){check(slot<2,"enable slot");if(value)++on;else ++off;return value&&failEnable?E_FAIL:S_OK;}
 int main(int argc,char** argv)try{
  check(argc==3,"renderer and camera model arguments");
  std::ifstream file(argv[2],std::ios::binary);modelBytes.assign(std::istreambuf_iterator<char>(file),{});check(modelBytes.size()>sizeof(studiohdr_t),"camera model");
@@ -60,10 +61,11 @@ int main(int argc,char** argv)try{
  auto publish=reinterpret_cast<Publish>(GetProcAddress(dll,"DX_CofLightStateV2"));auto trigger=reinterpret_cast<Trigger>(GetProcAddress(dll,"DX_CofCameraFlashV1"));auto describe=reinterpret_cast<Describe>(GetProcAddress(dll,"DX_CofCameraFlashDescriptionV1"));
  check(publish&&trigger&&describe,"photo exports");
  for(const char* name:{"dx_remix","dx_dlights","dx_dlight_fixed","dx_cof_camera_flash"})symbol<convar_t*>(name)->value=1;
+ symbol<float*>("g_vForward")[0]=1;
  dx_cof_light_state_v2 packet;packet.direction[0]=1;packet.time=10;check(publish(&packet)!=0,"zero-toggle light publication");
  D3DLIGHT9 light{};check(!describe(&light),"no light from draw/equip alone");check(trigger(10)&&!trigger(10),"one trigger per exposure timestamp");
  check(describe(&light)&&light.Type==D3DLIGHT_SPOT&&light.Range==600&&light.Diffuse.r>.79f&&light.Direction.x==1,"white photo spotlight");
- check(pose(&vm,10,zero,zero,zero,point)!=0,"expected emitter");check(fabsf(light.Position.x-point[0])<.01f&&fabsf(light.Position.y-point[1])<.01f&&fabsf(light.Position.z-point[2])<.01f,"light at animated flash bone");
+ check(pose(&vm,10,zero,zero,zero,point)!=0,"expected emitter");check(fabsf(light.Position.x-point[0]-8)<.01f&&fabsf(light.Position.y-point[1])<.01f&&fabsf(light.Position.z-point[2])<.01f,"light at animated flash bone");
  void* methods[119]{};methods[51]=reinterpret_cast<void*>(setLight);methods[53]=reinterpret_cast<void*>(enable);Device recorder{methods};*symbol<IDirect3DDevice9**>("device")=reinterpret_cast<IDirect3DDevice9*>(&recorder);
  auto apply=symbol<void(*)()>("R_ApplyDLights");apply();check(sets==1&&on==1&&off==0,"production light submission");
  client.time=10.075;packet.time=static_cast<float>(client.time);publish(&packet);apply();check(sets==2&&recorded.Diffuse.r>0&&recorded.Diffuse.r<.3f,"short discharge tail");
@@ -75,13 +77,28 @@ int main(int argc,char** argv)try{
   if(i==3)client.time-=1;
   if(i==4)client.time+=.3;
   if(i==5)symbol<convar_t*>("dx_cof_camera_flash")->value=0;
-  if(i==2)publish(&packet);check(!describe(&light),"hidden/replaced/suppressed/rollback/stale/off clears pulse");
+  if(i==2){publish(&packet);check(describe(&light),"accepted photo ignores unrelated handheld suppression");continue;}check(!describe(&light),"hidden/replaced/suppressed/rollback/stale/off clears pulse");
   vm.curstate.effects=0;strcpy_s(model.name,"models/weapons/camera/v_camera.mdl");symbol<convar_t*>("dx_cof_camera_flash")->value=1;
  }
  packet.reasons=0;client.time=50;packet.time=50;publish(&packet);check(trigger(50)!=0,"failure pulse");
  failSet=true;apply();check(off>=2,"failed SetLight disables slot");failSet=false;failEnable=true;apply();check(off>=3,"failed LightEnable disables slot");failEnable=false;
  symbol<void(*)()>("R_ResetCofLights")();check(!describe(&light),"map/device reset clears pulse");
+ client.time=55;check(trigger(55)&&describe(&light),"accepted photo works without any handheld publication");
+ symbol<void(*)()>("R_ResetCofLights")();
  check(!trigger(std::numeric_limits<float>::quiet_NaN()),"NaN trigger rejected");
+ packet.reasons=0;client.time=60;packet.time=59;publish(&packet);
+ check(trigger(60.05f)!=0,"network photo arrives ahead of render clock with old view packet");
+ check(!describe(&light),"future photo waits for the next view");
+ client.time=60.2; // Deliberately retain stale, unrelated handheld state.
+ check(describe(&light)&&light.Diffuse.r>.79f,"first rendered exposure survives network delay and stale previous publication");
+ client.time=60.31;check(!describe(&light),"deferred exposure expires");
+ using NativePublish=int(__cdecl*)(const dx_cof_native_light*);
+ auto nativePublish=reinterpret_cast<NativePublish>(GetProcAddress(dll,"DX_CofNativeLightV1"));check(nativePublish!=nullptr,"native light bridge export");
+ symbol<convar_t*>("dx_dlight_entities")->value=1;
+ dx_cof_native_light head;head.key=540;head.time=70;head.range=696;head.cone=90;head.color[0]=.75f;head.color[1]=.7421875f;head.color[2]=.6484375f;head.angles[1]=270;
+ client.time=70;check(nativePublish(&head)!=0,"left headlight");head.key=546;head.origin[0]=44;check(nativePublish(&head)!=0,"right headlight");
+ const unsigned beforeNative=sets;apply();check(sets==beforeNative+2&&recorded.Type==D3DLIGHT_SPOT&&recorded.Position.x==44&&recorded.Direction.y<-.999f,"two actual submitted headlight cones");
+ client.time=70.16;apply();check(sets==beforeNative+2,"cutscene toggle/removal expires lights");
  *symbol<IDirect3DDevice9**>("device")=nullptr;
- printf("PASS: %u real camera poses; native-shot pulse without toggle flags, flash-bone placement, checked production light sink, discharge/expiry/off/suppression/model change/rollback/stale/reset/failures. No device/window/game.\n",poses);return 0;
+ printf("PASS: %u real camera poses; queued native-shot pulse across message/view clock skew; flash-bone placement and expiry; checked production photo/headlight pair submissions, movement direction, off/suppression/model change/rollback/stale/reset/failures. No device/window/game.\n",poses);return 0;
 }catch(const std::exception& e){fprintf(stderr,"FAIL CAMERA FLASH: %s\n",e.what());return 1;}

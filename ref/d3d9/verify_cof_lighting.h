@@ -36,7 +36,7 @@ static bool verifyCofLighting(const char* modelPath) {
  for(unsigned reason:{1u,2u,4u,8u,16u,32u,64u,256u}) {
   p.reasons=reason;p.eligibleFlags=DX_CofEligible(15,reason);bridge.publish(&p);if(!check(!bridge.flags(p.time),"suppression"))return false;
  }
- p.reasons=DX_COF_NO_VIEWMODEL;if(!check(DX_CofEligible(15,p.reasons)==3,"weapon/handheld model gate"))return false;
+ p.reasons=DX_COF_NO_VIEWMODEL;if(!check(DX_CofEligible(15,p.reasons)==11,"bare hands retain stowed portable light and suppress mounted weapon light"))return false;
  for(unsigned raw:{16u,64u,0x8000u,0x8008u,0xffffu}) {
   p.reasons=0;p.rawFlags=raw;p.eligibleFlags=DX_CofEligible(raw,0);D3DLIGHT9 light{};
   if(!check(bridge.publish(&p)&&bridge.packet.rawFlags==raw&&bridge.flags(p.time)==(raw&15),"raw higher HUD bits retained"))return false;

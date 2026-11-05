@@ -129,7 +129,7 @@ int main(int argc,char** argv) {
     publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 42;
     publication.size=0;if(publishV2(&publication)||describe(&light))return 43;
     std::puts("PASS: actual compiled renderer V2 export builds dimmed lens-attached spotlight without player entity lookup; off/invalid publication clears it.");
-    // Native bit8 deliberately remains on while the actual equipped model changes.
+    // A switched-on light remains on when stowed, with a dimmer ground beam.
     const auto flashlightBytes=lightModelBytes;secondaryLightBytes=flashlightBytes;
     secondaryLightModel=lightModel;
     std::ifstream gun(modelPath.substr(0,slash)+"/weapons/glock/v_glock.mdl",std::ios::binary);
@@ -137,7 +137,7 @@ int main(int argc,char** argv) {
     strcpy_s(lightModel.name,"models/weapons/glock/v_glock.mdl");
     lightViewmodel.curstate.sequence=0;
     publication.size=sizeof(publication);publication.rawFlags=publication.eligibleFlags=8;publication.time=client.time;
-    if(!publishV2(&publication)||describe(&light))return 70;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f||fabsf(light.Diffuse.r-.2625f)>.0001f)return 70;
     // Glock attachments exist: merely checking attachment count is insufficient.
     if(!pose(&lightViewmodel,client.time,camera,angles,offsets,points))return 71;
     publication.rawFlags=publication.eligibleFlags=12;
@@ -148,15 +148,15 @@ int main(int argc,char** argv) {
     publication.rawFlags=publication.eligibleFlags=8;
     if(!dual(&secondary,1,client.time)||!publishV2(&publication)||!describe(&light))return 74;
     if(!pose(&secondary,client.time,camera,angles,offsets,points)||fabsf(light.Position.x-points[0])>.01f||fabsf(light.Position.y+points[1])>.01f||fabsf(light.Position.z-points[2])>.01f)return 75;
-    if(!dual(nullptr,0,client.time)||describe(&light))return 76;
+    if(!dual(nullptr,0,client.time)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 76;
     if(!dual(&secondary,1,client.time))return 77;
     client.time+=.3f;publication.time=client.time;
-    if(!publishV2(&publication)||describe(&light))return 78;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 78;
     client.time=0;publication.time=0;
     lightModelBytes=flashlightBytes;strcpy_s(lightModel.name,"models/weapons/flashlight/v_flashlight.mdl");
     if(!publishV2(&publication)||!describe(&light))return 79;
     publication.rawFlags=publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 80;
-    puts("PASS: compiled flashlight-to-Glock swap with native bit8 held on suppresses beam; real gun attachments rejected as flashlight; weapon-light bit4 retained; mirrored second-hand flashlight, clear/expiry, re-equip and off pass. No game.");
+    puts("PASS: stowed switched-on flashlight emits a 25%-dimmer ground beam; actual gun attachments are not used as its lens; mounted weapon light, held/mirrored second-hand flashlight, re-equip and true off pass. No game.");
     // Exercise the actual phone model through production publication -> light
     // description, not just the attachment helper. Native uses attachment[1].
     auto savedLightBytes=std::move(lightModelBytes);
@@ -177,13 +177,46 @@ int main(int argc,char** argv) {
         if(fabsf(light.Direction.x)>.001f||fabsf(light.Direction.y-1)>.001f||fabsf(light.Direction.z)>.001f||fabsf(light.Diffuse.r-((flags&1)?.46f:.15f))>.0001f)return 63;
         ++phonePoses;
     }
+    // The held phone keeps normal camera aim and brightness.
+    lightViewmodel.curstate.sequence=0;
+    for(float yaw:{-179.f,-90.f,0.f,90.f,179.f})for(float pitch:{-89.f,-45.f,0.f,45.f,89.f}) {
+        const float y=yaw*.0174532925199433f,p=pitch*.0174532925199433f;
+        publication.direction[0]=std::cos(p)*std::cos(y);publication.direction[1]=std::cos(p)*std::sin(y);publication.direction[2]=-std::sin(p);
+        publication.rawFlags=publication.eligibleFlags=1;publication.time=client.time;
+        if(!publishV2(&publication)||!describe(&light))return 81;
+        if(fabsf(light.Direction.x-publication.direction[0])>.001f||fabsf(light.Direction.y-publication.direction[1])>.001f||fabsf(light.Direction.z-publication.direction[2])>.001f||fabsf(light.Diffuse.r-.46f)>.0001f)return 82;
+    }
+    // Stowed phone and torch: ignore vertical camera pitch, preserve heading,
+    // and dim exactly 25 percent. Exercise production descriptors, not a mock.
+    strcpy_s(lightModel.name,"models/weapons/switchblade/v_switchblade.mdl");
+    for(unsigned flags:{1u,2u,8u})for(float yaw:{-179.f,-90.f,0.f,90.f,179.f})for(float pitch:{-89.f,-45.f,0.f,45.f,89.f}) {
+        const float y=yaw*.0174532925199433f,p=pitch*.0174532925199433f;
+        publication.direction[0]=std::cos(p)*std::cos(y);publication.direction[1]=std::cos(p)*std::sin(y);publication.direction[2]=-std::sin(p);
+        publication.rawFlags=publication.eligibleFlags=flags;publication.time=client.time;
+        publication.origin[0]=123.f+yaw;publication.origin[1]=-45.f;publication.origin[2]=100.f+pitch;
+        if(!publishV2(&publication)||!describe(&light))return 84;
+        if(fabsf(light.Position.x-publication.origin[0]-4.f*std::cos(y))>.001f||
+           fabsf(light.Position.y-publication.origin[1]-4.f*std::sin(y))>.001f||
+           fabsf(light.Position.z-publication.origin[2]+24.f)>.001f)return 87;
+        const float brightness=(flags==8?.35f:flags==1?.46f:.15f)*.75f;
+        if(fabsf(light.Direction.x-.34202014f*std::cos(y))>.001f||fabsf(light.Direction.y-.34202014f*std::sin(y))>.001f||fabsf(light.Direction.z+.93969262f)>.001f||fabsf(light.Diffuse.r-brightness)>.0001f)return 85;
+    }
+    lightViewmodel.model=nullptr;publication.rawFlags=publication.eligibleFlags=8;publication.reasons=DX_COF_NO_VIEWMODEL;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 86;
+    lightViewmodel.model=&lightModel;publication.reasons=0;strcpy_s(lightModel.name,"models/weapons/mobile/v_mobile.mdl");
+    publication.rawFlags=publication.eligibleFlags=1;
+    for(float yaw:{-179.f,-90.f,0.f,90.f,179.f})for(float vertical:{-1.f,1.f}) {
+        float direction[3]={0,0,vertical};const float y=yaw*.0174532925199433f;
+        if(!DX_CofGroundPhoneDirection(direction,yaw)||fabsf(direction[0]-.34202014f*std::cos(y))>.001f||fabsf(direction[1]-.34202014f*std::sin(y))>.001f||fabsf(direction[2]+.93969262f)>.001f)return 83;
+    }
+    publication.direction[0]=0;publication.direction[1]=1;publication.direction[2]=0;
     const int phoneAttachmentOffset=phoneHdr->attachmentindex;phoneHdr->attachmentindex=phoneHdr->length;
     if(!publishV2(&publication)||describe(&light))return 64;phoneHdr->attachmentindex=phoneAttachmentOffset;
     publication.rawFlags=publication.eligibleFlags=4;publishV2(&publication);
     if(!describe(&light)||fabsf(light.Position.x-publication.origin[0])>.001f||fabsf(light.Position.y-publication.origin[1]-4)>.001f)return 65;
     publication.rawFlags=publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 66;
     lightModelBytes=std::move(savedLightBytes);strcpy_s(lightModel.name,"models/weapons/flashlight/v_flashlight.mdl");
-    printf("PASS: compiled phone spotlight from native attachment[1], %u poses, main/reduced priority, preserved camera aim/brightness, translation/yaw, invalid attachment rejection, unrelated weapon-light path and off. No device/window.\n",phonePoses);
+    printf("PASS: held phone attachment/normal aim across %u poses and 25 pitch/yaw pairs; stowed phone/torch origin 24 units below eyes and 4 forward, always 70 degrees down and 25%% dimmer across 75 pitch/yaw cases, both vertical poles and bare hands; invalid attachments, mounted light and off preserved. No device/window.\n",phonePoses);
     client.time=0;
     const int attachmentCount=std::min(hdr->numattachments,4);
     int samples=0; float first[3]{}; bool moved=false;

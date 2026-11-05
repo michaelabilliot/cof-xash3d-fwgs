@@ -3,6 +3,7 @@
 #include "dx_local.h"
 #include "dx_geometry_stability.h"
 #include "dx_camera_flash.h"
+#include "dx_cof_native_light.h"
 #include "dx_effect_timing.h"
 #include "dx_cof_light_render.h"
 #include <cstdarg>
@@ -13,13 +14,18 @@ static dx_cof_light_bridge_t g_cofLightBridge;
 static bool g_cofV2=false;
 static bool g_cofClientPresent=false;
 static dx_camera_flash_t g_cameraFlash;
+static float g_cofPhotoTime=-99999.f;
+float R_CofPhotoTime(){return g_cofPhotoTime;}
+float R_CofPhotoFlash(){return g_cameraFlash.fade(R_CurrentRenderTime(0.f));}
+static dx_cof_native_lights g_cofNativeLights;
+extern "C" __declspec(dllexport) int __cdecl DX_CofNativeLightV1(const dx_cof_native_light* light){
+ return light&&g_cofNativeLights.publish(*light)?1:0;
+}
 static bool R_CofCameraFlashDescription(D3DLIGHT9& light) {
  const float now=R_CurrentRenderTime(0.f),fade=g_cameraFlash.fade(now);
  if(fade<=0)return false;
- if(dx_cof_camera_flash.value==0.f||dx_dlights.value==0.f||dx_dlight_fixed.value==0.f||
-    !g_cofV2||!g_cofLightBridge.published||!DX_CofFresh(g_cofLightBridge.packet.time,now)||
-    g_cofLightBridge.packet.reasons!=0){g_cameraFlash.clear();return false;}
- auto pose=g_cofLightBridge.packet;
+ if(dx_cof_camera_flash.value==0.f||dx_dlights.value==0.f||dx_dlight_fixed.value==0.f){g_cameraFlash.clear();return false;}
+ dx_cof_light_state_v2 pose{};pose.time=now;
  if(!R_CofCameraFlashPose(pose)){g_cameraFlash.clear();return false;}
  const float brightness=dx_cof_camera_flash_brightness.value;
  if(!std::isfinite(brightness)||brightness<=0){g_cameraFlash.clear();return false;}
@@ -33,12 +39,13 @@ static bool R_CofCameraFlashDescription(D3DLIGHT9& light) {
  return light.Diffuse.r>0;
 }
 extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashV1(float time) {
- D3DLIGHT9 check;
- if(!std::isfinite(time)||!DX_CofFresh(time,R_CurrentRenderTime(0.f))){g_cameraFlash.clear();return 0;}
+ const float now=R_CurrentRenderTime(time);
+ if(!std::isfinite(time)||!std::isfinite(now)||fabsf(time-now)>.25f){g_cameraFlash.clear();return 0;}
  if(!g_cameraFlash.trigger(time))return 0;
- const bool valid=R_CofCameraFlashDescription(check);
- if(valid)R_CofLightDebug("camera photo pulse t=%.4f duration=%.3f",time,dx_camera_flash_t::duration);
- return valid?1:0;
+ g_cofPhotoTime=time;
+ // Pose/publication belongs to the next view callback, not message dispatch.
+ R_CofLightDebug("camera photo queued t=%.4f duration=%.3f",time,dx_camera_flash_t::duration);
+ return 1;
 }
 extern "C" __declspec(dllexport) int __cdecl DX_CofCameraFlashDescriptionV1(D3DLIGHT9* light) {
  return light&&R_CofCameraFlashDescription(*light)?1:0;
@@ -54,6 +61,8 @@ void R_CofLightDebug(const char* format,...) {
  gEngfuncs.Con_Printf("COF LIGHT: %s\n",message);
 }
 void R_ResetCofLights() {
+ g_cofNativeLights.clear();
+ g_cofPhotoTime=-99999.f;R_ResetNightmarePhoto();
  g_cameraFlash.clear();
  if(device)for(int i=0;i<g_dxFixedLightCount;++i)device->LightEnable(i,FALSE);
  g_dxFixedLightCount=0;
@@ -2966,54 +2975,52 @@ static void R_FillRemixFlashlight( const cl_entity_s *entity, D3DLIGHT9 &light )
 	light.Falloff = 1.0f;
 }
 
-static void R_ApplyCofLightShape(unsigned flags,D3DLIGHT9 &light) {
-    auto profile=DX_CofLightProfile(flags);
-    if(flags&DX_COF_HANDHELD)profile.intensity*=std::isfinite(dx_cof_flashlight_brightness.value)?std::max(0.f,std::min(4.f,dx_cof_flashlight_brightness.value)):.25f;
-    light.Range=700.f;
-    light.Theta=DEG2RAD(profile.innerDegrees);
-    light.Phi=DEG2RAD(profile.outerDegrees);
-    light.Attenuation2=3.f/(light.Range*light.Range);
-    light.Diffuse.r*=profile.intensity;
-    light.Diffuse.g*=profile.intensity;
-    light.Diffuse.b*=profile.intensity;
-}
 // CPU descriptor query also exercises the production builder without a device.
 static bool R_CofLightDescription(D3DLIGHT9& light) {
  unsigned flags=R_CofLightFlags();
- // Native holster/network flags can outlive the equipped handheld model.
- // Remove only that source; phone and weapon-mounted lights remain eligible.
- if(!R_CofHandheldLightEquipped())flags&=~DX_COF_HANDHELD;
- if(dx_cof_light_test.value!=0.f)flags=1;
+ const bool testing=dx_cof_light_test.value!=0.f;
+ if(testing)flags=1;
  if(dx_cof_flashlight.value==0.f||!flags)return false;
+ const bool heldHandheld=!testing&&(flags&DX_COF_HANDHELD)&&R_CofHandheldLightEquipped();
+ // A weapon-mounted source retains priority over a stowed handheld source.
+ if((flags&DX_COF_WEAPON)&&!heldHandheld)flags&=~DX_COF_HANDHELD;
+ const bool phoneSource=!(flags&(DX_COF_HANDHELD|DX_COF_WEAPON))&&(flags&(DX_COF_MAIN|DX_COF_REDUCED));
+ const bool heldPhone=!testing&&phoneSource&&R_CofPhoneLightActive(flags);
+ const bool stowed=!testing&&(((flags&DX_COF_HANDHELD)&&!heldHandheld)||(phoneSource&&!heldPhone));
+ const auto build=[&](dx_cof_light_state_v2 p,float advance) {
+  if(heldHandheld&&!R_CofHandheldLightPose(p))return false;
+  if(heldPhone&&!R_CofPhoneLightPose(p))return false;
+  if(stowed) {
+   if(!DX_CofGroundPhoneDirection(p.direction,g_vAngles[YAW]))return false;
+   // Bag height is below the hands in world space, independent of view pitch.
+   constexpr float bagDrop=24.f,bagForward=4.f;
+   p.origin[0]+=bagForward*p.direction[0]/DX_COF_STOWED_HORIZONTAL;
+   p.origin[1]+=bagForward*p.direction[1]/DX_COF_STOWED_HORIZONTAL;
+   p.origin[2]-=bagDrop;
+   advance=0.f;
+  }
+  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale()*(stowed?.75f:1.f),light,
+   dx_cof_flashlight_brightness.value,(heldHandheld||heldPhone)?0.f:advance);
+ };
  if(g_cofV2 && g_cofLightBridge.published) {
   auto p=g_cofLightBridge.packet;
-  if(dx_cof_light_test.value!=0.f && gpGlobals) {
+  if(testing&&gpGlobals) {
    VectorCopy(gpGlobals->vieworg,p.origin);AngleVectors(gpGlobals->viewangles,p.direction,nullptr,nullptr);
   }
-  const bool handheld=(flags&DX_COF_HANDHELD)&&dx_cof_light_test.value==0.f;
-  const bool phone=dx_cof_light_test.value==0.f&&R_CofPhoneLightActive(flags);
-  if(handheld&&!R_CofHandheldLightPose(p))return false;
-  if(phone&&!R_CofPhoneLightPose(p))return false;
-  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light,
-   dx_cof_flashlight_brightness.value,(handheld||phone)?0.f:4.f);
+  return build(p,4.f);
  }
- // V1 supports old client proxies and the reference test can run without a player lookup.
- if(dx_cof_light_test.value!=0.f && gpGlobals) {
+ if(testing&&gpGlobals) {
   dx_cof_light_state_v2 p;
   VectorCopy(gpGlobals->vieworg,p.origin);AngleVectors(gpGlobals->viewangles,p.direction,nullptr,nullptr);
-  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light);
+  return build(p,4.f);
  }
  if(!gp_cl||!gEngfuncs.R_BeamGetEntity)return false;
- auto entity=gEngfuncs.R_BeamGetEntity(gp_cl->playernum+1);
- if(!entity)return false;
- if((flags&DX_COF_HANDHELD)||R_CofPhoneLightActive(flags)) {
-  dx_cof_light_state_v2 p;p.time=R_CurrentRenderTime(0.f);
-  VectorCopy(g_vForward,p.direction);
-  if(flags&DX_COF_HANDHELD){if(!R_CofHandheldLightPose(p))return false;}
-  else if(!R_CofPhoneLightPose(p))return false;
-  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale(),light,dx_cof_flashlight_brightness.value,0.f);
- }
- R_FillRemixFlashlight(entity,light);R_ApplyCofLightShape(flags,light);return true;
+ auto entity=gEngfuncs.R_BeamGetEntity(gp_cl->playernum+1);if(!entity)return false;
+ D3DLIGHT9 cameraLight;R_FillRemixFlashlight(entity,cameraLight);
+ dx_cof_light_state_v2 p;p.time=R_CurrentRenderTime(0.f);
+ p.origin[0]=cameraLight.Position.x;p.origin[1]=cameraLight.Position.y;p.origin[2]=cameraLight.Position.z;
+ p.direction[0]=cameraLight.Direction.x;p.direction[1]=cameraLight.Direction.y;p.direction[2]=cameraLight.Direction.z;
+ return build(p,0.f);
 }
 extern "C" __declspec(dllexport) int __cdecl DX_CofLightDescriptionV1(D3DLIGHT9* light) {
  return light&&R_CofLightDescription(*light)?1:0;
@@ -3052,6 +3059,20 @@ static int R_EmitRemixFlashlights( int maxLights )
         R_CofLightDebug("camera flash submit SetLight=0x%08x LightEnable=0x%08x rgb=%.3f origin=(%.2f %.2f %.2f)",
             static_cast<unsigned>(setResult),static_cast<unsigned>(enableResult),photo.Diffuse.r,photo.Position.x,photo.Position.y,photo.Position.z);
     }
+    if(dx_dlight_entities.value!=0.f)g_cofNativeLights.visit(R_CurrentRenderTime(0.f),[&](const dx_cof_native_light& p){
+        if(emitted>=maxLights)return;
+        D3DLIGHT9 light{};light.Type=p.cone>0?D3DLIGHT_SPOT:D3DLIGHT_POINT;
+        light.Position={p.origin[0],p.origin[1],p.origin[2]};
+        vec3_t direction;AngleVectors(p.angles,direction,nullptr,nullptr);
+        light.Direction={direction[0],direction[1],direction[2]};
+        const float intensity=R_DynamicLightIntensityScale();
+        light.Diffuse={p.color[0]*intensity,p.color[1]*intensity,p.color[2]*intensity,1};
+        light.Range=p.range;light.Attenuation0=1;light.Attenuation2=3.f/(p.range*p.range);
+        light.Theta=DEG2RAD(p.cone*.8f);light.Phi=DEG2RAD(p.cone);light.Falloff=1;
+        if(DX_CofSubmit(static_cast<unsigned>(emitted),light,
+            [&](unsigned slot,const D3DLIGHT9& value){return static_cast<long>(device->SetLight(slot,&value));},
+            [&](unsigned slot,bool on){return static_cast<long>(device->LightEnable(slot,on?TRUE:FALSE));}))++emitted;
+    });
     if(!gEngfuncs.R_BeamGetEntity || (dx_dlight_engine.value==0.f && dx_dlight_entities.value==0.f))return emitted;
 	const int localIndex = gp_cl->playernum + 1;
 	auto emitPlayer = [&]( int playerIndex )
@@ -4386,6 +4407,7 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 			continue;
 
 		const world_material_batch_t &batch = model.batches[batchIndex];
+        if(R_DrawNightmareX(batch,ent,time))continue;
 		texture_t *texture = R_SelectAnimatedTexture( batch.baseTexture, ent, time );
 		if( !texture || texture->gl_texturenum <= 0 || batch.primitiveCount == 0 )
 			continue;

@@ -16,6 +16,7 @@ inline int profile(std::string path) {
     for(char& c:path){if(c=='\\')c='/';c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));}
     if(path=="models/props/utomhusd/stadlyktrund4.mdl")return 4;
     if(path=="models/props/utomhusd/stadlyktrund2.mdl")return 2;
+    if(path=="models/props/utomhusd/stadlyktrund3.mdl")return 3;
     return 0;
 }
 class Reader {
@@ -27,7 +28,7 @@ public:
         std::memcpy(&value,data+offset,sizeof(T));return true;
     }
 };
-// These two supported assets have one rigid bone and a constant idle pose.
+// These supported assets have one rigid bone and a constant idle pose.
 // Reject different animation layouts instead of silently using the bind pose.
 inline bool extract(const std::vector<unsigned char>& bytes,const std::string& path,int body,int skin,
     const D3DMATRIX& world,Bulb& output,std::string& reason) {
@@ -55,7 +56,8 @@ inline bool extract(const std::vector<unsigned char>& bytes,const std::string& p
         }
         if(!std::isfinite(pose[i]))return false;
     }
-    const int selected=kind==4?2:body;
+    // rund3 has the same pole/globe split, with the globe in body 1.
+    const int selected=kind==4?2:kind==3?1:body;
     mstudiomodel_t model{};
     if(part.modelindex<0||part.modelindex>hdr.length-int(sizeof(model))*part.nummodels||
         !read.get(part.modelindex+selected*int(sizeof(model)),model)||model.numverts<3||model.numverts>4096||model.nummesh<1||model.nummesh>256)return false;

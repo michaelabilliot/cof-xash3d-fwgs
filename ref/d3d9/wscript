@@ -216,6 +216,11 @@ def build(bld):
 			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
 			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
 			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_cof_features.cpp', target='verify_cof_features',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
 		bld.program(source='verify_player_visibility.cpp', target='verify_player_visibility',
 			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
 			use=['engine_includes', 'sdk_includes', 'public', 'werror'],

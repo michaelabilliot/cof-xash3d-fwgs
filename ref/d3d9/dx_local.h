@@ -95,6 +95,11 @@ extern vec3_t g_dxCullOrigin, g_dxCullForward, g_dxCullRight, g_dxCullUp;
 extern float g_dxCullTanX, g_dxCullTanY, g_dxCullNear, g_dxCullFar;
 
 struct studio_cache_t;
+float R_CofPhotoTime();
+float R_CofPhotoFlash();
+void R_ResetNightmarePhoto();
+void R_QueueNightmarePhoto(const cl_entity_s*,const studio_cache_t&,const D3DMATRIX&);
+void R_QueueNightmarePhotoCpu(const cl_entity_s*,const model_drawdata_t&,const D3DMATRIX&);
 
 struct lightmap_vertex_t
 {
@@ -130,6 +135,8 @@ struct world_surface_draw_range_t
 	float planeDist = 0.0f;
 };
 
+struct world_material_batch_t;
+bool R_DrawNightmareX(const world_material_batch_t&,const cl_entity_s*,float);
 struct world_material_batch_t
 {
 	texture_t *baseTexture = nullptr;
@@ -356,8 +363,10 @@ struct glow_occlusion_query_t
 	float lastIssueTime = -99999.0f;
 };
 
+struct cof_flare_event_state_t { const model_t* model=nullptr;dx_muzzle_cursor_t cursor; };
 struct entity_cache_t
 {
+ cof_flare_event_state_t flare;
 	attachment_cache_t attachments;
 	muzzleflash_state_t muzzleflash;
 	studio_light_probe_cache_t lightProbe;
@@ -1123,3 +1132,16 @@ bool R_CofHandheldLightEquipped();
 bool R_CofPhoneLightActive(unsigned flags);
 bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose);
 int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror=false);
+
+void R_ResetCofShadow();
+void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_entity_s* viewmodel);
+float R_CofPickupStrength(const cl_entity_s* entity);
+void R_QueueCofPickupOutline(const studio_cache_t& cache,const D3DMATRIX& world,float strength);
+
+extern convar_t dx_cof_player_shadow;
+cl_entity_s* R_CofShadowSecondary(float now);
+bool R_CofShadowCrouchInput(float now,bool& held,float& height);
+
+void R_CofShadowProbeCmd();
+void R_CofShadowTraceCmd();
+void R_CofShadowStudioStatus();

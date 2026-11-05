@@ -96,6 +96,12 @@ static void V_SetupViewModel( void )
 	if( !cl.local.weaponstarttime )
 		cl.local.weaponstarttime = cl.time;
 
+    // CoF sends draw/holster sequences with the authoritative model snapshot.
+    // Its weapon prediction can retain the previous model for one more render;
+    // applying the incoming draw sequence to that old mesh causes an idle-pose pop.
+    if( !Q_stricmp( GI->gamefolder, "CryOfFear" ) && cl.frames[cl.parsecountmod].valid )
+        cl.local.viewmodel = cl.frames[cl.parsecountmod].clientdata.viewmodel;
+
 	// setup the viewent variables
 	view->curstate.colormap = (info->topcolor & 0xFFFF)|((info->bottomcolor << 8) & 0xFFFF);
 	view->curstate.number = cl.playernum + 1;
@@ -405,6 +411,7 @@ void V_RenderView( void )
 	do
 	{
 		clgame.dllFuncs.pfnCalcRefdef( &rp );
+
 		V_GetRefParams( &rp, &rvp );
 		V_RefApplyOverview( &rvp );
 		V_ApplyRefUnderwater( &rvp );

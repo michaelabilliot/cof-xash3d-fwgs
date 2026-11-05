@@ -3974,6 +3974,51 @@ static void CL_InitStudioAPI( void )
 	ref.dllFuncs.R_StudioSetDrawInterface( pStudioDraw );
 }
 
+// The original Cry of Fear menu logs failed image loads but dereferences the
+// missing BitmapTGA objects while laying out its buttons. Check before entering
+// the client DLL so an incomplete installation reports the file, not an AV.
+// The scope panel has the same unconditional size query during HUD startup.
+static qboolean CL_CheckLegacyVGUIAssets( void )
+{
+	static const char *const images[] =
+	{
+		"gfx/vgui/menu_logo.tga",
+		"gfx/vgui/menu_logo_ts.tga",
+		"gfx/vgui/menu_newgame.tga",
+		"gfx/vgui/menu_loadgame.tga",
+		"gfx/vgui/menu_unlockables.tga",
+		"gfx/vgui/menu_language.tga",
+		"gfx/vgui/menu_2d.tga",
+		"gfx/vgui/menu_quit.tga",
+		"gfx/vgui/menu_campaign.tga",
+		"gfx/vgui/menu_options.tga",
+		"gfx/vgui/menu_newgame_mo.tga",
+		"gfx/vgui/menu_loadgame_mo.tga",
+		"gfx/vgui/menu_unlockables_mo.tga",
+		"gfx/vgui/menu_language_mo.tga",
+		"gfx/vgui/menu_2d_mo.tga",
+		"gfx/vgui/menu_quit_mo.tga",
+		"gfx/vgui/menu_campaign_mo.tga",
+		"gfx/vgui/cs/cs_scope.tga",
+	};
+
+	if( Q_stricmp( GI->gamefolder, "CryOfFear" ))
+		return true;
+
+	for( int i = 0; i < ARRAYSIZE( images ); i++ )
+	{
+		const char *path = images[i];
+		if( FS_FileExists( path, false ))
+			continue;
+
+		COM_PushLibraryError( va( "Cry of Fear is missing required VGUI image %s. Restore the original game assets.", path ));
+		Con_Reportf( S_ERROR "%s: missing %s\n", __func__, path );
+		return false;
+	}
+
+	return true;
+}
+
 qboolean CL_LoadProgs( const char *name )
 {
 	static playermove_t		gpMove;
@@ -3983,6 +4028,9 @@ qboolean CL_LoadProgs( const char *name )
 	qboolean try_internal_vgui_support = GI->internal_vgui_support;
 
 	if( clgame.hInstance ) CL_UnloadProgs();
+
+	if( !CL_CheckLegacyVGUIAssets() )
+		return false;
 
 	// initialize PlayerMove
 	clgame.pmove = &gpMove;

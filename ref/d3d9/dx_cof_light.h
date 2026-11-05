@@ -27,7 +27,7 @@ struct dx_cof_light_state_v2 {
 static_assert(sizeof(dx_cof_light_state_v2)==48,"CoF light ABI");
 inline unsigned DX_CofEligible(unsigned raw,unsigned reasons) {
  if(reasons & ~DX_COF_NO_VIEWMODEL) return 0;
- return (raw&DX_COF_SUPPORTED_FLAGS) & ((reasons&DX_COF_NO_VIEWMODEL)?(DX_COF_MAIN|DX_COF_REDUCED):DX_COF_SUPPORTED_FLAGS);
+ return (raw&DX_COF_SUPPORTED_FLAGS) & ((reasons&DX_COF_NO_VIEWMODEL)?(DX_COF_MAIN|DX_COF_REDUCED|DX_COF_HANDHELD):DX_COF_SUPPORTED_FLAGS);
 }
 inline bool DX_CofValid(const dx_cof_light_state_v2& p) {
  if(p.size!=sizeof(p)||p.version!=2||!std::isfinite(p.time))return false;
@@ -37,6 +37,24 @@ inline bool DX_CofValid(const dx_cof_light_state_v2& p) {
 }
 inline bool DX_CofFresh(float published,float now) {
  return std::isfinite(published)&&std::isfinite(now)&&now>=published&&now-published<.25f;
+}
+// Aim stowed portable lights 70 degrees below horizontal, independent of pitch. Heading
+// comes from the horizontal view direction; at the poles use the camera yaw.
+constexpr float DX_COF_STOWED_HORIZONTAL=.3420201433256687f; // cos(70 degrees)
+constexpr float DX_COF_STOWED_DOWN=.9396926207859084f; // sin(70 degrees)
+inline bool DX_CofGroundPhoneDirection(float* direction,float fallbackYaw) {
+ if(!direction||!std::isfinite(fallbackYaw))return false;
+ for(int i=0;i<3;++i)if(!std::isfinite(direction[i]))return false;
+ const float horizontal=std::hypot(direction[0],direction[1]);
+ if(horizontal>1e-6f) {
+  direction[0]=DX_COF_STOWED_HORIZONTAL*direction[0]/horizontal;
+  direction[1]=DX_COF_STOWED_HORIZONTAL*direction[1]/horizontal;
+ } else {
+  const float yaw=fallbackYaw*.0174532925199433f;
+  direction[0]=DX_COF_STOWED_HORIZONTAL*std::cos(yaw);direction[1]=DX_COF_STOWED_HORIZONTAL*std::sin(yaw);
+ }
+ direction[2]=-DX_COF_STOWED_DOWN;
+ return true;
 }
 // Both production and CPU fixtures submit through this checked sink contract.
 template<class Light,class Set,class Enable> bool DX_CofSubmit(unsigned slot,const Light& light,Set set,Enable enable) {

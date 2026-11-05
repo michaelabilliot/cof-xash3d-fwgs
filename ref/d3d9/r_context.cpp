@@ -58,10 +58,31 @@ extern "C" {
 #include "dx_map_sky.h"
 #include "dx_light_position.h"
 #include "dx_studio_fixture.h"
+#include "dx_cof_features.h"
+#include "dx_cof_pickup_outline.h"
+#include "dx_cof_crouch.h"
+static dx_cof_crouch_signal g_cofCrouchSignal;
+extern "C" __declspec(dllexport) int __cdecl DX_CofCrouchStateV1(int held,float height,float now){return g_cofCrouchSignal.publish(held,height,now)?1:0;}
+bool R_CofShadowCrouchInput(float now,bool& held,float& height){return g_cofCrouchSignal.sample(now,held,height);}
+static std::vector<cof_pickup::Span> g_cofPickupOutline;
 static dx_cof_dual_state_t g_cofDual;
+cl_entity_s* R_CofShadowSecondary(float now){return g_cofDual.current(now);}
 static uint64_t g_cofDualPass=0;
 static dx_cof_player_visibility_t g_cofPlayerVisibility;
-static void R_ResetCofPlayerVisibility(){g_cofPlayerVisibility.clear();}
+static cof_features::Pickups g_cofPickups;
+static int g_cofPickupIndex=0,g_cofPickupModel=0;static float g_cofPickupStrength=0;
+static bool g_cofPickupLight=false;
+static void R_CofPickupStatusCmd() {
+ if(gEngfuncs.Con_Printf)gEngfuncs.Con_Printf("PICKUP outline index=%d model=%d strength=%.3f spans=%u softLight=%d\n",g_cofPickupIndex,g_cofPickupModel,g_cofPickupStrength,unsigned(g_cofPickupOutline.size()),int(g_cofPickupLight));
+}
+extern "C" __declspec(dllexport) int __cdecl DX_CofPickupV1(int index,int model,int active,float time) {
+ return g_cofPickups.publish(index,model,active!=0,time)?1:0;
+}
+float R_CofPickupStrength(const cl_entity_s* ent) {
+ return ent&&ent->model&&ent->index==g_cofPickupIndex&&ent->curstate.modelindex==g_cofPickupModel?
+  g_cofPickupStrength:0.f;
+}
+static void R_ResetCofPlayerVisibility(){g_cofPlayerVisibility.clear();R_ResetCofShadow();g_cofCrouchSignal.clear();g_cofPickups.clear();g_cofPickupOutline.clear();g_cofPickupIndex=0;g_cofPickupModel=0;g_cofPickupStrength=0;g_cofPickupLight=false;}
 extern "C" __declspec(dllexport) int __cdecl DX_CofPlayerVisibilityV1(unsigned reasons,float time) {
  return g_cofPlayerVisibility.publish(reasons,time)?1:0;
 }
@@ -417,6 +438,8 @@ static bool R_DrawScratchIndexed( D3DPRIMITIVETYPE type,
 static constexpr int DX_SKYBOX_SIDES = 6;
 static int g_skyTextures[DX_SKYBOX_SIDES] = {};
 
+convar_t dx_cof_player_shadow = { (char *)"dx_cof_player_shadow", (char *)"1", FCVAR_ARCHIVE };
+static convar_t dx_cof_pickup_outline = { (char *)"dx_cof_pickup_outline", (char *)"1", FCVAR_ARCHIVE };
 convar_t dx_remix = { (char *)"dx_remix", (char *)"0", 0 };
 convar_t dx_remix_decal_cutout =
 { (char *)"dx_remix_decal_cutout", (char *)"1", 0 };
@@ -967,6 +990,10 @@ struct remix_map_light_t
 	const char *positionReason = "authored; no verified fixture profile";
 	const char *submissionRoute = "not submitted";
 	bool manualPosition = false;
+	char parentModel[64] = {};
+	D3DXMATRIX parentInverse;
+	bool parentResolved = false;
+	vec3_t movingOrigin = {}, movingDirection = {};
 	dx_map_light::Instance instance;
 	remix_map_light_type_t type = REMIX_MAP_LIGHT_POINT;
 	vec3_t origin = {};
@@ -1326,7 +1353,66 @@ static void R_ClearRemixMapLights( void )
 
 static const float *R_MapLightPosition( const remix_map_light_t &light )
 {
+	if(light.parentResolved)return light.movingOrigin;
 	return dx_remix_map_light_centering.value != 0.f ? light.centeredOrigin : light.origin;
+}
+
+static void R_BindMapLightParent(remix_map_light_t& light,const std::vector<map_entity_record_t>& entities)
+{
+    if(!g_worldmodel||Q_stricmp(g_worldmodel->name,"maps/c_subway2st3.bsp"))return;
+    // These seven authored lights illuminate bigtrain's interior, including
+    // its table lamp. They have no movewith key because the original game
+    // baked their lighting into the train's moving brush lightmaps.
+    struct Binding {int id;float origin[3];};
+    static const Binding bindings[]={
+        {199,{-389,-506,-475}},{200,{-317,-418,-475}},
+        {201,{-317,-242,-475}},{202,{-317,16,-475}},
+        {203,{-317,-1070,-475}},{209,{-334,-133,-543}},
+        {211,{-391,-676,-475}}
+    };
+    bool matched=false;
+    for(const auto& binding:bindings)if(binding.id==light.entityIndex){
+        matched=true;for(int a=0;a<3;++a)if(fabsf(binding.origin[a]-light.origin[a])>.01f)matched=false;
+        break;
+    }
+    if(!matched)return;
+    const map_entity_record_t* parent=nullptr;
+    for(const auto& entity:entities)if(!strcmp(entity.fields.targetname,"bigtrain")){
+        if(parent)return;parent=&entity;
+    }
+    if(!parent||strcmp(parent->fields.classname,"func_train")||strcmp(parent->fields.model,"*19"))return;
+    cl_entity_t reference{};model_t model{};model.type=mod_brush;reference.model=&model;
+    R_ParseMapVector(parent->fields.origin,reference.origin);R_ParseMapVector(parent->fields.angles,reference.angles);
+    const float expected[3]={-354,-1066,-536};
+    for(int a=0;a<3;++a)if(!std::isfinite(reference.origin[a])||!std::isfinite(reference.angles[a])||fabsf(reference.origin[a]-expected[a])>.01f)return;
+    D3DXMATRIX world;R_SetEntityWorldTransform(&reference,0,&world);
+    if(!D3DXMatrixInverse(&light.parentInverse,nullptr,&world))return;
+    snprintf(light.parentModel,sizeof(light.parentModel),"%s",parent->fields.model);
+}
+
+static void R_UpdateMapLightParents()
+{
+    for(auto& light:g_remixMapLights)if(light.parentModel[0]){
+        light.parentResolved=false;const cl_entity_s* parent=nullptr;bool ambiguous=false;
+        auto inspect=[&](const std::vector<cl_entity_s*>& list){for(auto entity:list){
+            if(!entity||!entity->model||entity->model->type!=mod_brush||
+                (entity->curstate.effects&EF_NODRAW)||Q_stricmp(entity->model->name,light.parentModel))continue;
+            if(parent&&parent!=entity){ambiguous=true;continue;}parent=entity;
+        }};
+        inspect(g_opaqueBrushEntities);inspect(g_translucentCandidates);
+        if(!parent||ambiguous)continue;
+        bool finite=true;for(int a=0;a<3;++a)if(!std::isfinite(parent->origin[a])||!std::isfinite(parent->angles[a]))finite=false;
+        if(!finite)continue;
+        D3DXMATRIX world;R_SetEntityWorldTransform(parent,R_CurrentRenderTime(0.f),&world);
+        const auto position=dx_remix_map_light_centering.value!=0.f?light.centeredOrigin:light.origin;
+        D3DXVECTOR3 authored(position),direction(light.direction),local,moved;
+        D3DXVec3TransformCoord(&local,&authored,&light.parentInverse);D3DXVec3TransformCoord(&moved,&local,&world);
+        for(int a=0;a<3;++a)light.movingOrigin[a]=moved[a];
+        D3DXVec3TransformNormal(&local,&direction,&light.parentInverse);D3DXVec3TransformNormal(&moved,&local,&world);
+        const float length=D3DXVec3Length(&moved);if(!std::isfinite(length)||length<1e-8f)continue;
+        for(int a=0;a<3;++a){light.movingDirection[a]=moved[a]/length;if(!std::isfinite(light.movingOrigin[a])||!std::isfinite(light.movingDirection[a]))finite=false;}
+        light.parentResolved=finite;
+    }
 }
 
 static bool R_MapLightPositionAllowed( const vec3_t original, const vec3_t position )
@@ -1543,7 +1629,10 @@ static void R_BuildRemixMapLights( void )
 		// Authored indoor placement is intentional; nearby textured faces alone
 		// do not justify moving the source into a shade or through its opening.
 		VectorCopy(light.origin,light.centeredOrigin);
-		if(light.type==REMIX_MAP_LIGHT_POINT && !lampFixtures.empty())
+		// These are closed globe fixtures even when the map author used a
+		// downward light_spot. Restricting correction to point lights left
+		// the same bulb off-centre with radius 8 in nightmare/apartment maps.
+		if(light.type!=REMIX_MAP_LIGHT_DIRECTIONAL && !lampFixtures.empty())
 		{
 			const auto match=dx_light_position::locate({light.origin[0],light.origin[1],light.origin[2]},lampFixtures,24.f,true);
 			if(match.fixture>=0&&R_MapLightPositionAllowed(light.origin,match.position.data()))
@@ -1554,6 +1643,7 @@ static void R_BuildRemixMapLights( void )
 		}
 		VectorCopy(light.centeredOrigin,light.automaticOrigin);
 		light.centeredRadius=R_CenteredFixtureRadius(light);
+		R_BindMapLightParent(light,entities);
 		g_remixMapLights.push_back( light );
 	}
 
@@ -1656,9 +1746,10 @@ static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
 
 	if( source.type == REMIX_MAP_LIGHT_SPOT )
 	{
-		light.Direction.x = source.direction[0];
-		light.Direction.y = source.direction[1];
-		light.Direction.z = source.direction[2];
+		const auto direction=source.parentResolved?source.movingDirection:source.direction;
+		light.Direction.x = direction[0];
+		light.Direction.y = direction[1];
+		light.Direction.z = direction[2];
 
 		// D3D9 uses full cone apertures; Hammer stores half-angles.
 		const float d3dInnerCone = std::min( 179.0f, source.innerCone * 2.0f );
@@ -1678,10 +1769,14 @@ static void R_ApplyRemixMapLights( void )
 		return;
 	}
 
+	R_UpdateMapLightParents();
 	g_remixMapLightCandidates.clear( );
 	for( size_t i = 0; i < g_remixMapLights.size( ); ++i )
 	{
 		remix_map_light_t &light = g_remixMapLights[i];
+		if(light.parentModel[0]&&!light.parentResolved){
+			light.submissionRoute="moving parent absent";g_mapEmitterBridge.retire(light.instance);continue;
+		}
 		if( R_RemixMapLightStyleScale( light ) <= 0.001f )
 		{
 			light.submissionRoute="style off";
@@ -1715,10 +1810,13 @@ static void R_ApplyRemixMapLights( void )
 		const float radius = R_FinalMapLightRadius(source);
 		const float level = R_MapLightLevel();
 		const float outputScale = (std::isfinite(dx_remix_map_light_output_scale.value) ? std::clamp(dx_remix_map_light_output_scale.value,0.f,4.f) : .75f) * level;
-		if( dx_remix_map_light_api.value != 0.f && source.type != REMIX_MAP_LIGHT_DIRECTIONAL &&
+		// Attached lights use per-frame D3D submission. The map API bridge
+		// throttles moving definitions and can recreate them on x86, which
+		// leaves a fast train's light behind between updates.
+		if( !source.parentModel[0] && dx_remix_map_light_api.value != 0.f && source.type != REMIX_MAP_LIGHT_DIRECTIONAL &&
 			g_mapEmitterBridge.emit(source.instance,light,radius,g_mapEmitterIdentity ^ (uint64_t(source.entityIndex+1)*0x9e3779b97f4a7c15ull),outputScale) ) { source.submissionRoute="Remix API"; ++apiEmitted; continue; }
 		g_mapEmitterBridge.retire(source.instance);
-		source.submissionRoute="legacy capacity/error";
+		source.submissionRoute=source.parentModel[0]?"moving parent D3D":"legacy capacity/error";
 		light.Diffuse.r *= level;
 		light.Diffuse.g *= level;
 		light.Diffuse.b *= level;
@@ -1967,6 +2065,7 @@ static void R_SaveLightPositionsCmd()
 	gEngfuncs.Con_Printf("%s %d manual light overrides: %s\n",saved?"Saved":"Failed to save",count,path.c_str());
 }
 
+static void R_CofShadowStatusCmd();
 static void R_RegisterContextCommands( void )
 {
 	if( g_contextCommandsRegistered )
@@ -1986,6 +2085,10 @@ static void R_RegisterContextCommands( void )
 	gEngfuncs.Cmd_AddCommand("dx_light_radius",R_LightRadiusCmd,"Inspect or change one BSP light emitter radius independently of position");
 	gEngfuncs.Cmd_AddCommand("dx_light_position",R_LightPositionCmd,"Inspect or correct a BSP light position");
 	gEngfuncs.Cmd_AddCommand("dx_light_positions_save",R_SaveLightPositionsCmd,"Save per-map position and radius overrides without editing the BSP");
+	gEngfuncs.Cmd_AddCommand("dx_cof_shadow_status",R_CofShadowStatusCmd,"Inspect local Simon shadow gates and submission");
+	gEngfuncs.Cmd_AddCommand("dx_cof_pickup_status",R_CofPickupStatusCmd,"Inspect aimed pickup outline without world lighting");
+	gEngfuncs.Cmd_AddCommand("dx_cof_shadow_probe",R_CofShadowProbeCmd,"Isolate box, CPU Simon or skinned Simon 96 units ahead");
+	gEngfuncs.Cmd_AddCommand("dx_cof_shadow_trace",R_CofShadowTraceCmd,"Log the next 32 shadow submissions");
 	g_contextCommandsRegistered = true;
 }
 
@@ -2001,6 +2104,10 @@ static void R_RemoveContextCommands( void )
 	gEngfuncs.Cmd_RemoveCommand("dx_light_radius");
 	gEngfuncs.Cmd_RemoveCommand("dx_light_position");
 	gEngfuncs.Cmd_RemoveCommand("dx_light_positions_save");
+	gEngfuncs.Cmd_RemoveCommand("dx_cof_shadow_status");
+	gEngfuncs.Cmd_RemoveCommand("dx_cof_pickup_status");
+	gEngfuncs.Cmd_RemoveCommand("dx_cof_shadow_probe");
+	gEngfuncs.Cmd_RemoveCommand("dx_cof_shadow_trace");
 	g_contextCommandsRegistered = false;
 }
 
@@ -2010,6 +2117,8 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
+ gEngfuncs.Cvar_RegisterVariable( &dx_cof_player_shadow );
+ gEngfuncs.Cvar_RegisterVariable( &dx_cof_pickup_outline );
 	DX_RagdollRegister();
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_cutout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_alpha_ref );
@@ -4393,7 +4502,9 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		return true;
 	}
 
-	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 || R_CofLanternModel(clent,false) )
+	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 || R_CofLanternModel(clent,false) ||
+  (cof_features::flareModel(clent->model->name,false)&&clent->curstate.renderfx==165) ||
+  g_cofPickups.contains(clent->index,clent->curstate.modelindex,R_CurrentRenderTime(0.f)) )
 	{
 		g_entityLightEmitters.push_back( clent );
 		++g_entityLightEmitterCount;
@@ -4403,7 +4514,10 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		? R_StudioRenderMode( clent )
 		: clent->curstate.rendermode;
 
-	if( dx_remix.value != 0.0f && effectiveRenderMode == kRenderGlow )
+	const bool nightmareHeadlight = R_CofClientPresent() && g_worldmodel &&
+        !Q_stricmp(g_worldmodel->name,"maps/c_nightmare.bsp") && modelType==mod_sprite &&
+        !Q_stricmp(clent->model->name,"sprites/glow03.spr");
+	if( dx_remix.value != 0.0f && effectiveRenderMode == kRenderGlow && !nightmareHeadlight )
 		return false;
 
 	if( effectiveRenderMode != kRenderNormal )
@@ -5427,7 +5541,8 @@ bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose) {
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
  if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points))return false;
  // Native74910 receives viewmodel attachment[1], not the camera or phone pivot.
- // Its aiming angles remain the camera angles; the attachment is an emitter.
+ // The held phone follows normal view aim; only a stowed, switched-on
+ // portable light uses the separate world-grounded direction.
  for(int i=0;i<3;++i)pose.origin[i]=points[3+i];
  return DX_CofValid(pose);
 }
@@ -5436,7 +5551,7 @@ static bool g_sceneViewModelHidden=false;
 bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose) {
  auto ent=R_CurrentViewModel();
  const auto drawViewModel=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("r_drawviewmodel"):nullptr;
- if(!ent||g_sceneViewModelHidden||!gp_cl||gp_cl->viewentity!=gp_cl->playernum+1||
+ if(!ent||!ent->model||g_sceneViewModelHidden||!gp_cl||gp_cl->viewentity!=gp_cl->playernum+1||
     ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0||ENGINE_GET_PARM(PARM_THIRDPERSON)||
     (drawViewModel&&drawViewModel->value==0.f)||
     Q_stricmp(ent->model->name,"models/weapons/camera/v_camera.mdl"))return false;
@@ -5444,7 +5559,9 @@ bool R_CofCameraFlashPose(dx_cof_light_state_v2& pose) {
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
- return R_StudioCameraFlashPoint(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,pose.origin)!=0;
+ if(!R_StudioCameraFlashPoint(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,pose.origin))return false;
+ for(int i=0;i<3;++i){pose.direction[i]=g_vForward[i];pose.origin[i]+=g_vForward[i]*8.f;}
+ return DX_CofValid(pose);
 }
 extern "C" __declspec(dllexport) void __cdecl DX_SceneViewModelHiddenV1( int hidden )
 {
@@ -5463,8 +5580,110 @@ extern "C" __declspec(dllexport) void __cdecl DX_CofDualHandsV1(int primary,int 
     g_cofDual.secondaryHiddenArm=g_cofDual.valid&&secondary>=0&&secondary<=2?secondary:0;
 }
 
+static bool R_CofRifleScopeActive() {
+ auto ent=R_CurrentViewModel();
+ return R_CofClientPresent()&&!g_sceneViewModelHidden&&gp_cl&&gp_cl->viewentity==gp_cl->playernum+1&&
+  ENGINE_GET_PARM(PARM_LOCAL_HEALTH)>0&&!ENGINE_GET_PARM(PARM_THIRDPERSON)&&ent&&ent->model&&
+  !(ent->curstate.effects&EF_NODRAW)&&cof_features::rifleScope(ent->model->name);
+}
+void R_QueueCofPickupOutline(const studio_cache_t& cache,const D3DMATRIX& world,float strength) {
+ if(!g_sceneViewportValid||!cache.gpuSkinningPoseValid||cache.gpuSkinningBoneCount<=0||
+    cache.gpuSkinningBoneCount>MAXSTUDIOBONES||dx_cof_pickup_outline.value==0.f)return;
+ D3DXMATRIX viewProjection,transform;D3DXMatrixMultiply(&viewProjection,&g_sceneView,&g_sceneProjection);
+ D3DXMatrixMultiply(&transform,reinterpret_cast<const D3DXMATRIX*>(&world),&viewProjection);
+ std::vector<cof_pickup::Point> points;std::vector<uint32_t> indices;
+ for(const auto& batch:cache.batches) {
+  if(points.size()+batch.sources.size()>65536||indices.size()+batch.indices.size()>98304)return;
+  const uint32_t base=uint32_t(points.size());
+  for(const auto& source:batch.sources) {
+   cof_pickup::Point p;
+   if(source.bone>=cache.gpuSkinningBoneCount){points.push_back(p);continue;}
+   const float local[3]={source.x,source.y,source.z};float posed[3];
+   const auto& bone=cache.gpuSkinningBoneMatrices[source.bone];
+   for(int row=0;row<3;++row)posed[row]=local[0]*bone[row][0]+local[1]*bone[row][1]+local[2]*bone[row][2]+bone[row][3];
+   const D3DXVECTOR4 input(posed[0],posed[1],posed[2],1);D3DXVECTOR4 clip;
+   D3DXVec4Transform(&clip,&input,&transform);
+   if(std::isfinite(clip.w)&&clip.w>.01f&&clip.z>=0&&clip.z<=clip.w) {
+    p.x=float(g_sceneViewport.X)+(clip.x/clip.w+1.f)*float(g_sceneViewport.Width)*.5f;
+    p.y=float(g_sceneViewport.Y)+(1.f-clip.y/clip.w)*float(g_sceneViewport.Height)*.5f;p.valid=true;
+   }
+   points.push_back(p);
+  }
+  for(auto index:batch.indices){if(index>=batch.sources.size())return;indices.push_back(base+index);}
+ }
+ g_cofPickupOutline=cof_pickup::outline(points,indices,float(g_sceneViewport.X),float(g_sceneViewport.Y),
+  float(g_sceneViewport.Width),float(g_sceneViewport.Height),strength);
+}
+#include "dx_nightmare_photo.h"
+static void R_DrawCofPickupOutline() {
+ if(!device||g_cofPickupOutline.empty()||!g_sceneViewportValid||dx_cof_pickup_outline.value==0.f||
+    FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ R_Set2DMode(true);R_Flush2DBatch();R_Apply2DNeutralState();DX_BindRawTexture(0,nullptr);
+ DX_SetTextureStageStateCached(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
+ DX_SetTextureStageStateCached(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);
+ DX_SetTextureStageStateCached(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);
+ DX_SetTextureStageStateCached(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);
+ DX_SetRenderStateCached(D3DRS_ALPHABLENDENABLE,TRUE);DX_SetRenderStateCached(D3DRS_BLENDOP,D3DBLENDOP_ADD);
+ DX_SetRenderStateCached(D3DRS_SRCBLEND,D3DBLEND_SRCALPHA);DX_SetRenderStateCached(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
+ DX_SetRenderStateCached(D3DRS_CULLMODE,D3DCULL_NONE);
+ std::vector<vertex2d_t> vertices;vertices.reserve(g_cofPickupOutline.size()*6);
+ for(const auto& span:g_cofPickupOutline) {
+  const DWORD color=D3DCOLOR_ARGB(span.alpha,235,45,35);
+  const vertex2d_t a={span.x-.5f,span.y-.5f,0,1,color,0,0},b={span.x+span.width-.5f,span.y-.5f,0,1,color,0,0};
+  const vertex2d_t c={span.x-.5f,span.y+span.height-.5f,0,1,color,0,0},d={span.x+span.width-.5f,span.y+span.height-.5f,0,1,color,0,0};
+  vertices.insert(vertices.end(),{a,b,c,b,d,c});
+ }
+ device->SetFVF(D3DFVF_VERTEX2D);
+ R_DrawScratch(D3DPT_TRIANGLELIST,UINT(vertices.size()/3),UINT(vertices.size()),vertices.data(),sizeof(vertex2d_t));
+ R_Set2DMode(false);DX_InvalidateD3DStateCache();DX_InvalidateTextureBindCache();
+}
+static void R_DrawCofScopeOverlay() {
+ if(!device||!g_sceneViewportValid||!R_CofRifleScopeActive()||
+    FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ R_Set2DMode(true);R_Flush2DBatch();R_Apply2DNeutralState();
+ DX_BindRawTexture(0,nullptr);
+ DX_SetTextureStageStateCached(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
+ DX_SetTextureStageStateCached(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);
+ DX_SetTextureStageStateCached(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);
+ DX_SetTextureStageStateCached(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);
+ DX_SetRenderStateCached(D3DRS_ALPHABLENDENABLE,TRUE);
+ DX_SetRenderStateCached(D3DRS_BLENDOP,D3DBLENDOP_ADD);
+ DX_SetRenderStateCached(D3DRS_SRCBLEND,D3DBLEND_SRCALPHA);
+ DX_SetRenderStateCached(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
+ DX_SetRenderStateCached(D3DRS_CULLMODE,D3DCULL_NONE);
+ std::vector<vertex2d_t> vertices;
+ const float w=float(g_sceneViewport.Width),h=float(g_sceneViewport.Height);
+ const float cx=float(g_sceneViewport.X)+w*.5f,cy=float(g_sceneViewport.Y)+h*.5f;
+ const float radius=std::min(w,h)*.46f,outer=std::max(w,h)*2.f;
+ const auto quad=[&](float ax,float ay,float bx,float by,float dx,float dy,float ex,float ey,byte innerAlpha,byte outerAlpha) {
+  vertex2d_t a={ax,ay,0,1,D3DCOLOR_ARGB(innerAlpha,0,0,0),0,0},b={bx,by,0,1,D3DCOLOR_ARGB(innerAlpha,0,0,0),0,0};
+  vertex2d_t d={dx,dy,0,1,D3DCOLOR_ARGB(outerAlpha,0,0,0),0,0},e={ex,ey,0,1,D3DCOLOR_ARGB(outerAlpha,0,0,0),0,0};
+  vertices.insert(vertices.end(),{a,b,d,b,e,d});
+ };
+ // No texture in the aperture: the zoomed scene remains truly transparent.
+ for(int i=0;i<256;++i) {
+  const float a=float(i)*float(M_PI*2)/256.f,b=float(i+1)*float(M_PI*2)/256.f;
+  const auto ring=[&](float inner,float end,byte ia,byte oa) {
+   quad(cx+inner*cosf(a),cy+inner*sinf(a),cx+inner*cosf(b),cy+inner*sinf(b),
+        cx+end*cosf(a),cy+end*sinf(a),cx+end*cosf(b),cy+end*sinf(b),ia,oa);
+  };
+  ring(radius,radius+1.f,0,255);ring(radius+1.f,outer,255,255);
+ }
+ const float line=std::max(1.f,h/900.f);
+ const auto rect=[&](float x,float y,float width,float height) {quad(x,y,x+width,y,x,y+height,x+width,y+height,255,255);};
+ rect(cx-radius,cy-line*.5f,radius*2,line);rect(cx-line*.5f,cy-radius,line,radius*2);
+ for(int i=-3;i<=3;++i)if(i) {
+  const float tick=radius*float(i)*.2f;
+  rect(cx+tick-line*.5f,cy-4*line,line,8*line);rect(cx-4*line,cy+tick-line*.5f,8*line,line);
+ }
+ device->SetFVF(D3DFVF_VERTEX2D);
+ R_DrawScratch(D3DPT_TRIANGLELIST,static_cast<UINT>(vertices.size()/3),static_cast<UINT>(vertices.size()),vertices.data(),sizeof(vertex2d_t));
+ R_Set2DMode(false);DX_InvalidateD3DStateCache();DX_InvalidateTextureBindCache();
+}
+
 static void R_DrawViewModel( void )
 {
+ if(R_CofRifleScopeActive()){R_RetireViewmodelFlashes(nullptr);return;}
 	// Match the other Xash renderers: external camera scenes have no weapon.
 	const auto drawViewModel=gEngfuncs.pfnGetCvarPointer ?
 		gEngfuncs.pfnGetCvarPointer("r_drawviewmodel") : nullptr;
@@ -5713,10 +5932,70 @@ static void R_CollectLanternLights() {
  }
 }
 
+static void R_CollectCofFlareLights() {
+ if(!R_CofClientPresent()||!gp_cl||dx_dlights.value==0.f||dx_dlight_entities.value==0.f)return;
+ const float now=R_CurrentRenderTime(0.f);
+ if(!g_sceneViewModelHidden&&gp_cl->viewentity==gp_cl->playernum+1&&ENGINE_GET_PARM(PARM_LOCAL_HEALTH)>0&&
+    !ENGINE_GET_PARM(PARM_THIRDPERSON)) {
+  auto draw=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("r_drawviewmodel"):nullptr;
+  cl_entity_s* hands[2]={R_CurrentViewModel(),g_cofDual.current(now)};
+  for(int hand=0;hand<2;++hand) {
+   auto ent=hands[hand];
+   if((draw&&draw->value==0.f)||!ent||!ent->model||(ent->curstate.effects&EF_NODRAW)||!cof_features::flareModel(ent->model->name,true))continue;
+   auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
+   if(!hdr||ent->curstate.sequence<0||ent->curstate.sequence>=hdr->numseq||
+      !R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t)))continue;
+   const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+   const auto& seq=seqs[ent->curstate.sequence];char label[33]{};memcpy(label,seq.label,32);
+   const float frame=R_StudioEstimateFrame(ent,const_cast<mstudioseqdesc_t*>(&seq),now);
+   if(!cof_features::litFlareSequence(label,frame))continue;
+   float points[6],offsets[3]={r_viewmodel_offset_x.value,r_viewmodel_offset_y.value,r_viewmodel_offset_z.value};
+   if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAngles,offsets,points,hand==1&&g_cofDual.mirror))
+    R_AddDLight(points,220.f,255,8,3,now+.1f,-20-hand);
+  }
+ }
+ for(auto ent:g_entityLightEmitters)if(ent&&ent->model&&cof_features::flareModel(ent->model->name,false)&&
+    ent->curstate.renderfx==165&&!(ent->curstate.effects&EF_NODRAW)) {
+  float point[3]={ent->origin[0],ent->origin[1],ent->origin[2]+5.f};
+  R_AddDLight(point,220.f,255,8,3,now+.1f,ent->index);
+ }
+}
+
+static void R_SelectCofPickup() {
+ g_cofPickupOutline.clear();
+ g_cofPickupLight=false;
+ g_cofPickupIndex=0;g_cofPickupModel=0;g_cofPickupStrength=0;
+ if(!R_CofClientPresent()||!gp_cl||g_sceneViewModelHidden||gp_cl->viewentity!=gp_cl->playernum+1||
+    ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0||ENGINE_GET_PARM(PARM_THIRDPERSON)||
+    FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ const float now=R_CurrentRenderTime(0.f);float selected[3]{};
+ for(auto ent:g_entityLightEmitters) {
+  if(!ent||!ent->model||ent->model->type!=mod_studio||(ent->curstate.effects&EF_NODRAW)||
+     !g_cofPickups.contains(ent->index,ent->curstate.modelindex,now))continue;
+  float center[3];for(int i=0;i<3;++i)center[i]=ent->origin[i]+(ent->model->mins[i]+ent->model->maxs[i])*.5f;
+  const float strength=cof_features::pickupStrength(g_vOrigin,g_vForward,center);
+  if(strength<=g_cofPickupStrength||!gEngfuncs.CL_TraceLine)continue;
+  auto trace=gEngfuncs.CL_TraceLine(g_vOrigin,center,PM_WORLD_ONLY);
+  if(trace.startsolid||trace.allsolid||trace.fraction<.98f)continue;
+  g_cofPickupIndex=ent->index;g_cofPickupModel=ent->curstate.modelindex;g_cofPickupStrength=strength;
+  VectorCopy(center,selected);
+ }
+ // Keep the contour as the primary cue. A much weaker, smaller fill sits
+ // above the item, avoiding the old light concentrated against the floor.
+ const int red=int(std::lround(4.f*g_cofPickupStrength));
+ if(g_cofPickupIndex&&red>0&&dx_cof_pickup_outline.value!=0.f&&dx_dlights.value!=0.f&&dx_dlight_entities.value!=0.f) {
+  selected[2]+=4.f;const auto previous=g_dxDLights.size();
+  R_AddDLight(selected,18.f,red,0,0,now+.1f,-40);
+  g_cofPickupLight=g_dxDLights.size()>previous;
+ }
+}
+
 static void R_SetupSceneDLights( )
 {
 	R_BeginDLights( );
 	R_CollectLanternLights();
+ R_CollectCofFlareLights();
+ R_SelectCofPickup();
 	R_CollectEngineDLights( );
 	R_CollectMuzzleLights( );
 	for( int i = 0; i < g_entityLightEmitterCount; ++i )
@@ -5907,6 +6186,23 @@ static void R_DrawLateWaterPass( const D3DXMATRIX &identity, bool &worldIsIdenti
 	R_SetWorldIdentity( identity, worldIsIdentity );
 }
 
+unsigned R_CofShadowSceneBlockers(unsigned flags){
+ unsigned blocked=0;
+ if(!R_CofClientPresent())blocked|=1u;if(dx_remix.value==0.f)blocked|=2u;
+ if(g_sceneViewModelHidden)blocked|=4u;if(!gp_cl)blocked|=8u;
+ else if(gp_cl->viewentity!=gp_cl->playernum+1)blocked|=16u;
+ if(ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0)blocked|=32u;
+ if(ENGINE_GET_PARM(PARM_THIRDPERSON))blocked|=64u;
+ if(g_cofPlayerVisibility.hidden(R_CurrentRenderTime(0.f)))blocked|=128u;
+ if(flags&RF_DRAW_CUBEMAP)blocked|=256u;if(flags&RF_DRAW_OVERVIEW)blocked|=512u;
+ return blocked;
+}
+static void R_CofShadowStatusCmd(){
+ char path[MAX_PATH]{};GetModuleFileNameA(GetModuleHandleA("ref_d3d9.dll"),path,MAX_PATH);
+ gEngfuncs.Con_Printf("SHADOW build=%s %s renderer=%s mode=%.0f device=%d CoF=%d remix=%.0f hiddenView=%d client=%d viewentity=%d local=%d health=%d thirdPerson=%d nativeHidden=%d viewFlags=%u\n",__DATE__,__TIME__,path,dx_cof_player_shadow.value,int(device!=nullptr),int(R_CofClientPresent()),dx_remix.value,int(g_sceneViewModelHidden),int(gp_cl!=nullptr),gp_cl?gp_cl->viewentity:-1,gp_cl?gp_cl->playernum+1:-1,int(ENGINE_GET_PARM(PARM_LOCAL_HEALTH)),int(ENGINE_GET_PARM(PARM_THIRDPERSON)),int(g_cofPlayerVisibility.hidden(R_CurrentRenderTime(0.f))),unsigned(g_currentViewFlags));
+ gEngfuncs.Con_Printf("SHADOW blockedMask=0x%X (CoF=1 remix=2 hiddenView=4 client=8 externalCamera=16 dead=32 thirdPerson=64 nativeScene=128 cubemap=256 overview=512)\n",R_CofShadowSceneBlockers(unsigned(g_currentViewFlags)));
+ R_CofShadowStudioStatus();
+}
 void R_DrawEnts( const vec3_t view_origin )
 {
 	if( !device )
@@ -6138,7 +6434,15 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 
 	DX_UpdateFog( rvp );
 	R_DrawEnts( rvp->vieworigin );
+ if(R_CofShadowSceneBlockers(unsigned(rvp->flags))==0) {
+  auto model=gEngfuncs.Mod_ForName?gEngfuncs.Mod_ForName("models/cofr/player/simon_shadow.mdl",false,false):nullptr;
+  auto donor=gEngfuncs.Mod_ForName?gEngfuncs.Mod_ForName("models/cofr/player/police_shadow_anim.mdl",false,false):nullptr;
+  R_DrawCofPlayerShadow(gEngfuncs.R_BeamGetEntity?gEngfuncs.R_BeamGetEntity(gp_cl->playernum+1):nullptr,model,donor,R_CurrentViewModel());
+ }
 
+ R_DrawNightmarePhoto();
+ R_DrawCofPickupOutline();
+ R_DrawCofScopeOverlay();
 	if( dx_debug_text3d_test.value != 0.0f &&
 		!FBitSet( rvp->flags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
 	{
