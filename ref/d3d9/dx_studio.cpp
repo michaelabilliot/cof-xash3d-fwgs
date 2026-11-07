@@ -1154,6 +1154,7 @@ static void R_StudioBuildWorldFromMatrix( const D3DMATRIX *currentWorldMatrix,
 	DX_MatrixIdentity( outWorld );
 }
 
+static model_t *R_ModelFromClientIndex( int modelIndex );
 static void R_StudioAttachmentPoint( studiohdr_t *hdr,
 	const BoneMat34 *boneMatrices, const D3DMATRIX &world,
 	int attachmentIndex, vec3_t outPoint )
@@ -1607,6 +1608,14 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 
 	if( ent->player && !viewModel )
 	{
+		// The held weapon uses merged player bones later in this draw. Player
+		// attachments belong to the body and are not the weapon's muzzle.
+		model_t *held = R_ModelFromClientIndex( ent->curstate.weaponmodel );
+		studiohdr_t *heldHdr = held && held->type == mod_studio
+			? static_cast<studiohdr_t *>( gEngfuncs.Mod_Extradata( mod_studio, held ) ) : nullptr;
+		if( dx_player_weapon_models.value != 0.0f && held != ent->model &&
+			R_StudioHeaderValid( heldHdr ) && heldHdr->numattachments > 0 )
+			return false;
 		bool spawned = false;
 
 		if( hasEfMuzzle )
@@ -5845,6 +5854,16 @@ static void R_DrawPlayerWeapon( model_t *playerModel,
 
 	R_StudioStoreAttachments( playerEnt, weaponHdr,
 		weaponBones, entityWorld, renderTime );
+	if( (playerEnt->curstate.effects & EF_MUZZLEFLASH) != 0 )
+	{
+		if( dx_muzzleflash_sprite.value != 0.0f && weaponHdr->numattachments > 0 )
+		{
+			vec3_t origin;
+			R_StudioAttachmentPoint( weaponHdr, weaponBones, entityWorld, 0, origin );
+			R_SpawnRendererMuzzleFlash( playerEnt, origin, 20, false, renderTime );
+		}
+		playerEnt->curstate.effects &= ~EF_MUZZLEFLASH;
+	}
 
 	R_DrawStudioEntityModel( weaponModel, &weaponEnt, 0, 0.0f,
 		-1, 0.0f, 0.0f, renderTime, studioLight, studioLightDir,

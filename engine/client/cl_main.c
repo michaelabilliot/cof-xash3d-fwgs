@@ -320,12 +320,40 @@ finalize connection process and begin new frame
 with new cls.state
 ===============
 */
+static qboolean CL_SignonCanSend( void )
+{
+	if( cls.net_protocol != PROTO_CURRENT || NET_IsLocalAddress( cls.netchan.remote_address ))
+		return true;
+
+	if( host.realtime < cls.nextcmdtime )
+	{
+		return false;
+	}
+	if( !Netchan_CanPacket( &cls.netchan, true ))
+	{
+		return false;
+	}
+	cls.nextcmdtime = host.realtime + 1.0 / bound( 10.0f, cl_cmdrate.value, 100.0f );
+	return true;
+}
+
+static void CL_FinishSignonFlowControl( void )
+{
+	if( cls.net_protocol != PROTO_CURRENT || NET_IsLocalAddress( cls.netchan.remote_address ))
+		return;
+
+	// Loading must not leave gameplay waiting on accumulated sign-on bandwidth.
+	cls.netchan.cleartime = host.realtime;
+	cls.nextcmdtime = host.realtime;
+}
+
 static void CL_CheckClientState( void )
 {
 	// first update is the pre-final signon stage
 	if(( cls.state == ca_connected || cls.state == ca_validate ) && ( cls.signon == SIGNONS ))
 	{
 		cls.state = ca_active;
+		CL_FinishSignonFlowControl();
 		cls.changelevel = false;		// changelevel is done
 		cls.changedemo = false;		// changedemo is done
 		cl.first_frame = true;		// first rendering frame
@@ -881,7 +909,8 @@ static void CL_WritePacket( void )
 
 	if( cls.state < min_state )
 	{
-		Netchan_TransmitBits( &cls.netchan, 0, "" );
+		if( CL_SignonCanSend() )
+			Netchan_TransmitBits( &cls.netchan, 0, "" );
 		return;
 	}
 	// cls.state can only be ca_validate or ca_active from here

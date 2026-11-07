@@ -3911,6 +3911,9 @@ static float R_WaterTurbIndex( float rawIndex )
 static float R_WaterGLVerticalWaveZ( const water_source_vertex_t &source,
 	const cl_entity_s *ent, float time )
 {
+	// Remix replacements require source positions independent of time and eye height.
+	if( dx_remix.value != 0.0f )
+		return source.z;
 
 	const float scale = ent ? ent->curstate.scale : 0.0f;
 	if( fabsf( scale ) <= 0.0001f )
@@ -4725,11 +4728,11 @@ static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 	constexpr float waterTexturePeriod = 64.0f;
 	const float tw = waterTexturePeriod;
 	const float th = waterTexturePeriod;
-	const float waveScale = std::max( 0.0f, std::min( 4.0f, dx_water_wave_size.value ) );
-	const float speed = dx_water_wave_speed.value;
+	const float waveScale = dx_remix.value != 0.0f ? 0.0f : std::max( 0.0f, std::min( 4.0f, dx_water_wave_size.value ) );
+	const float speed = dx_remix.value != 0.0f ? 0.0f : dx_water_wave_speed.value;
 	const bool combineRippleAndWaves = rippleTextureMode;
 	const bool uvWaves = waveScale > 0.0f && ( !rippleTextureMode || combineRippleAndWaves );
-	const float entityScale = ent ? ent->curstate.scale : 0.0f;
+	const float entityScale = dx_remix.value == 0.0f && ent ? ent->curstate.scale : 0.0f;
 	const bool vertexWaves = fabsf( entityScale ) > 0.0001f;
 	const float animTime = ( uvWaves || vertexWaves ) ? R_WaterQuantizedTime( time ) : 0.0f;
 	const int renderMode = ent ? ent->curstate.rendermode : kRenderNormal;
@@ -5301,7 +5304,10 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 	IDirect3DTexture9 *boundRippleTexture = nullptr;
 	for( auto &batch : model.waterBatches )
 	{
-		texture_t *texture = R_SelectAnimatedTexture( batch.baseTexture, ent, time );
+		// Pin the primary frame even if an entity requests alternate/frame animation.
+		texture_t *texture = dx_remix.value != 0.0f
+			? R_SelectAnimatedTexture( batch.baseTexture, nullptr, 0.0f )
+			: R_SelectAnimatedTexture( batch.baseTexture, ent, time );
 		if( !texture || texture->gl_texturenum <= 0 || batch.primitiveCount == 0 )
 			continue;
 
@@ -5311,10 +5317,10 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 		if( !ent && !R_BoundsVisibleInCurrentView( batch.mins, batch.maxs, batch.boundsValid ) )
 			continue;
 
-		IDirect3DTexture9 *rippleTexture = depthOnly ? nullptr : R_UpdateWaterRippleTexture( texture, time );
-		const bool usingRippleTexture = R_WaterRippleTextureEnabled( );
+		IDirect3DTexture9 *rippleTexture = depthOnly || dx_remix.value != 0.0f ? nullptr : R_UpdateWaterRippleTexture( texture, time );
+		const bool usingRippleTexture = dx_remix.value == 0.0f && R_WaterRippleTextureEnabled( );
 
-		if( !R_UpdateWaterBatchVertices( batch, texture, ent, time, usingRippleTexture ) )
+		if( !R_UpdateWaterBatchVertices( batch, texture, ent, time, rippleMode ) )
 		{
 			if( batch.dynamicVertices.size( ) != batch.sources.size( ) )
 				batch.dynamicVertices.resize( batch.sources.size( ) );
@@ -5328,7 +5334,7 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 				vertex.x = source.x;
 				vertex.y = source.y;
 				vertex.z = R_WaterGLVerticalWaveZ( source, ent, time );
-				vertex.diffuse = R_WaterVertexColor( ent, 255, usingRippleTexture );
+				vertex.diffuse = R_WaterVertexColor( ent, 255, rippleMode );
 				vertex.u = source.s / tw;
 				vertex.v = source.t / th;
 			}

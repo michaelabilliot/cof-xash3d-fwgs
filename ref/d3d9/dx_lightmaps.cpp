@@ -3629,7 +3629,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 
 	const float forwardOffset = std::max( -16.0f,
 		std::min( 16.0f, dx_muzzleflash_forward_offset.value ) );
-	VectorMA( flash.origin, forwardOffset, g_vForward, flash.origin );
+	if( viewModel ) VectorMA( flash.origin, forwardOffset, g_vForward, flash.origin );
 
 	flash.textureId = R_FindMuzzleFlashTexture( spriteType );
 	flash.scale = scale;
