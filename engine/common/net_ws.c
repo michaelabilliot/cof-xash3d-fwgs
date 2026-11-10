@@ -111,6 +111,7 @@ typedef struct
 } net_state_t;
 
 static net_state_t		net;
+
 static CVAR_DEFINE_AUTO( net_address, "0", FCVAR_PRIVILEGED|FCVAR_READ_ONLY, "contain local address of current client" );
 static CVAR_DEFINE( net_ipname, "ip", "localhost", FCVAR_PRIVILEGED, "network ip address" );
 static CVAR_DEFINE( net_iphostport, "ip_hostport", "0", FCVAR_READ_ONLY, "network ip host port" );
@@ -1347,58 +1348,72 @@ static qboolean NET_QueuePacket( int net_socket, netsrc_t sock, netadr_t *from, 
 	if( !NET_IsSocketValid( net_socket ))
 		return NET_LagPacket( false, sock, from, length, data );
 
-	WSAsize_t addr_len = sizeof( addr );
-	int ret = recvfrom( net_socket, buf, sizeof( buf ), 0, (struct sockaddr *)&addr, &addr_len );
-
-	NET_SockadrToNetadr( &addr, from );
-
-	if( !NET_IsSocketError( ret ))
+	// A partial split packet is not an empty socket. Drain queued parts
+	// before returning false, or large snapshots throttle to one part/frame.
+	// Bound the work so malformed/unrelated traffic cannot monopolize a frame.
+	for( int batch = 0; batch < 128; batch++ )
 	{
-		if( ret < NET_MAX_FRAGMENT )
+		WSAsize_t addr_len = sizeof( addr );
+		int ret = recvfrom( net_socket, buf, sizeof( buf ), 0, (struct sockaddr *)&addr, &addr_len );
+
+		NET_SockadrToNetadr( &addr, from );
+
+		if( !NET_IsSocketError( ret ))
 		{
-			// Transfer data
-			memcpy( data, buf, ret );
-			*length = ret;
+			if( ret < NET_MAX_FRAGMENT )
+			{
+				// Transfer data
+				memcpy( data, buf, ret );
+				*length = ret;
 
 #if !XASH_DEDICATED
-			// check for split message
-			if( sock == NS_CLIENT && *(int *)data == NET_HEADER_SPLITPACKET )
-			{
-				if( CL_IsFromConnectingServer( *from ))
-					return NET_GetLong( data, ret, length, CL_GetSplitSize( ), CL_Protocol( ));
+				// check for split message
+				if( sock == NS_CLIENT && ret >= (int)sizeof( int ) && *(int *)data == NET_HEADER_SPLITPACKET )
+				{
+					if( CL_IsFromConnectingServer( *from ))
+					{
+						if( NET_GetLong( data, ret, length, CL_GetSplitSize(), CL_Protocol() )) return true;
+						continue;
+					}
 
-				// GoldSrc servers (e.g. ReUnion) can split large query responses
-				if( CL_HasActiveNetRequest( *from ))
-					return NET_GetLong( data, ret, length, 1400, PROTO_GOLDSRC );
+					// GoldSrc servers (e.g. ReUnion) can split large query responses
+					if( CL_HasActiveNetRequest( *from ))
+					{
+						if( NET_GetLong( data, ret, length, 1400, PROTO_GOLDSRC )) return true;
+						continue;
+					}
 
-				return false;
-			}
+					continue;
+				}
 #endif
 
-			// lag the packet, if needed
-			return NET_LagPacket( true, sock, from, length, data );
+				// lag the packet, if needed
+				return NET_LagPacket( true, sock, from, length, data );
+			}
+			else
+			{
+				Con_Reportf( "%s: oversize packet from %s\n", __func__, NET_AdrToString( *from ));
+			}
 		}
 		else
 		{
-			Con_Reportf( "%s: oversize packet from %s\n", __func__, NET_AdrToString( *from ));
-		}
-	}
-	else
-	{
-		int err = WSAGetLastError();
+			int err = WSAGetLastError();
 
-		switch( err )
-		{
-		case WSAEWOULDBLOCK:
-		case WSAECONNRESET:
-		case WSAECONNREFUSED:
-		case WSAEMSGSIZE:
-		case WSAETIMEDOUT:
-			break;
-		default:	// let's continue even after errors
-			Con_DPrintf( S_ERROR "%s: %s from %s\n", __func__, NET_ErrorString(), NET_AdrToString( *from ));
-			break;
+			switch( err )
+			{
+			case WSAEWOULDBLOCK:
+			case WSAECONNRESET:
+			case WSAECONNREFUSED:
+			case WSAEMSGSIZE:
+			case WSAETIMEDOUT:
+				break;
+			default:	// let's continue even after errors
+				Con_DPrintf( S_ERROR "%s: %s from %s\n", __func__, NET_ErrorString(), NET_AdrToString( *from ));
+				break;
+			}
 		}
+
+		return NET_LagPacket( false, sock, from, length, data );
 	}
 
 	return NET_LagPacket( false, sock, from, length, data );
