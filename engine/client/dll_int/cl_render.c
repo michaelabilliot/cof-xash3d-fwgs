@@ -175,6 +175,9 @@ intptr_t CL_RenderGetParm( const int parm, const int arg, const qboolean checkRe
 			return cl.local.waterlevel;
 		case PARM_LOCAL_HEALTH:
 			return cl.local.health;
+		case PARM_COF_PLAYER_LIGHT:
+			return cl.maxclients > 1 && arg <= cl.maxclients && !Q_stricmp( GI->gamefolder, "CryOfFear" )
+				? CofPlayerLightsGet( &cl.cofPlayerLights, arg ) : 0;
 		case PARM_SINGLEPLAYER_GAME:
 			return Host_IsSinglePlayerGame();
 		case PARM_NUMENTITIES:

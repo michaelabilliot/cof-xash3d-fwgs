@@ -1,5 +1,6 @@
 
 #include "dx_local.h"
+#include "dx_gun_smoke.h"
 
 #ifndef D3D_PARTICLE_FVF
 #define D3D_PARTICLE_FVF ( D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1 )
@@ -2611,6 +2612,7 @@ static void R_QueueSpriteFrame( cl_entity_s *ent, const mspriteframe_t *frame,
 
 bool R_QueueSprite( cl_entity_s *ent, model_t *mod )
 {
+ if(mod&&R_CofGunSmokeReplace(mod->name))return true;
 	if( dx_remix_perf.value == 0.0f )
 		return false;
 	if( !ent || !mod || !mod->cache.data )
@@ -2695,6 +2697,7 @@ static void R_DrawSpriteLightmapPass( const mspriteframe_t *frame,
 
 static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 {
+ if(mod&&R_CofGunSmokeReplace(mod->name))return;
 	DX_MODEL_PROFILE_SCOPE( spriteProfileScope, DX_PROFILE_PHASE_SPRITEMODEL );
 	if( !ent || !mod || !mod->cache.data )
 		return;

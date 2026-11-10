@@ -36,6 +36,7 @@ GNU General Public License for more details.
 #include "ref_common.h"
 #include "voice.h"
 #include "q_client.h"
+#include "cof_player_lights.h"
 
 //=============================================================================
 typedef struct netbandwithgraph_s
@@ -277,6 +278,7 @@ typedef struct
 	double frametime_remainder;
 
 	uint worldmapCRC;
+	cof_player_lights_t cofPlayerLights; // reset with the rest of cl on disconnect/map load
 } client_t;
 
 /*

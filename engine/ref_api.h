@@ -401,6 +401,7 @@ typedef enum
 	PARM_GET_RAGDOLL_RETAINED = -25, // index=acquire, -index-3=lookup; -1=generation, -2=version, -3=count, -65536-slot=iterate
     PARM_RAGDOLL_CLAIM = -27, // arg=index: generation-checked ownership mailbox; -2=version
     PARM_RAGDOLL_ACK = -26, // arg=index: unsigned event acknowledgement mailbox
+    PARM_COF_PLAYER_LIGHT = -28, // arg=player index: 0x10000 | native ScoreInfo flags; 0=unknown
     PARM_GET_RAGDOLL_ENTITY = -24, // snapshot pointer; arg=index, -1=local edict high-water mark
 
 	// implemented by ref_dll

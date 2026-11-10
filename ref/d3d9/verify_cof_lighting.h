@@ -4,6 +4,14 @@
 #include <string>
 static bool verifyCofLighting(const char* modelPath) {
  auto check=[](bool ok,const char* name){if(!ok)std::fprintf(stderr,"FAIL LIGHT V2: %s\n",name);return ok;};
+ struct PlayerLight{int player=0;};std::vector<int> order;
+ const auto build=[](int player,PlayerLight& light){light.player=player;return true;};
+ const auto submit=[&](unsigned slot,const PlayerLight& light){if(slot!=order.size())return false;order.push_back(light.player);return true;};
+ if(!check(DX_CofEmitPlayerFlashlights<PlayerLight>(0,3,3,4,false,build,submit)==3&&order==std::vector<int>{3,1,2},"local non-host first, remote priority and exact slot cap"))return false;
+ order={3};
+ if(!check(DX_CofEmitPlayerFlashlights<PlayerLight>(1,3,3,4,true,build,submit)==3&&order==std::vector<int>{3,1,2},"successful native submission prevents duplicate local cone"))return false;
+ order.clear();
+ if(!check(DX_CofEmitPlayerFlashlights<PlayerLight>(0,1,3,4,false,build,submit)==1&&order==std::vector<int>{3},"failed native light leaves network fallback available"))return false;
  dx_cof_light_bridge_t bridge;dx_cof_light_state_v2 p;p.time=10;p.direction[0]=1;p.origin[2]=28;
  unsigned submitted=0,disabled=0;D3DLIGHT9 recorded{};
  auto set=[&](unsigned slot,const D3DLIGHT9& light)->long{if(slot!=0)return -1;recorded=light;++submitted;return 0;};

@@ -38,10 +38,10 @@ inline bool DX_CofValid(const dx_cof_light_state_v2& p) {
 inline bool DX_CofFresh(float published,float now) {
  return std::isfinite(published)&&std::isfinite(now)&&now>=published&&now-published<.25f;
 }
-// Aim stowed portable lights 70 degrees below horizontal, independent of pitch. Heading
+// Use a horizontal basis to position the exterior backpack glow. Heading
 // comes from the horizontal view direction; at the poles use the camera yaw.
-constexpr float DX_COF_STOWED_HORIZONTAL=.3420201433256687f; // cos(70 degrees)
-constexpr float DX_COF_STOWED_DOWN=.9396926207859084f; // sin(70 degrees)
+constexpr float DX_COF_STOWED_HORIZONTAL=1.f; // horizontal forward, independent of camera pitch
+constexpr float DX_COF_STOWED_DOWN=0.f; // no downward tilt
 inline bool DX_CofGroundPhoneDirection(float* direction,float fallbackYaw) {
  if(!direction||!std::isfinite(fallbackYaw))return false;
  for(int i=0;i<3;++i)if(!std::isfinite(direction[i]))return false;
@@ -61,6 +61,18 @@ template<class Light,class Set,class Enable> bool DX_CofSubmit(unsigned slot,con
  if(set(slot,light)<0){enable(slot,false);return false;}
  if(enable(slot,true)<0){enable(slot,false);return false;}
  return true;
+}
+// Player lights get the remaining slots before transient native effects.
+// Only a successfully submitted local source suppresses its network fallback.
+template<class Light,class Build,class Submit> int DX_CofEmitPlayerFlashlights(
+ int emitted,int maximum,int local,int players,bool localSubmitted,Build build,Submit submit) {
+ const auto emit=[&](int index){
+  if(emitted>=maximum||index<1||index>players||(index==local&&localSubmitted))return;
+  Light light{};if(build(index,light)&&submit(emitted,light))++emitted;
+ };
+ emit(local);
+ for(int i=1;i<=players&&emitted<maximum;++i)if(i!=local)emit(i);
+ return emitted;
 }
 
 struct dx_cof_light_bridge_t {

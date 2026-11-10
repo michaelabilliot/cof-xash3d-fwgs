@@ -61,6 +61,7 @@ extern "C" {
 #include "dx_cof_features.h"
 #include "dx_cof_pickup_outline.h"
 #include "dx_cof_crouch.h"
+#include "dx_gun_smoke.h"
 static dx_cof_crouch_signal g_cofCrouchSignal;
 extern "C" __declspec(dllexport) int __cdecl DX_CofCrouchStateV1(int held,float height,float now){return g_cofCrouchSignal.publish(held,height,now)?1:0;}
 bool R_CofShadowCrouchInput(float now,bool& held,float& height){return g_cofCrouchSignal.sample(now,held,height);}
@@ -2692,6 +2693,7 @@ struct triapi_state_t
 {
 	bool active = false;
 	bool screenSpace = false;
+	bool gunSmoke = false;
 	int primitiveMode = TRI_TRIANGLES;
 	int renderMode = kRenderNormal;
 	float rgba[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -2934,6 +2936,7 @@ static void R_TriEnd( void )
 		return;
 	}
 	g_triApi.active = false;
+	if(g_triApi.gunSmoke && !g_triApi.screenSpace)return;
 
 	const UINT vertexCount = static_cast<UINT>( R_TriVertexCount( ) );
 	if( vertexCount == 0 )
@@ -3196,6 +3199,7 @@ static void R_TriCullFace( TRICULLSTYLE mode )
 
 static int R_TriSpriteTexture( model_t *spriteModel, int frame )
 {
+ g_triApi.gunSmoke=spriteModel&&R_CofGunSmokeReplace(spriteModel->name);
 	if( !spriteModel || spriteModel->type != mod_sprite ||
 		!spriteModel->cache.data || !gEngfuncs.R_GetSpriteFrame )
 	{
@@ -3884,6 +3888,7 @@ static qboolean R_Init( void )
 	}
 
 	DX_ProfilerRegisterCommands( );
+ R_CofGunSmokeInit();
 	gEngfuncs.Cmd_AddCommand("dx_triapi_batch_stats",R_TriBatchStats,"Show transparent TriangleAPI batch counters");
 	R_RegisterContextCommands( );
 	DX_UpdateRemix( );
@@ -3899,6 +3904,7 @@ static qboolean R_Init( void )
 
 static void R_Shutdown( void )
 {
+ R_CofGunSmokeShutdown();
 	if(g_inventoryResetCallback)g_inventoryResetCallback();
 	g_mapSky.invalidate();
 	g_mapSkyRetryAt = 0;
@@ -4494,6 +4500,7 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 		return true;
 	}
 
+	if(R_CofGunSmokeReplace(clent->model->name))return true;
 	const int modelType = clent->model->type;
 	if( modelType != mod_brush &&
 		modelType != mod_studio &&
@@ -5790,18 +5797,23 @@ static bool R_SphereVisible( const float center[3], float radius )
 	const float depth = DotProduct( rel, g_dxCullForward );
 	const float side = DotProduct( rel, g_dxCullRight );
 	const float vertical = DotProduct( rel, g_dxCullUp );
+	// Side-plane normals (forward * tanFov +/- right/up) are not unit
+	// length. Scale the sphere radius by that length to avoid clipping
+	// intersecting models at wide FOVs and near the screen edges.
+	const float radiusX = radius * sqrtf( 1.0f + g_dxCullTanX * g_dxCullTanX );
+	const float radiusY = radius * sqrtf( 1.0f + g_dxCullTanY * g_dxCullTanY );
 
 	if( depth + radius < g_dxCullNear )
 		return false;
 	if( depth - radius > g_dxCullFar )
 		return false;
-	if( depth * g_dxCullTanX + side + radius < 0.0f )
+	if( depth * g_dxCullTanX + side + radiusX < 0.0f )
 		return false;
-	if( depth * g_dxCullTanX - side + radius < 0.0f )
+	if( depth * g_dxCullTanX - side + radiusX < 0.0f )
 		return false;
-	if( depth * g_dxCullTanY + vertical + radius < 0.0f )
+	if( depth * g_dxCullTanY + vertical + radiusY < 0.0f )
 		return false;
-	if( depth * g_dxCullTanY - vertical + radius < 0.0f )
+	if( depth * g_dxCullTanY - vertical + radiusY < 0.0f )
 		return false;
 	return true;
 }
@@ -5825,10 +5837,11 @@ static bool R_EntityMightBeVisible( const cl_entity_s *ent )
 			ent->model->type != mod_brush && ent->curstate.scale > 0.0f
 			? ent->curstate.scale : 1.0f;
 
-		center[0] += cx * modelScale;
-		center[1] += cy * modelScale;
-		center[2] += cz * modelScale;
-		radius = sqrtf( ex * ex + ey * ey + ez * ez ) * modelScale;
+		// Keep the sphere around the entity origin. A local bounds center
+		// cannot simply be added in world space when the entity rotates.
+		// This rotation-invariant bound also covers interpolated rotations.
+		radius = ( sqrtf( ex * ex + ey * ey + ez * ez ) +
+			sqrtf( cx * cx + cy * cy + cz * cz ) ) * modelScale;
 		if( radius < 8.0f )
 			radius = 8.0f;
 	}
@@ -6295,9 +6308,9 @@ void R_DrawEnts( const vec3_t view_origin )
 	if( gEngfuncs.pfnDrawTransparentTriangles )
 	{
         DX_TriBatchBarrier(DX_TRI_FLUSH_PASS);
-        g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true;
+        g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true; g_triApi.gunSmoke=false;
         gEngfuncs.pfnDrawTransparentTriangles( );
-        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false;
+        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false;
 		R_MarkWorldTransformDirty( worldIsIdentity );
 		R_SetWorldIdentity( identity, worldIsIdentity );
 	}
@@ -6326,6 +6339,8 @@ void R_DrawEnts( const vec3_t view_origin )
 	if( !FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
 	{
 		DX_PROFILE_SCOPE( viewModelScope, DX_PROFILE_VIEWMODEL );
+  // World-space smoke uses the world camera, before viewmodel projection.
+  R_CofGunSmokeDraw();
 		R_DrawViewModel( );
 	}
 }
@@ -7216,7 +7231,7 @@ void R_RenderFrame( )
 void R_EndFrame( void )
 {
 	R_TriTraceFlush("frame-complete");
-	DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false;
+	DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false;
 	if( !device )
 		return;
 
@@ -7341,6 +7356,8 @@ void R_ClearScene( void )
 
 void R_NewMap( void )
 {
+ R_CofGunSmokeReset();
+	R_ResetAudiReplacement();
 	DX_RagdollReset("new-map");
 	R_ResetCofPlayerVisibility();
 	g_cofDual.clear();

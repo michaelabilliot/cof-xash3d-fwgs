@@ -8,6 +8,7 @@
 #include "dx_cof_shadow.h"
 #include "dx_cof_shadow_animation.h"
 #include "dx_cof_shadow_motion.h"
+#include "dx_audi_replacement.h"
 
 constexpr float DX_STUDIO_SHADE_LAMBERT = 1.4953241f;
 
@@ -2606,8 +2607,14 @@ static void R_DestroyStudioGpuCache( studio_cache_t &cache )
 	cache.containsChrome = false;
 }
 
+void R_ResetAudiReplacement( )
+{
+	audi_replacement::asset.reset();
+}
+
 void R_ClearStudioGpuCaches( )
 {
+	audi_replacement::asset.reset();
 	for( auto &cache : g_studioEntityGpuCacheStorage )
 		R_DestroyStudioGpuCache( cache );
 	g_studioEntityGpuCacheStorage.clear( );
@@ -2622,6 +2629,7 @@ void R_ClearStudioGpuCaches( )
 
 void R_ModelsLostDevice( )
 {
+	R_ResetAudiReplacement();
 	DX_ShutdownWorkers( );
 	R_FreeModelScratchBuffers( );
 	DX_FreeStudioSkinningShaders( );
@@ -5856,6 +5864,8 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
 		return;
 	if( !R_CofPlayerDrawAllowed( ent ) )
+		return;
+	if( audi_replacement::asset.draw( ent ) )
 		return;
 
 	model_t *mod = ent->model;

@@ -201,6 +201,19 @@ def build(bld):
 		defines=['NOMINMAX'], use=['engine_includes','sdk_includes','public'],
 		cxxflags=bld.env.D3D9_CXXFLAGS+['/EHsc','/W4'],includes=['.'],subsystem='console')
 	if bld.options.verify_camera:
+		bld.program(source='verify_gun_smoke.cpp', target='verify_gun_smoke',
+			defines=['NOMINMAX'], cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.'], subsystem='console', lib=['user32'])
+		bld.program(source='verify_audi.cpp', target='verify_audi',
+			defines=['REF_DLL=1', 'NOMINMAX'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_frustum.cpp', target='verify_frustum',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
 		bld.program(source='verify_attachments.cpp', target='verify_attachments',
 			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
 			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
@@ -266,6 +279,7 @@ def build(bld):
 		'dx_lightmaps.cpp',
 		'dx_studio.cpp',
 		'dx_effects.cpp',
+		'dx_gun_smoke.cpp',
 		'dx_textures.cpp',
 		'dx_profiler.cpp',
 		'dx_studio_shader.cpp',

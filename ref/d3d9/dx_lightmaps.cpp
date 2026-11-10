@@ -6,7 +6,9 @@
 #include "dx_cof_native_light.h"
 #include "dx_effect_timing.h"
 #include "dx_cof_light_render.h"
+#include "dx_gun_smoke.h"
 #include "dx_camera_area_light.h"
+#include "cof_player_lights.h"
 #include <cstdarg>
 
 static unsigned g_cofLightFlags=0;
@@ -2777,17 +2779,24 @@ void R_CollectBeamLights( void )
 	}
 }
 
-static bool R_RemixPlayerFlashlightEntity( int key, cl_entity_s **outEntity = nullptr )
+static int R_CofPlayerLightState(int index) {
+ return gp_cl && gp_cl->maxclients>1 && gEngfuncs.EngineGetParm
+  ? static_cast<int>(gEngfuncs.EngineGetParm(PARM_COF_PLAYER_LIGHT,index)):0;
+}
+
+static bool R_PlayerFlashlightEntity( int key, cl_entity_s **outEntity = nullptr )
 {
-	if( dx_remix.value == 0.0f || key <= 0 || !gp_cl ||
+	if( key <= 0 || !gp_cl ||
 		!gEngfuncs.R_BeamGetEntity || key > gp_cl->maxclients )
 	{
 		return false;
 	}
 
 	cl_entity_s *entity = gEngfuncs.R_BeamGetEntity( key );
-	if( !entity || entity->index != key ||
-		( entity->curstate.effects & EF_DIMLIGHT ) == 0 )
+	const int cofState=R_CofPlayerLightState(key);
+	const bool on=(cofState&COF_PLAYER_LIGHT_KNOWN)
+		? (cofState&COF_PLAYER_LIGHT_VEST)!=0 : entity && (entity->curstate.effects&EF_DIMLIGHT)!=0;
+	if( !entity || entity->index != key || !on || entity->curstate.spectator )
 	{
 		return false;
 	}
@@ -2795,6 +2804,9 @@ static bool R_RemixPlayerFlashlightEntity( int key, cl_entity_s **outEntity = nu
 	if( outEntity )
 		*outEntity = entity;
 	return true;
+}
+static bool R_RemixPlayerFlashlightEntity(int key,cl_entity_s** outEntity=nullptr) {
+ return dx_remix.value!=0.f && R_PlayerFlashlightEntity(key,outEntity);
 }
 
 static void R_CollectDynamicLightArray( const dlight_t *lights, int count,
@@ -2978,6 +2990,8 @@ static void R_FillRemixFlashlight( const cl_entity_s *entity, D3DLIGHT9 &light )
 		VectorCopy( entity->origin, origin );
 		origin[2] += entity->curstate.usehull == 1 ? 12.0f : 28.0f;
 		angles[PITCH] = entity->curstate.angles[PITCH] * 9.0f;
+		if(R_CofPlayerLightState(entity->index)&COF_PLAYER_LIGHT_KNOWN)
+			angles[PITCH]=-entity->angles[PITCH]; // CoF native 1001ef90 uses rendered entity angles
 		angles[YAW] = entity->angles[YAW];
 		angles[ROLL] = 0.0f;
 	}
@@ -3007,10 +3021,17 @@ static void R_FillRemixFlashlight( const cl_entity_s *entity, D3DLIGHT9 &light )
 	light.Theta = DEG2RAD( 12.0f );
 	light.Phi = DEG2RAD( 24.0f );
 	light.Falloff = 1.0f;
+	if(R_CofPlayerLightState(entity->index)&COF_PLAYER_LIGHT_KNOWN) {
+		// CoF's multiplayer spotlight: native 1001ef90, range 700, FOV 50,
+		// warm RGB .70/.65/.65. Keep the generic EF_DIMLIGHT profile separate.
+		light.Range=700.f;light.Attenuation2=3.f/(700.f*700.f);
+		light.Diffuse.r=.70f*intensity;light.Diffuse.g=light.Diffuse.b=.65f*intensity;
+		light.Theta=DEG2RAD(40.f);light.Phi=DEG2RAD(50.f);
+	}
 }
 
 // CPU descriptor query also exercises the production builder without a device.
-static bool R_CofLightDescription(D3DLIGHT9& light) {
+static bool R_CofPublishedLightDescription(D3DLIGHT9& light) {
  unsigned flags=R_CofLightFlags();
  const bool testing=dx_cof_light_test.value!=0.f;
  if(testing)flags=1;
@@ -3026,15 +3047,28 @@ static bool R_CofLightDescription(D3DLIGHT9& light) {
   if(heldPhone&&!R_CofPhoneLightPose(p))return false;
   if(stowed) {
    if(!DX_CofGroundPhoneDirection(p.direction,g_vAngles[YAW]))return false;
-   // Bag height is below the hands in world space, independent of view pitch.
-   constexpr float bagDrop=24.f,bagForward=4.f;
-   p.origin[0]+=bagForward*p.direction[0]/DX_COF_STOWED_HORIZONTAL;
-   p.origin[1]+=bagForward*p.direction[1]/DX_COF_STOWED_HORIZONTAL;
+   // Top/right edge of Simon's backpack: behind the shoulder, below eye level.
+   // Use a horizontal body basis so looking down cannot swing the lamp around.
+   constexpr float bagDrop=8.f,bagBack=10.f,bagRight=16.f;
+   const float fx=p.direction[0]/DX_COF_STOWED_HORIZONTAL;
+   const float fy=p.direction[1]/DX_COF_STOWED_HORIZONTAL;
+   p.origin[0]+=-bagBack*fx+bagRight*fy;
+   p.origin[1]+=-bagBack*fy-bagRight*fx;
    p.origin[2]-=bagDrop;
    advance=0.f;
   }
-  return DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale()*(stowed?.75f:1.f),light,
-   dx_cof_flashlight_brightness.value,(heldHandheld||heldPhone)?0.f:advance);
+  if(!DX_CofBuildLight(p,flags,R_DynamicLightIntensityScale()*(stowed?.975f:1.f),light,
+   dx_cof_flashlight_brightness.value,(heldHandheld||heldPhone)?0.f:advance))return false;
+  if(stowed) {
+   // Stowed and still switched on: local diffuse glow around the exterior bag.
+   // A point source lights the surroundings without a directional floor spot.
+   light.Type=D3DLIGHT_POINT;
+   light.Direction={};
+   light.Range=180.f;
+   light.Attenuation2=4.f/(light.Range*light.Range);
+   light.Theta=0.f;light.Phi=0.f;light.Falloff=0.f;
+  }
+  return true;
  };
  if(g_cofV2 && g_cofLightBridge.published) {
   auto p=g_cofLightBridge.packet;
@@ -3056,6 +3090,40 @@ static bool R_CofLightDescription(D3DLIGHT9& light) {
  p.direction[0]=cameraLight.Direction.x;p.direction[1]=cameraLight.Direction.y;p.direction[2]=cameraLight.Direction.z;
  return build(p,0.f);
 }
+static bool R_PlayerFlashlightDescription(int playerIndex,D3DLIGHT9& light) {
+ cl_entity_s* entity=nullptr;
+ if(!R_PlayerFlashlightEntity(playerIndex,&entity))return false;
+ if(playerIndex==gp_cl->playernum+1 && (R_CofPlayerLightState(playerIndex)&COF_PLAYER_LIGHT_KNOWN) &&
+    gEngfuncs.EngineGetParm(PARM_LOCAL_HEALTH,0)<=0)return false;
+ // The local network flag can remain set while a spectator/scripted camera
+ // is active. It must not turn that camera into the player's flashlight.
+ if(playerIndex==gp_cl->playernum+1 && gp_cl->viewentity!=playerIndex)return false;
+ if(playerIndex==gp_cl->playernum+1 && R_CofClientPresent()) {
+  if(dx_cof_flashlight.value==0.f)return false;
+  if(g_cofV2 && g_cofLightBridge.published &&
+     DX_CofFresh(g_cofLightBridge.packet.time,R_CurrentRenderTime(0.f)) &&
+     (g_cofLightBridge.packet.reasons&~DX_COF_NO_VIEWMODEL))return false;
+ }
+ R_FillRemixFlashlight(entity,light);
+ return true;
+}
+static bool R_CofLightDescription(D3DLIGHT9& light) {
+ const bool published=R_CofPublishedLightDescription(light);
+ // Co-op can publish a stowed portable-light profile, or no eligible native
+ // light, while the server's EF_DIMLIGHT flashlight is on. In multiplayer
+ // retain a real published spotlight, otherwise use the network spotlight.
+ // Single-player backpack/phone behavior stays on the native publication.
+ if(gp_cl && gp_cl->maxclients>1 && dx_cof_flashlight.value!=0.f &&
+    dx_cof_light_test.value==0.f && (!published || light.Type!=D3DLIGHT_SPOT)) {
+  const unsigned reasons=g_cofV2&&g_cofLightBridge.published&&
+   DX_CofFresh(g_cofLightBridge.packet.time,R_CurrentRenderTime(0.f))?g_cofLightBridge.packet.reasons:0;
+  if(!(reasons&~DX_COF_NO_VIEWMODEL) && R_PlayerFlashlightDescription(gp_cl->playernum+1,light))return true;
+ }
+ return published;
+}
+extern "C" __declspec(dllexport) int __cdecl DX_PlayerFlashlightDescriptionV1(int playerIndex,D3DLIGHT9* light) {
+ return light&&R_PlayerFlashlightDescription(playerIndex,*light)?1:0;
+}
 extern "C" __declspec(dllexport) int __cdecl DX_CofLightDescriptionV1(D3DLIGHT9* light) {
  return light&&R_CofLightDescription(*light)?1:0;
 }
@@ -3070,12 +3138,13 @@ static int R_EmitRemixFlashlights( int maxLights )
 	int emitted = 0;
     D3DLIGHT9 local{};
     const bool haveLocal=R_CofLightDescription(local);
+    bool localSubmitted=false;
     if(haveLocal) {
         HRESULT setResult=D3D_OK,enableResult=D3D_OK;
         const bool ok=DX_CofSubmit(0,local,
             [&](unsigned slot,const D3DLIGHT9& light){setResult=device->SetLight(slot,&light);return static_cast<long>(setResult);},
             [&](unsigned slot,bool on){const auto result=device->LightEnable(slot,on?TRUE:FALSE);if(on)enableResult=result;return static_cast<long>(result);});
-        if(ok)++emitted;
+        if(ok){++emitted;localSubmitted=true;}
         static unsigned previous=~0u;const unsigned state=R_CofLightFlags()|(ok?256u:0u)|(dx_cof_light_debug.value!=0.f?512u:0u);
         if(state!=previous||!ok) {
             R_CofLightDebug("submit flags=%u test=%d pose=%s slot=0 SetLight=0x%08x LightEnable=0x%08x range=%.1f rgb=(%.3f %.3f %.3f) origin=(%.2f %.2f %.2f) dir=(%.3f %.3f %.3f)",
@@ -3086,6 +3155,16 @@ static int R_EmitRemixFlashlights( int maxLights )
     if(g_cameraFlashWorldPass){
         if(g_cameraAreaLight.draw())g_cameraFlashRendered=true;
         else if(!g_cameraFlashRendered)g_cameraFlash.pending=true;
+    }
+    // Reserve available slots for player flashlights before transient native
+    // effects. A raw native flag or a failed submission is not a replacement.
+    if(gEngfuncs.R_BeamGetEntity && (dx_dlight_engine.value!=0.f || dx_dlight_entities.value!=0.f)) {
+     const int localIndex=gp_cl->playernum+1;
+     emitted=DX_CofEmitPlayerFlashlights<D3DLIGHT9>(emitted,maxLights,localIndex,gp_cl->maxclients,localSubmitted,
+      [](int index,D3DLIGHT9& light){return R_PlayerFlashlightDescription(index,light);},
+      [&](unsigned index,const D3DLIGHT9& light){return DX_CofSubmit(index,light,
+       [&](unsigned slot,const D3DLIGHT9& value){return static_cast<long>(device->SetLight(slot,&value));},
+       [&](unsigned slot,bool on){return static_cast<long>(device->LightEnable(slot,on?TRUE:FALSE));});});
     }
     if(dx_dlight_entities.value!=0.f)g_cofNativeLights.visit(R_CurrentRenderTime(0.f),[&](const dx_cof_native_light& p){
         if(emitted>=maxLights)return;
@@ -3101,30 +3180,6 @@ static int R_EmitRemixFlashlights( int maxLights )
             [&](unsigned slot,const D3DLIGHT9& value){return static_cast<long>(device->SetLight(slot,&value));},
             [&](unsigned slot,bool on){return static_cast<long>(device->LightEnable(slot,on?TRUE:FALSE));}))++emitted;
     });
-    if(!gEngfuncs.R_BeamGetEntity || (dx_dlight_engine.value==0.f && dx_dlight_entities.value==0.f))return emitted;
-	const int localIndex = gp_cl->playernum + 1;
-	auto emitPlayer = [&]( int playerIndex )
-	{
-		if( emitted >= maxLights )
-			return;
-		cl_entity_s *entity = nullptr;
-		if(playerIndex==localIndex && (haveLocal || R_CofLightFlags()))return;
-		if(!R_RemixPlayerFlashlightEntity(playerIndex,&entity))return;
-		if( !entity ) return;
-
-		D3DLIGHT9 light{};
-		R_FillRemixFlashlight( entity, light );
-		if(SUCCEEDED(device->SetLight( emitted, &light )) &&
-			SUCCEEDED(device->LightEnable( emitted, TRUE ))) ++emitted;
-	};
-
-	if( localIndex > 0 && localIndex <= gp_cl->maxclients )
-		emitPlayer( localIndex );
-	for( int i = 1; i <= gp_cl->maxclients && emitted < maxLights; ++i )
-	{
-		if( i != localIndex )
-			emitPlayer( i );
-	}
 	return emitted;
 }
 
@@ -3642,6 +3697,12 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 		6.28318530718f );
 
 	g_rendererMuzzleFlashes.push_back( flash );
+ if(R_CofClientPresent()) {
+  vec3_t smokeForward;
+  if(!viewModel && ent)AngleVectors(ent->angles,smokeForward,nullptr,nullptr);
+  else VectorCopy(g_vForward,smokeForward);
+  R_CofGunSmokeShot(origin,smokeForward,flash.startTime);
+ }
 
 	if( dx_dlight_muzzleflash.value != 0.0f )
 	{

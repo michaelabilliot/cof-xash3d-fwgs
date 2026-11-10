@@ -1,5 +1,6 @@
 #include "dx_local.h"
 #include "dx_effect_timing.h"
+#include "cof_player_lights.h"
 #include <fstream>
 #include <vector>
 #include <cstdio>
@@ -12,11 +13,16 @@ static ref_client_t client{};
 static ref_host_t host{};
 static cvar_t shared{};
 static cl_entity_t lightPlayer{};
-static cl_entity_t* beamEntity(int index) { return index==1?&lightPlayer:nullptr; }
-static intptr_t parm(int key,int) {
+static cl_entity_t mpPlayers[5]{};
+static cof_player_lights_t mpLightState{};
+static int mpLocalHealth=100;
+static cl_entity_t* beamEntity(int index) { return index==1?&lightPlayer:(index>1&&index<5?&mpPlayers[index]:nullptr); }
+static intptr_t parm(int key,int arg) {
     if(key==PARM_GET_CLIENT_PTR) return reinterpret_cast<intptr_t>(&client);
     if(key==PARM_GET_VIEWENT_PTR)return reinterpret_cast<intptr_t>(&lightViewmodel);
     if(key==PARM_GET_HOST_PTR) return reinterpret_cast<intptr_t>(&host);
+    if(key==PARM_COF_PLAYER_LIGHT)return CofPlayerLightsGet(&mpLightState,arg);
+    if(key==PARM_LOCAL_HEALTH)return mpLocalHealth;
     return 0;
 }
 static void reg(convar_t* value) { value->value=static_cast<float>(atof(value->string)); }
@@ -108,8 +114,8 @@ int main(int argc,char** argv) {
     for(unsigned flags:{1u,2u,4u,5u,8u,12u,15u}) {
         for(int tick=0;tick<1800;++tick) {
             client.time=tick/60.f; lightState(flags);
-            if(!describe(&light) || light.Type!=D3DLIGHT_SPOT || light.Range!=700.f ||
-                light.Theta<=0 || light.Phi<=light.Theta || (!std::isfinite(light.Diffuse.r)||light.Diffuse.r<=0)) return 31;
+            if(!describe(&light) || light.Type!=((flags==1u||flags==2u)?D3DLIGHT_POINT:D3DLIGHT_SPOT) || light.Range!=((flags==1u||flags==2u)?180.f:700.f) ||
+                ((flags!=1u&&flags!=2u)&&(light.Theta<=0 || light.Phi<=light.Theta)) || (!std::isfinite(light.Diffuse.r)||light.Diffuse.r<=0)) return 31;
         }
     }
     lightState(0); if(describe(&light)) return 32;
@@ -129,7 +135,7 @@ int main(int argc,char** argv) {
     publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 42;
     publication.size=0;if(publishV2(&publication)||describe(&light))return 43;
     std::puts("PASS: actual compiled renderer V2 export builds dimmed lens-attached spotlight without player entity lookup; off/invalid publication clears it.");
-    // A switched-on light remains on when stowed, with a dimmer ground beam.
+    // A switched-on light remains on when stowed, with a local backpack glow.
     const auto flashlightBytes=lightModelBytes;secondaryLightBytes=flashlightBytes;
     secondaryLightModel=lightModel;
     std::ifstream gun(modelPath.substr(0,slash)+"/weapons/glock/v_glock.mdl",std::ios::binary);
@@ -137,7 +143,7 @@ int main(int argc,char** argv) {
     strcpy_s(lightModel.name,"models/weapons/glock/v_glock.mdl");
     lightViewmodel.curstate.sequence=0;
     publication.size=sizeof(publication);publication.rawFlags=publication.eligibleFlags=8;publication.time=client.time;
-    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f||fabsf(light.Diffuse.r-.2625f)>.0001f)return 70;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+0.f)>.001f||fabsf(light.Diffuse.r-.34125f)>.0001f)return 70;
     // Glock attachments exist: merely checking attachment count is insufficient.
     if(!pose(&lightViewmodel,client.time,camera,angles,offsets,points))return 71;
     publication.rawFlags=publication.eligibleFlags=12;
@@ -148,15 +154,79 @@ int main(int argc,char** argv) {
     publication.rawFlags=publication.eligibleFlags=8;
     if(!dual(&secondary,1,client.time)||!publishV2(&publication)||!describe(&light))return 74;
     if(!pose(&secondary,client.time,camera,angles,offsets,points)||fabsf(light.Position.x-points[0])>.01f||fabsf(light.Position.y+points[1])>.01f||fabsf(light.Position.z-points[2])>.01f)return 75;
-    if(!dual(nullptr,0,client.time)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 76;
+    if(!dual(nullptr,0,client.time)||!describe(&light)||fabsf(light.Direction.z+0.f)>.001f)return 76;
     if(!dual(&secondary,1,client.time))return 77;
     client.time+=.3f;publication.time=client.time;
-    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 78;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+0.f)>.001f)return 78;
     client.time=0;publication.time=0;
     lightModelBytes=flashlightBytes;strcpy_s(lightModel.name,"models/weapons/flashlight/v_flashlight.mdl");
     if(!publishV2(&publication)||!describe(&light))return 79;
     publication.rawFlags=publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 80;
-    puts("PASS: stowed switched-on flashlight emits a 25%-dimmer ground beam; actual gun attachments are not used as its lens; mounted weapon light, held/mirrored second-hand flashlight, re-equip and true off pass. No game.");
+    puts("PASS: stowed switched-on flashlight emits a local backpack glow boosted 30% over the previous version; actual gun attachments are not used as its lens; mounted weapon light, held/mirrored second-hand flashlight, re-equip and true off pass. No game.");
+    // Exercise multiplayer through the actual compiled renderer exports, with
+    // a non-host local player and independently toggled remote entities.
+    using NetworkLight=int(__cdecl*)(int,D3DLIGHT9*);
+    auto networkLight=reinterpret_cast<NetworkLight>(GetProcAddress(dll,"DX_PlayerFlashlightDescriptionV1"));
+    client.maxclients=4;client.playernum=2;client.viewentity=3;client.time=publication.time=100;
+    for(int i=2;i<=4;++i){mpPlayers[i].index=i;mpPlayers[i].origin[0]=float(i*100);mpPlayers[i].curstate.effects=0;}
+    globals.vieworg[0]=20;globals.vieworg[1]=30;globals.vieworg[2]=40;globals.viewangles[1]=90;
+    publication.rawFlags=publication.eligibleFlags=0;publication.reasons=0;publishV2(&publication);
+    mpPlayers[3].curstate.effects=EF_DIMLIGHT;
+    const bool localNetwork=describe(&light)!=0;
+    if(!localNetwork||light.Type!=D3DLIGHT_SPOT||fabsf(light.Position.x-20)>.001f||fabsf(light.Position.y-34)>.001f||fabsf(light.Position.z-40)>.001f){
+     printf("FAIL MP: local EF_DIMLIGHT fallback active=%d type=%d position=(%.3f %.3f %.3f), expected spotlight at (20 34 40).\n",localNetwork,int(light.Type),light.Position.x,light.Position.y,light.Position.z);return 91;}
+    // A native backpack point must not swallow a server-controlled MP cone.
+    publication.rawFlags=publication.eligibleFlags=DX_COF_MAIN;publishV2(&publication);
+    if(!describe(&light)||light.Type!=D3DLIGHT_SPOT||light.Range!=2000){puts("FAIL MP: native backpack glow swallowed network spotlight");return 92;}
+    if(!networkLight)return 90;
+    // Held/native spotlights retain their lens and brightness.
+    publication.rawFlags=publication.eligibleFlags=DX_COF_HANDHELD;publishV2(&publication);
+    if(!describe(&light)||light.Range!=700||fabsf(light.Diffuse.r-.35f)>.001f)return 93;
+    publication.rawFlags=publication.eligibleFlags=0;publishV2(&publication);
+    mpPlayers[3].curstate.effects=0;if(describe(&light))return 94;
+    mpPlayers[3].curstate.effects=EF_DIMLIGHT;client.viewentity=4;
+    if(describe(&light)||networkLight(3,&light))return 95;
+    client.viewentity=3;publication.reasons=DX_COF_BOAT;publishV2(&publication);
+    if(describe(&light)||networkLight(3,&light))return 96;
+    publication.reasons=0;publishV2(&publication);
+    mpPlayers[2].curstate.effects=EF_DIMLIGHT;mpPlayers[2].curstate.angles[0]=5;mpPlayers[2].angles[1]=90;
+    if(!networkLight(2,&light)||fabsf(light.Direction.z+.7071068f)>.001f||fabsf(light.Position.z-(28-4*.7071068f))>.001f)return 97;
+    mpPlayers[2].curstate.usehull=1;
+    if(!networkLight(2,&light)||fabsf(light.Position.z-(12-4*.7071068f))>.001f)return 98;
+    mpPlayers[2].curstate.effects=0;if(networkLight(2,&light)||networkLight(0,&light)||networkLight(5,&light))return 99;
+    // Real CoF co-op uses ScoreInfo, with no EF_DIMLIGHT and no FlashFlags.
+    // Feed network bytes through the same parser used by the engine, then
+    // query the compiled renderer. An explicit OFF overrides stale effects.
+    unsigned char score[9]={3,0x20,0,0,0,0,0,1,0};
+    mpPlayers[3].curstate.effects=0;
+    if(!CofPlayerLightsScoreInfo(&mpLightState,9,score)||!describe(&light)||
+       light.Type!=D3DLIGHT_SPOT||light.Range!=700.f||fabsf(light.Phi-DEG2RAD(50.f))>.001f||
+       fabsf(light.Diffuse.r-.70f)>.001f||fabsf(light.Diffuse.g-.65f)>.001f)return 100;
+    client.time=publication.time=105;publishV2(&publication);
+    if(!describe(&light))return 101; // change-only messages must not expire
+    score[1]=0;CofPlayerLightsScoreInfo(&mpLightState,9,score);
+    mpPlayers[3].curstate.effects=EF_DIMLIGHT;
+    if(describe(&light)||networkLight(3,&light))return 102;
+    score[0]=2;score[1]=0x20;CofPlayerLightsScoreInfo(&mpLightState,9,score);
+    mpPlayers[2].angles[PITCH]=-45;
+    if(!networkLight(2,&light)||describe(&light)||fabsf(light.Direction.z+.7071068f)>.001f)return 103;
+    score[0]=3;score[1]=0x20;
+    if(CofPlayerLightsScoreInfo(&mpLightState,8,score)||CofPlayerLightsScoreInfo(&mpLightState,9,nullptr)||describe(&light))return 104;
+    score[0]=0;if(CofPlayerLightsScoreInfo(&mpLightState,9,score))return 105;
+    score[0]=65;if(CofPlayerLightsScoreInfo(&mpLightState,9,score))return 106;
+    score[0]=3;CofPlayerLightsScoreInfo(&mpLightState,9,score);
+    client.viewentity=4;if(describe(&light))return 107;client.viewentity=3;
+    publication.reasons=DX_COF_BOAT;publishV2(&publication);if(describe(&light))return 108;
+    publication.reasons=0;publishV2(&publication);
+    mpPlayers[3].curstate.spectator=1;if(describe(&light))return 109;mpPlayers[3].curstate.spectator=0;
+    mpLocalHealth=0;if(describe(&light)||!networkLight(2,&light))return 111;mpLocalHealth=100;
+    mpLightState={};mpPlayers[3].curstate.effects=0;
+    if(describe(&light)||networkLight(2,&light))return 110; // map/disconnect reset
+    puts("PASS: CoF co-op ScoreInfo bytes -> engine parser -> compiled RTX spotlight: native warm color/range/cone, persistent on, explicit off, independent remote/non-host, malformed messages, spectator/camera/scene gates and map reset.");
+    client.maxclients=1;client.playernum=0;client.viewentity=1;lightPlayer.index=1;lightPlayer.curstate.effects=0;
+    globals.vieworg[0]=globals.vieworg[1]=globals.vieworg[2]=globals.viewangles[1]=0;
+    client.time=publication.time=0;publishV2(&publication);
+    puts("PASS: compiled multiplayer local/non-host EF_DIMLIGHT fallback, backpack-vs-cone priority, held lens preservation, local/remote toggles, crouch, encoded pitch, external camera and scripted suppression.");
     // Exercise the actual phone model through production publication -> light
     // description, not just the attachment helper. Native uses attachment[1].
     auto savedLightBytes=std::move(lightModelBytes);
@@ -184,10 +254,11 @@ int main(int argc,char** argv) {
         publication.direction[0]=std::cos(p)*std::cos(y);publication.direction[1]=std::cos(p)*std::sin(y);publication.direction[2]=-std::sin(p);
         publication.rawFlags=publication.eligibleFlags=1;publication.time=client.time;
         if(!publishV2(&publication)||!describe(&light))return 81;
+        if(light.Type!=D3DLIGHT_SPOT||light.Range!=700.f)return 89;
         if(fabsf(light.Direction.x-publication.direction[0])>.001f||fabsf(light.Direction.y-publication.direction[1])>.001f||fabsf(light.Direction.z-publication.direction[2])>.001f||fabsf(light.Diffuse.r-.46f)>.0001f)return 82;
     }
     // Stowed phone and torch: ignore vertical camera pitch, preserve heading,
-    // and dim exactly 25 percent. Exercise production descriptors, not a mock.
+    // and emit an omnidirectional glow scaled to 97.5 percent of the corresponding held profile. Exercise production descriptors, not a mock.
     strcpy_s(lightModel.name,"models/weapons/switchblade/v_switchblade.mdl");
     for(unsigned flags:{1u,2u,8u})for(float yaw:{-179.f,-90.f,0.f,90.f,179.f})for(float pitch:{-89.f,-45.f,0.f,45.f,89.f}) {
         const float y=yaw*.0174532925199433f,p=pitch*.0174532925199433f;
@@ -195,19 +266,21 @@ int main(int argc,char** argv) {
         publication.rawFlags=publication.eligibleFlags=flags;publication.time=client.time;
         publication.origin[0]=123.f+yaw;publication.origin[1]=-45.f;publication.origin[2]=100.f+pitch;
         if(!publishV2(&publication)||!describe(&light))return 84;
-        if(fabsf(light.Position.x-publication.origin[0]-4.f*std::cos(y))>.001f||
-           fabsf(light.Position.y-publication.origin[1]-4.f*std::sin(y))>.001f||
-           fabsf(light.Position.z-publication.origin[2]+24.f)>.001f)return 87;
-        const float brightness=(flags==8?.35f:flags==1?.46f:.15f)*.75f;
-        if(fabsf(light.Direction.x-.34202014f*std::cos(y))>.001f||fabsf(light.Direction.y-.34202014f*std::sin(y))>.001f||fabsf(light.Direction.z+.93969262f)>.001f||fabsf(light.Diffuse.r-brightness)>.0001f)return 85;
+        if(fabsf(light.Position.x-publication.origin[0]+10.f*std::cos(y)-16.f*std::sin(y))>.001f||
+           fabsf(light.Position.y-publication.origin[1]+10.f*std::sin(y)+16.f*std::cos(y))>.001f||
+           fabsf(light.Position.z-publication.origin[2]+8.f)>.001f)return 87;
+        if(light.Type!=D3DLIGHT_POINT||fabsf(light.Range-180.f)>.001f||light.Theta!=0.f||
+           light.Phi!=0.f||light.Falloff!=0.f||fabsf(light.Attenuation2-4.f/(180.f*180.f))>1e-8f)return 88;
+        const float brightness=(flags==8?.35f:flags==1?.46f:.15f)*.975f;
+        if(fabsf(light.Direction.x)>.001f||fabsf(light.Direction.y)>.001f||fabsf(light.Direction.z)>.001f||fabsf(light.Diffuse.r-brightness)>.0001f)return 85;
     }
     lightViewmodel.model=nullptr;publication.rawFlags=publication.eligibleFlags=8;publication.reasons=DX_COF_NO_VIEWMODEL;
-    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+.93969262f)>.001f)return 86;
+    if(!publishV2(&publication)||!describe(&light)||fabsf(light.Direction.z+0.f)>.001f)return 86;
     lightViewmodel.model=&lightModel;publication.reasons=0;strcpy_s(lightModel.name,"models/weapons/mobile/v_mobile.mdl");
     publication.rawFlags=publication.eligibleFlags=1;
     for(float yaw:{-179.f,-90.f,0.f,90.f,179.f})for(float vertical:{-1.f,1.f}) {
         float direction[3]={0,0,vertical};const float y=yaw*.0174532925199433f;
-        if(!DX_CofGroundPhoneDirection(direction,yaw)||fabsf(direction[0]-.34202014f*std::cos(y))>.001f||fabsf(direction[1]-.34202014f*std::sin(y))>.001f||fabsf(direction[2]+.93969262f)>.001f)return 83;
+        if(!DX_CofGroundPhoneDirection(direction,yaw)||fabsf(direction[0]-1.f*std::cos(y))>.001f||fabsf(direction[1]-1.f*std::sin(y))>.001f||fabsf(direction[2]+0.f)>.001f)return 83;
     }
     publication.direction[0]=0;publication.direction[1]=1;publication.direction[2]=0;
     const int phoneAttachmentOffset=phoneHdr->attachmentindex;phoneHdr->attachmentindex=phoneHdr->length;
@@ -216,7 +289,7 @@ int main(int argc,char** argv) {
     if(!describe(&light)||fabsf(light.Position.x-publication.origin[0])>.001f||fabsf(light.Position.y-publication.origin[1]-4)>.001f)return 65;
     publication.rawFlags=publication.eligibleFlags=0;publishV2(&publication);if(describe(&light))return 66;
     lightModelBytes=std::move(savedLightBytes);strcpy_s(lightModel.name,"models/weapons/flashlight/v_flashlight.mdl");
-    printf("PASS: held phone attachment/normal aim across %u poses and 25 pitch/yaw pairs; stowed phone/torch origin 24 units below eyes and 4 forward, always 70 degrees down and 25%% dimmer across 75 pitch/yaw cases, both vertical poles and bare hands; invalid attachments, mounted light and off preserved. No device/window.\n",phonePoses);
+    printf("PASS: held phone attachment/normal aim across %u poses and 25 pitch/yaw pairs; exterior backpack phone/torch origin 8 below eyes, 10 back and 16 right, omnidirectional local glow with no cone and 180 unit range and 30%% brighter than the previous version across 75 pitch/yaw cases, both vertical poles and bare hands; invalid attachments, mounted light and off preserved. No device/window.\n",phonePoses);
     client.time=0;
     const int attachmentCount=std::min(hdr->numattachments,4);
     int samples=0; float first[3]{}; bool moved=false;

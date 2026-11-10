@@ -2180,12 +2180,19 @@ CL_DispatchUserMessage
 Dispatch user message by engine request
 ==============
 */
+static void CL_ObserveCofPlayerLight( const char *name, int size, const void *data )
+{
+	if( cl.maxclients > 1 && !Q_stricmp( GI->gamefolder, "CryOfFear" ) && !Q_strcmp( name, "ScoreInfo" ))
+		CofPlayerLightsScoreInfo( &cl.cofPlayerLights, size, data );
+}
+
 qboolean CL_DispatchUserMessage( const char *pszName, int iSize, void *pbuf )
 {
 	int	i;
 
 	if( COM_StringEmptyOrNULL( pszName ))
 		return false;
+	CL_ObserveCofPlayerLight( pszName, iSize, pbuf );
 
 	for( i = 0; i < MAX_USER_MESSAGES; i++ )
 	{
@@ -2272,6 +2279,8 @@ void CL_ParseUserMessage( sizebuf_t *msg, int svc_num, connprotocol_t proto )
 
 	// parse user message into buffer
 	MSG_ReadBytes( msg, pbuf, sizeof( pbuf ), iSize );
+
+	CL_ObserveCofPlayerLight( clgame.msg[i].name, iSize, pbuf );
 
 	if( cl_trace_messages.value )
 	{

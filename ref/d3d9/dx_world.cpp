@@ -275,6 +275,8 @@ convar_t dx_water_depth_prepass =
 
 convar_t r_nocull =
 { (char *)"r_nocull", (char *)"0", 0 };
+convar_t dx_cof_audi200 =
+{ (char *)"dx_cof_audi200", (char *)"1", 0 };
 
 convar_t r_novis =
 { (char *)"r_novis", (char *)"0", 0 };
@@ -493,6 +495,7 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_update_hz );
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_depth_prepass );
 	gEngfuncs.Cvar_RegisterVariable( &r_nocull );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_audi200 );
 	gEngfuncs.Cvar_RegisterVariable( &r_novis );
 	gEngfuncs.Cvar_RegisterVariable( &dx_pvs_water_margin );
 	gEngfuncs.Cvar_RegisterVariable( &dx_glow_occlusion );
@@ -3359,9 +3362,10 @@ static int R_CurrentPVSLeaf( const world_model_draw_t &model,
 static bool R_UsePVSCache(
 	const world_model_draw_t &model )
 {
-
+	// A PVS-only cache does not depend on camera direction. Frustum culling
+	// requires the full view cache key and per-batch bounds even for megabatches.
 	return dx_world_megabatch.value != 0.0f &&
-		model.sourceModel == g_worldmodel;
+		model.sourceModel == g_worldmodel && r_nocull.value != 0.0f;
 }
 
 static bool R_WorldVisCacheMatches( const world_model_draw_t &model,
@@ -3375,7 +3379,8 @@ static bool R_WorldVisCacheMatches( const world_model_draw_t &model,
 		cache.batchCount == model.batches.size( ) &&
 		cache.pvsLeaf == pvsLeaf &&
 		cache.pvsAllVisible == pvsAllVisible &&
-		R_CloseFloat( cache.rNovis, r_novis.value );
+		R_CloseFloat( cache.rNovis, r_novis.value ) &&
+		R_CloseFloat( cache.rNocull, r_nocull.value );
 
 	if( !commonMatch )
 		return false;
