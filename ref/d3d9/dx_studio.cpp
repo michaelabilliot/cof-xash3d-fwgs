@@ -3724,6 +3724,18 @@ static void R_BeginStudioGlowShellPass( D3DCOLOR shellColor )
 		D3DTOP_SELECTARG1, D3DTA_TEXTURE, D3DTA_DIFFUSE );
 }
 
+static bool R_LakeForestStudioTextureSuppressed(const cl_entity_s* ent,int textureId)
+{
+    if(!ent||!R_LakeForestReplacesMixedPines(ent->model)||!gEngfuncs.Mod_Extradata)return false;
+    const auto* hdr=static_cast<const studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
+    if(!hdr||hdr->numtextures<=0||hdr->numtextures>4096||
+       !R_StudioRangeValid(hdr,hdr->textureindex,size_t(hdr->numtextures)*sizeof(mstudiotexture_t)))return false;
+    const auto* textures=reinterpret_cast<const mstudiotexture_t*>(reinterpret_cast<const byte*>(hdr)+hdr->textureindex);
+    for(int i=0;i<hdr->numtextures;++i)
+        if(textures[i].index==textureId)return R_LakeForestReplacesStudioTexture(ent->model,textures[i].name);
+    return false;
+}
+
 static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 	const cl_entity_s *ent, bool glowShellPass = false )
 {
@@ -3872,6 +3884,7 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 	{
 		if( !batch.indexBuffer || batch.primitiveCount == 0 )
 			continue;
+		if( R_LakeForestStudioTextureSuppressed(ent,batch.textureId) )continue;
 
 		if( !glowShellPass )
 		{
@@ -4169,6 +4182,7 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 	{
 		if( !batch.indexBuffer || batch.primitiveCount == 0 )
 			continue;
+		if( R_LakeForestStudioTextureSuppressed(ent,batch.textureId) )continue;
 		if( !combinedVB && !batch.vertexBuffer )
 			continue;
 
@@ -5539,6 +5553,7 @@ static void R_DrawStudioBatches( model_drawdata_t &drawData,
 
 		const int batchKey = drawData.texIds[i];
 		const int textureId = R_StudioCpuBatchTextureId( batchKey );
+		if( R_LakeForestStudioTextureSuppressed(ent,textureId) )continue;
 		const unsigned int flags =
 			R_StudioCpuBatchStateFlags( batchKey );
 		DX_Bind( 0, textureId );
@@ -5881,6 +5896,8 @@ static void R_DrawPlayerWeapon( model_t *playerModel,
 void R_DrawStudioEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
+		return;
+	if( R_LakeForestReplacesStudio( ent->model ) )
 		return;
 	if( !R_CofPlayerDrawAllowed( ent ) )
 		return;

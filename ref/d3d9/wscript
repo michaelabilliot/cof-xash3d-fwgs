@@ -201,6 +201,21 @@ def build(bld):
 		defines=['NOMINMAX'], use=['engine_includes','sdk_includes','public'],
 		cxxflags=bld.env.D3D9_CXXFLAGS+['/EHsc','/W4'],includes=['.'],subsystem='console')
 	if bld.options.verify_camera:
+		bld.program(source='verify_lake_bed.cpp', target='verify_lake_bed',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_lake_forest.cpp', target='verify_lake_forest',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
+		bld.program(source='verify_lake_reeds.cpp', target='verify_lake_reeds',
+			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
+			use=['engine_includes', 'sdk_includes', 'public', 'werror'],
+			uselib='D3D9SDK', cxxflags=bld.env.D3D9_CXXFLAGS,
+			includes=['.', '../common'], subsystem='console')
 		bld.program(source='verify_gun_smoke.cpp', target='verify_gun_smoke',
 			defines=['NOMINMAX'], cxxflags=bld.env.D3D9_CXXFLAGS,
 			includes=['.'], subsystem='console', lib=['user32'])
@@ -280,6 +295,9 @@ def build(bld):
 		'dx_studio.cpp',
 		'dx_effects.cpp',
 		'dx_gun_smoke.cpp',
+		'dx_lake_reeds.cpp',
+		'dx_lake_bed.cpp',
+		'dx_lake_forest.cpp',
 		'dx_textures.cpp',
 		'dx_profiler.cpp',
 		'dx_studio_shader.cpp',

@@ -2694,6 +2694,7 @@ struct triapi_state_t
 	bool active = false;
 	bool screenSpace = false;
 	bool gunSmoke = false;
+	bool lakeGrass = false;
 	int primitiveMode = TRI_TRIANGLES;
 	int renderMode = kRenderNormal;
 	float rgba[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -2936,7 +2937,7 @@ static void R_TriEnd( void )
 		return;
 	}
 	g_triApi.active = false;
-	if(g_triApi.gunSmoke && !g_triApi.screenSpace)return;
+	if((g_triApi.gunSmoke||g_triApi.lakeGrass) && !g_triApi.screenSpace)return;
 
 	const UINT vertexCount = static_cast<UINT>( R_TriVertexCount( ) );
 	if( vertexCount == 0 )
@@ -3200,6 +3201,7 @@ static void R_TriCullFace( TRICULLSTYLE mode )
 static int R_TriSpriteTexture( model_t *spriteModel, int frame )
 {
  g_triApi.gunSmoke=spriteModel&&R_CofGunSmokeReplace(spriteModel->name);
+ g_triApi.lakeGrass=R_LakeForestReplacesSprite(spriteModel);
 	if( !spriteModel || spriteModel->type != mod_sprite ||
 		!spriteModel->cache.data || !gEngfuncs.R_GetSpriteFrame )
 	{
@@ -3889,6 +3891,8 @@ static qboolean R_Init( void )
 
 	DX_ProfilerRegisterCommands( );
  R_CofGunSmokeInit();
+ R_LakeReedsInit();
+ R_LakeForestInit();
 	gEngfuncs.Cmd_AddCommand("dx_triapi_batch_stats",R_TriBatchStats,"Show transparent TriangleAPI batch counters");
 	R_RegisterContextCommands( );
 	DX_UpdateRemix( );
@@ -3905,6 +3909,9 @@ static qboolean R_Init( void )
 static void R_Shutdown( void )
 {
  R_CofGunSmokeShutdown();
+ R_LakeReedsShutdown();
+ R_LakeBedReset();
+ R_LakeForestShutdown();
 	if(g_inventoryResetCallback)g_inventoryResetCallback();
 	g_mapSky.invalidate();
 	g_mapSkyRetryAt = 0;
@@ -6280,6 +6287,9 @@ void R_DrawEnts( const vec3_t view_origin )
 	R_MarkWorldTransformDirty( worldIsIdentity );
 	R_SetWorldIdentity( identity, worldIsIdentity );
 
+	R_LakeReedsDraw();
+	R_LakeBedDraw();
+	R_LakeForestDraw();
 	R_DrawOpaqueEntities( identity, worldIsIdentity );
 	{
 		DX_PROFILE_SCOPE( spriteScope, DX_PROFILE_SPRITE_FLUSH );
@@ -6290,7 +6300,11 @@ void R_DrawEnts( const vec3_t view_origin )
 	if( dx_client_efx.value != 0.0f && gEngfuncs.CL_DrawEFX )
 		gEngfuncs.CL_DrawEFX( std::max( 0.0f, g_frametime ), false );
 	if( gEngfuncs.pfnDrawNormalTriangles )
+	{
+		g_triApi.lakeGrass=false;
 		gEngfuncs.pfnDrawNormalTriangles( );
+		g_triApi.lakeGrass=false;
+	}
 	R_MarkWorldTransformDirty( worldIsIdentity );
 
 	const int translucentCount = R_BuildTranslucentList( view_origin );
@@ -6308,9 +6322,9 @@ void R_DrawEnts( const vec3_t view_origin )
 	if( gEngfuncs.pfnDrawTransparentTriangles )
 	{
         DX_TriBatchBarrier(DX_TRI_FLUSH_PASS);
-        g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true; g_triApi.gunSmoke=false;
+        g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true; g_triApi.gunSmoke=false; g_triApi.lakeGrass=false;
         gEngfuncs.pfnDrawTransparentTriangles( );
-        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false;
+        DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false; g_triApi.lakeGrass=false;
 		R_MarkWorldTransformDirty( worldIsIdentity );
 		R_SetWorldIdentity( identity, worldIsIdentity );
 	}
@@ -7231,7 +7245,7 @@ void R_RenderFrame( )
 void R_EndFrame( void )
 {
 	R_TriTraceFlush("frame-complete");
-	DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false;
+	DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false; g_triApi.lakeGrass=false;
 	if( !device )
 		return;
 
@@ -7356,6 +7370,9 @@ void R_ClearScene( void )
 
 void R_NewMap( void )
 {
+ R_LakeReedsReset();
+ R_LakeBedReset();
+ R_LakeForestReset();
  R_CofGunSmokeReset();
 	R_ResetAudiReplacement();
 	DX_RagdollReset("new-map");

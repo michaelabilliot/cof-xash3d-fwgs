@@ -2698,6 +2698,7 @@ static void R_DrawSpriteLightmapPass( const mspriteframe_t *frame,
 static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 {
  if(mod&&R_CofGunSmokeReplace(mod->name))return;
+ if(R_LakeForestReplacesSprite(mod))return;
 	DX_MODEL_PROFILE_SCOPE( spriteProfileScope, DX_PROFILE_PHASE_SPRITEMODEL );
 	if( !ent || !mod || !mod->cache.data )
 		return;

@@ -4721,6 +4721,17 @@ bool R_UploadWaterBatch( world_water_batch_t &batch )
 	return true;
 }
 
+static float R_WaterTexturePeriod( const texture_t* texture )
+{
+	// Match the new lake normal field to world scale. Every BSP water polygon
+	// shares the original planar coordinates, including subdivision boundaries.
+	if( dx_remix.value != 0.f && g_worldmodel && texture &&
+		!Q_stricmp( g_worldmodel->name, "maps/c_lake.bsp" ) &&
+		!Q_stricmp( texture->name, "!sewage" ) )
+		return 1024.f;
+	return 64.f;
+}
+
 static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 	texture_t *texture, const cl_entity_s *ent, float time, bool rippleTextureMode )
 {
@@ -4730,7 +4741,7 @@ static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 	if( !R_UploadWaterBatch( batch ) )
 		return false;
 
-	constexpr float waterTexturePeriod = 64.0f;
+	const float waterTexturePeriod = R_WaterTexturePeriod( texture );
 	const float tw = waterTexturePeriod;
 	const float th = waterTexturePeriod;
 	const float waveScale = dx_remix.value != 0.0f ? 0.0f : std::max( 0.0f, std::min( 4.0f, dx_water_wave_size.value ) );
@@ -5329,7 +5340,7 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 		{
 			if( batch.dynamicVertices.size( ) != batch.sources.size( ) )
 				batch.dynamicVertices.resize( batch.sources.size( ) );
-			constexpr float waterTexturePeriod = 64.0f;
+			const float waterTexturePeriod = R_WaterTexturePeriod( texture );
 			const float tw = waterTexturePeriod;
 			const float th = waterTexturePeriod;
 			for( size_t i = 0; i < batch.sources.size( ); ++i )
@@ -5466,6 +5477,10 @@ bool R_DrawBrushEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_brush )
 		return false;
+	if( R_LakeReedsReplacesBrush( ent->model ) )
+		return false; // replacement was already submitted; this brush has no water
+	if( R_LakeForestReplacesBrush( ent->model ) )
+		return false; // forest and ground replace only the three backdrop brushes
 
 	D3DMATRIX entityWorld;
 	R_SetEntityWorldTransform( ent, gp_cl->time, &entityWorld );
