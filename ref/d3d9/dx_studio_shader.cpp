@@ -9,10 +9,18 @@ namespace
 	IDirect3DVertexShader9 *s_studioGpuSkinLocalShader = nullptr;
 	bool s_studioGpuSkinTriedCreate = false;
 	int s_studioGpuSkinMaxConstants = 0;
+	IDirect3DVertexDeclaration9 *s_studioRemixBlendDeclaration = nullptr;
+	bool s_studioRemixBlendTriedCreate = false;
 }
 
 void DX_FreeStudioSkinningShaders( void )
 {
+	if( s_studioRemixBlendDeclaration )
+	{
+		s_studioRemixBlendDeclaration->Release( );
+		s_studioRemixBlendDeclaration = nullptr;
+	}
+	s_studioRemixBlendTriedCreate = false;
 	if( s_studioGpuSkinShader )
 	{
 		s_studioGpuSkinShader->Release( );
@@ -287,4 +295,34 @@ void DX_BindStudioGpuSkinningShader( bool localLights )
 {
 	device->SetVertexDeclaration( s_studioGpuSkinDeclaration );
 	device->SetVertexShader( localLights ? s_studioGpuSkinLocalShader : s_studioGpuSkinShader );
+}
+
+bool DX_BindStudioRemixBlendDeclaration( void )
+{
+	if( !s_studioRemixBlendDeclaration )
+	{
+		if( s_studioRemixBlendTriedCreate || !device )
+			return false;
+		s_studioRemixBlendTriedCreate = true;
+
+		static const D3DVERTEXELEMENT9 declaration[] =
+		{
+			{ 0, offsetof( studio_blend_vertex_t, x ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+			{ 0, offsetof( studio_blend_vertex_t, weight ), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDWEIGHT, 0 },
+			{ 0, offsetof( studio_blend_vertex_t, indices ), D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0 },
+			{ 0, offsetof( studio_blend_vertex_t, nx ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
+			{ 0, offsetof( studio_blend_vertex_t, u ), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+			D3DDECL_END( )
+		};
+		if( FAILED( device->CreateVertexDeclaration( declaration, &s_studioRemixBlendDeclaration ) ) ||
+			!s_studioRemixBlendDeclaration )
+		{
+			gEngfuncs.Con_DPrintf( "D3D9: failed to create studio vertex blend declaration\n" );
+			s_studioRemixBlendDeclaration = nullptr;
+			return false;
+		}
+	}
+	device->SetVertexShader( nullptr );
+	device->SetVertexDeclaration( s_studioRemixBlendDeclaration );
+	return true;
 }
