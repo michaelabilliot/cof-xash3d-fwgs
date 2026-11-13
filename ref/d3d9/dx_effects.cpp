@@ -2633,13 +2633,13 @@ bool R_QueueSprite( cl_entity_s *ent, model_t *mod )
 		return true;
 
 	const bool glowSprite = ent->curstate.rendermode == kRenderGlow;
-	const bool useGlowCpuTrace = glowSprite && dx_glow_occlusion.value >= 2.0f;
+	const bool useGlowCpuTrace = glowSprite && !R_RemixCaptureAll() && dx_glow_occlusion.value >= 2.0f;
 	if( useGlowCpuTrace && R_GlowSpriteOccludedByWorld( ent ) )
 		return true;
 
 	bool glowHasAsyncDecision = false;
 	bool glowAsyncVisible = true;
-	if( glowSprite &&dx_glow_occlusion.value >= 1.0f && dx_glow_occlusion.value < 2.0f )
+	if( glowSprite && !R_RemixCaptureAll() && dx_glow_occlusion.value >= 1.0f && dx_glow_occlusion.value < 2.0f )
 	{
 		glowAsyncVisible = R_GlowQueryVisible( ent,
 			ent->origin, glowHasAsyncDecision );
@@ -2716,14 +2716,14 @@ static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 		return;
 
 	const bool glowSprite = ent->curstate.rendermode == kRenderGlow;
-	const bool useGlowCpuTrace = glowSprite &&
+	const bool useGlowCpuTrace = glowSprite && !R_RemixCaptureAll() &&
 		dx_glow_occlusion.value >= 2.0f;
 	if( useGlowCpuTrace && R_GlowSpriteOccludedByWorld( ent ) )
 		return;
 
 	bool glowHasAsyncDecision = false;
 	bool glowAsyncVisible = true;
-	if( glowSprite &&dx_glow_occlusion.value >= 1.0f && dx_glow_occlusion.value < 2.0f )
+	if( glowSprite && !R_RemixCaptureAll() && dx_glow_occlusion.value >= 1.0f && dx_glow_occlusion.value < 2.0f )
 	{
 		glowAsyncVisible = R_GlowQueryVisible( ent,
 			ent->origin, glowHasAsyncDecision );

@@ -201,6 +201,8 @@ def build(bld):
 		defines=['NOMINMAX'], use=['engine_includes','sdk_includes','public'],
 		cxxflags=bld.env.D3D9_CXXFLAGS+['/EHsc','/W4'],includes=['.'],subsystem='console')
 	if bld.options.verify_camera:
+		bld.program(source='verify_map_light_routes.cpp', target='verify_map_light_routes',
+			cxxflags=bld.env.D3D9_CXXFLAGS, includes=['.'], subsystem='console')
 		bld.program(source='verify_lake_bed.cpp', target='verify_lake_bed',
 			defines=['REF_DLL=1', 'NOMINMAX'], lib=['dbghelp'],
 			use=['engine_includes', 'sdk_includes', 'public', 'werror'],

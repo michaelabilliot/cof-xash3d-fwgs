@@ -275,6 +275,8 @@ convar_t dx_water_depth_prepass =
 
 convar_t r_nocull =
 { (char *)"r_nocull", (char *)"0", 0 };
+convar_t r_remixcull =
+{ (char *)"r_remixcull", (char *)"0", 0 };
 convar_t dx_cof_audi200 =
 { (char *)"dx_cof_audi200", (char *)"1", 0 };
 
@@ -498,6 +500,7 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_update_hz );
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_depth_prepass );
 	gEngfuncs.Cvar_RegisterVariable( &r_nocull );
+	gEngfuncs.Cvar_RegisterVariable( &r_remixcull );
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_audi200 );
 	gEngfuncs.Cvar_RegisterVariable( &r_novis );
 	gEngfuncs.Cvar_RegisterVariable( &dx_pvs_water_margin );
@@ -2844,7 +2847,7 @@ static bool R_BoxOutsideFrustumPlane( const float mins[3], const float maxs[3],
 bool R_BoundsVisibleInCurrentView( const float mins[3], const float maxs[3], bool valid )
 {
 
-	if( r_nocull.value != 0.0f || !g_dxCullValid || !valid )
+	if( R_RemixCaptureAll() || r_nocull.value != 0.0f || !g_dxCullValid || !valid )
 		return true;
 
 	constexpr float cullPadding = 64.0f;
@@ -3287,7 +3290,7 @@ void R_FinalizePVSLeafs( std::vector<int> &batchLeafs, bool alwaysVisible )
 bool R_PVSLeafsVisible( const world_model_draw_t &model,
 	const std::vector<int> &batchLeafs, bool alwaysVisible )
 {
-	if( !model.pvsApplicable || alwaysVisible || batchLeafs.empty( ) )
+	if( R_RemixCaptureAll() || !model.pvsApplicable || alwaysVisible || batchLeafs.empty( ) )
 		return true;
 	if( !R_UpdateCurrentWorldPVS( model ) || g_currentWorldPVSAllVisible )
 		return true;
@@ -3411,8 +3414,7 @@ static bool R_WorldVisCacheMatches( const world_model_draw_t &model,
 const std::vector<size_t> *R_GetVisibleWorldBatches(
 	const world_model_draw_t &model )
 {
-	if( dx_remix_perf.value == 0.0f ||
-		dx_remix_perf.value == 0.0f ||
+	if( R_RemixCaptureAll() || dx_remix_perf.value == 0.0f ||
 		model.sourceModel != g_worldmodel )
 	{
 		return nullptr;

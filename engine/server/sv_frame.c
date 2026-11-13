@@ -83,6 +83,10 @@ static void SV_AddEntitiesToPacket( edict_t *pViewEnt, edict_t *pClient, client_
 	}
 
 	svgame.dllFuncs.pfnSetupVisibility( pViewEnt, pClient, &clientpvs, &clientphs );
+	// The game DLL treats a null visibility set as unrestricted. Keep this
+	// snapshot override on the listen host's loopback connection.
+	if( NET_IsLocalAddress( cl->netchan.remote_address ) && Cvar_VariableValue( "r_remixcull" ) != 0.0f )
+		clientpvs = clientphs = NULL;
 	if( !clientpvs ) fullvis = true;
 
 	// g-cont: of course we can send world but not want to do it :-)
@@ -675,11 +679,16 @@ SV_SendClientDatagram
 */
 static void SV_SendClientDatagram( sv_client_t *cl )
 {
-	byte	msg_buf[MAX_DATAGRAM];
+	byte	msg_buf[FRAGMENT_LOCAL_SIZE];
 	sizebuf_t	msg;
+	const qboolean captureAll = NET_IsLocalAddress( cl->netchan.remote_address ) &&
+		Cvar_VariableValue( "r_remixcull" ) != 0.0f;
+	// Leave room for the channel header and reliable traffic in a loopback packet.
+	const size_t capture_size = Q_min( NET_MAX_PAYLOAD, FRAGMENT_LOCAL_SIZE ) - HEADER_BYTES - MAX_DATAGRAM;
+	const size_t msg_size = captureAll && capture_size > MAX_DATAGRAM ? capture_size : MAX_DATAGRAM;
 
-	memset( msg_buf, 0, sizeof( msg_buf ));
-	MSG_Init( &msg, "Datagram", msg_buf, sizeof( msg_buf ));
+	memset( msg_buf, 0, msg_size );
+	MSG_Init( &msg, "Datagram", msg_buf, msg_size );
 
 	// always send servertime at new frame
 	MSG_BeginServerCmd( &msg, svc_time );

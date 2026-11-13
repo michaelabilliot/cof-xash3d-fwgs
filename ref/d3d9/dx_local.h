@@ -1145,6 +1145,12 @@ extern convar_t dx_tracers;
 extern convar_t dx_viewmodel_beam_offset;
 extern convar_t dx_world_batch_cell;
 extern convar_t r_nocull;
+extern convar_t r_remixcull;
+
+inline bool R_RemixCaptureAll()
+{
+	return r_remixcull.value != 0.0f;
+}
 extern convar_t r_nointerp;
 extern convar_t r_nolm;
 extern convar_t r_viewmodel_near;

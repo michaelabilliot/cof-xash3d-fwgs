@@ -129,6 +129,9 @@ HRESULT DX_SetRenderStateCached( D3DRENDERSTATETYPE state, DWORD value )
 	if( !device )
 		return D3DERR_INVALIDCALL;
 
+	if( state == D3DRS_CULLMODE && R_RemixCaptureAll() )
+		value = D3DCULL_NONE;
+
 	const unsigned int index = static_cast<unsigned int>( state );
 	if( index < DX_RENDER_STATE_CACHE_SIZE &&
 		g_dxRenderStateValid[index] && g_dxRenderStateValue[index] == value )

@@ -56,6 +56,7 @@ extern "C" {
 #include "dx_cof_dual.h"
 #include "dx_cof_pause.h"
 #include "dx_map_light_api.h"
+#include "dx_map_light_route.h"
 #include "dx_map_sky.h"
 #include "dx_light_position.h"
 #include "dx_studio_fixture.h"
@@ -1029,6 +1030,7 @@ struct remix_map_light_t
 	float outerCone = 10.0f;
 	int falloff = 2;
 	int style = 0;
+	bool captureOnly = false;
 };
 
 struct map_light_debug_t
@@ -1079,6 +1081,7 @@ static bool g_remixMapLightCapacityWarned = false;
 /* Keep the renderer's transient point lights in slots 0-7. Map lights start
  * at 8 so their state never collides with muzzle flashes or the flashlight. */
 static constexpr int DX_REMIX_DYNAMIC_LIGHT_SLOTS = 8;
+static int g_remixMapLightFirstSlot = DX_REMIX_DYNAMIC_LIGHT_SLOTS;
 
 static const char *R_ParseMapEntityToken( const char *data,
 	char *token, size_t tokenSize )
@@ -1357,7 +1360,7 @@ static void R_DisableRemixMapLights( void )
 	if( device )
 	{
 		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
-			device->LightEnable( DX_REMIX_DYNAMIC_LIGHT_SLOTS + i, FALSE );
+			device->LightEnable( g_remixMapLightFirstSlot + i, FALSE );
 	}
 	g_remixMapLightSlotCount = 0;
 }
@@ -1606,12 +1609,11 @@ static void R_BuildRemixMapLights( void )
 		const map_light_debug_t &raw = entity.fields;
 		if( !R_IsMapLightClassname( raw.classname ) )
 			continue;
-		// The forest's isolated spawn fill is intentionally absent on every load.
-		if(g_worldmodel && !Q_stricmp(g_worldmodel->name,"maps/c_forest1.bsp") &&
-		   entity.entityIndex==2 && !strcmp(raw.classname,"light")) continue;
-
 		remix_map_light_t light{};
 		light.entityIndex = entity.entityIndex;
+		// Keep the suppressed forest spawn fill available for authored captures.
+		light.captureOnly = g_worldmodel && !Q_stricmp( g_worldmodel->name, "maps/c_forest1.bsp" ) &&
+			entity.entityIndex == 2 && !strcmp( raw.classname, "light" );
 		R_ParseMapVector( raw.origin, light.origin );
 		if( !R_ParseMapLightEmission( raw.light, light.r, light.g, light.b, light.brightness ) )
 			continue;
@@ -1784,7 +1786,8 @@ static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
 
 static void R_ApplyRemixMapLights( void )
 {
-	if( !device || dx_remix.value == 0.0f || dx_remix_map_lights.value == 0.0f ||
+	const bool captureAll = R_RemixCaptureAll();
+	if( !device || dx_remix.value == 0.0f || (!captureAll && dx_remix_map_lights.value == 0.0f) ||
 		g_remixMapLights.empty( ) || dx_remix_map_light_intensity.value <= 0.0f || R_MapLightLevel() <= 0.f )
 	{
 		R_DisableRemixMapLights( );
@@ -1796,10 +1799,16 @@ static void R_ApplyRemixMapLights( void )
 	for( size_t i = 0; i < g_remixMapLights.size( ); ++i )
 	{
 		remix_map_light_t &light = g_remixMapLights[i];
-		if(light.parentModel[0]&&!light.parentResolved){
+		if( light.captureOnly && !captureAll )
+		{
+			light.submissionRoute = "capture only";
+			g_mapEmitterBridge.retire( light.instance );
+			continue;
+		}
+		if(!captureAll && light.parentModel[0]&&!light.parentResolved){
 			light.submissionRoute="moving parent absent";g_mapEmitterBridge.retire(light.instance);continue;
 		}
-		if( R_RemixMapLightStyleScale( light ) <= 0.001f )
+		if( !captureAll && R_RemixMapLightStyleScale( light ) <= 0.001f )
 		{
 			light.submissionRoute="style off";
 			g_mapEmitterBridge.retire(light.instance);
@@ -1808,7 +1817,7 @@ static void R_ApplyRemixMapLights( void )
 		remix_map_light_candidate_t candidate{};
 		candidate.lightIndex = i;
 		candidate.directional = light.type == REMIX_MAP_LIGHT_DIRECTIONAL;
-		candidate.distanceSquared = candidate.directional ? 0.0f : R_RemixMapLightDistanceSquared( light );
+		candidate.distanceSquared = captureAll || candidate.directional ? 0.0f : R_RemixMapLightDistanceSquared( light );
 		g_remixMapLightCandidates.push_back( candidate );
 	}
 
@@ -1824,37 +1833,52 @@ static void R_ApplyRemixMapLights( void )
 
 	int emitted = 0;
 	int apiEmitted = 0;
+	const bool useMapLightApi = dx_remix_map_light_api.value != 0.f;
+	const float level = R_MapLightLevel();
+	const float outputScale = (std::isfinite( dx_remix_map_light_output_scale.value )
+		? std::clamp( dx_remix_map_light_output_scale.value, 0.f, 4.f ) : .75f) * level;
 	for( const remix_map_light_candidate_t &candidate : g_remixMapLightCandidates )
 	{
 		remix_map_light_t &source = g_remixMapLights[candidate.lightIndex];
 		D3DLIGHT9 light{};
-		R_FillRemixMapD3DLight( source, R_RemixMapLightStyleScale( source ), light );
+		const float style = R_RemixMapLightStyleScale( source );
+		R_FillRemixMapD3DLight( source, captureAll && style <= 0.001f ? 1.0f : style, light );
 		const float radius = R_FinalMapLightRadius(source);
-		const float level = R_MapLightLevel();
-		const float outputScale = (std::isfinite(dx_remix_map_light_output_scale.value) ? std::clamp(dx_remix_map_light_output_scale.value,0.f,4.f) : .75f) * level;
 		// Attached lights use per-frame D3D submission. The map API bridge
 		// throttles moving definitions and can recreate them on x86, which
 		// leaves a fast train's light behind between updates.
-		if( !source.parentModel[0] && dx_remix_map_light_api.value != 0.f && source.type != REMIX_MAP_LIGHT_DIRECTIONAL &&
-			g_mapEmitterBridge.emit(source.instance,light,radius,g_mapEmitterIdentity ^ (uint64_t(source.entityIndex+1)*0x9e3779b97f4a7c15ull),outputScale) ) { source.submissionRoute="Remix API"; ++apiEmitted; continue; }
-		g_mapEmitterBridge.retire(source.instance);
-		source.submissionRoute=source.parentModel[0]?"moving parent D3D":"legacy capacity/error";
+		if( dx_map_light::useApi( useMapLightApi, source.parentModel[0] != 0, source.type == REMIX_MAP_LIGHT_DIRECTIONAL ) )
+		{
+			const uint64_t sourceId = g_mapEmitterIdentity ^
+				(uint64_t( source.entityIndex + 1 ) * 0x9e3779b97f4a7c15ull);
+			const bool handled = g_mapEmitterBridge.emit( source.instance, light, radius, sourceId, outputScale );
+			const auto result = dx_map_light::apiResult( handled, source.instance.handle != nullptr );
+			if( result != dx_map_light::ApiResult::Unavailable )
+			{
+				source.submissionRoute = result == dx_map_light::ApiResult::Off ? "API output off" : "Remix API submitted";
+				if( result == dx_map_light::ApiResult::Submitted )
+					++apiEmitted;
+				continue;
+			}
+		}
+		g_mapEmitterBridge.retire( source.instance );
+		source.submissionRoute = "D3D9 not submitted (capacity or device error)";
 		light.Diffuse.r *= level;
 		light.Diffuse.g *= level;
 		light.Diffuse.b *= level;
-		if( g_remixEnabledLightLimit >= 0 && DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted >= g_remixEnabledLightLimit ) continue;
-		const DWORD slot = static_cast<DWORD>( DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted );
+		if( !captureAll && g_remixEnabledLightLimit >= 0 && g_remixMapLightFirstSlot + emitted >= g_remixEnabledLightLimit ) continue;
+		const DWORD slot = static_cast<DWORD>( g_remixMapLightFirstSlot + emitted );
 		HRESULT result = device->SetLight( slot, &light );
 		if( FAILED( result ) )
 		{
-			g_remixEnabledLightLimit = DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted;
+			g_remixEnabledLightLimit = g_remixMapLightFirstSlot + emitted;
 			if( !g_remixMapLightCapacityWarned )
 			{
 				gEngfuncs.Con_Printf(
 					"D3D9: RTX Remix accepted %d BSP lights; SetLight(%u) failed (0x%08X). "
-					"Set d3d9.maxEnabledLights to at least %d in rtx.conf to allow every active map light.\n",
+					"Set d3d9.maxEnabledLights to at least %d in dxvk.conf to allow every active map light.\n",
 					emitted, slot, static_cast<unsigned int>( result ),
-					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+					g_remixMapLightFirstSlot + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
 				g_remixMapLightCapacityWarned = true;
 			}
 			continue;
@@ -1863,25 +1887,25 @@ static void R_ApplyRemixMapLights( void )
 		result = device->LightEnable( slot, TRUE );
 		if( FAILED( result ) )
 		{
-			g_remixEnabledLightLimit = DX_REMIX_DYNAMIC_LIGHT_SLOTS + emitted;
+			g_remixEnabledLightLimit = g_remixMapLightFirstSlot + emitted;
 			if( !g_remixMapLightCapacityWarned )
 			{
 				gEngfuncs.Con_Printf(
 					"D3D9: RTX Remix accepted %d BSP lights; LightEnable(%u) failed (0x%08X). "
-					"Set d3d9.maxEnabledLights to at least %d in rtx.conf to allow every active map light.\n",
+					"Set d3d9.maxEnabledLights to at least %d in dxvk.conf to allow every active map light.\n",
 					emitted, slot, static_cast<unsigned int>( result ),
-					g_dxFixedLightCount + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+					g_remixMapLightFirstSlot + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
 				g_remixMapLightCapacityWarned = true;
 			}
 			device->LightEnable( slot, FALSE );
 			continue;
 		}
-		source.submissionRoute="legacy D3D";
+		source.submissionRoute = source.parentModel[0] ? "D3D9 moving source submitted" : "D3D9 submitted";
 		++emitted;
 	}
 
 	for( int i = emitted; i < g_remixMapLightSlotCount; ++i )
-		device->LightEnable( DX_REMIX_DYNAMIC_LIGHT_SLOTS + i, FALSE );
+		device->LightEnable( g_remixMapLightFirstSlot + i, FALSE );
 	g_remixMapLightSlotCount = emitted;
 	static uint64_t previousMap=0;
 	static int previousApi=-1, previousD3D=-1;
@@ -1999,7 +2023,8 @@ static void R_ListMapLightsCmd( void )
 		return;
 	}
 
-	gEngfuncs.Con_Printf( "D3D9: map lights for %s\n", g_worldmodel->name );
+	gEngfuncs.Con_Printf( "D3D9: map lights for %s (API cvar %g)\n", g_worldmodel->name, dx_remix_map_light_api.value );
+	gEngfuncs.Con_Printf( "Routes report Xash submissions. Toolkit capture hashes and replacement results are runtime data.\n" );
 	std::vector<map_entity_record_t> entities;
 	R_ParseMapEntities( entities );
 	int lightCount = 0;
@@ -4595,7 +4620,7 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 	const bool nightmareHeadlight = R_CofClientPresent() && g_worldmodel &&
         !Q_stricmp(g_worldmodel->name,"maps/c_nightmare.bsp") && modelType==mod_sprite &&
         !Q_stricmp(clent->model->name,"sprites/glow03.spr");
-	if( dx_remix.value != 0.0f && effectiveRenderMode == kRenderGlow && !nightmareHeadlight )
+	if( !R_RemixCaptureAll() && dx_remix.value != 0.0f && effectiveRenderMode == kRenderGlow && !nightmareHeadlight )
 		return false;
 
 	if( effectiveRenderMode != kRenderNormal )
@@ -5875,7 +5900,7 @@ static void R_DrawViewModel( void )
 
 static bool R_SphereVisible( const float center[3], float radius )
 {
-	if( !g_dxCullValid || r_nocull.value != 0.0f )
+	if( R_RemixCaptureAll() || !g_dxCullValid || r_nocull.value != 0.0f )
 		return true;
 
 	const float rel[3] =
@@ -6144,7 +6169,24 @@ static void R_SetupSceneDLights( )
 	for( int i = 0; i < g_entityLightEmitterCount; ++i )
 		R_CollectEntityDLight( g_entityLightEmitters[i] );
 	R_CollectBeamLights( );
+	static bool previousCaptureAll = false;
+	const bool captureAll = R_RemixCaptureAll();
+	if( device && (captureAll || previousCaptureAll) )
+	{
+		// Dynamic lights can cross the normal eight-slot boundary. Release the
+		// old legacy map slots before rebuilding the contiguous light ranges.
+		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
+			device->LightEnable( g_remixMapLightFirstSlot + i, FALSE );
+		g_remixMapLightSlotCount = 0;
+	}
+	if( captureAll != previousCaptureAll )
+	{
+		g_remixEnabledLightLimit = -1;
+		g_remixMapLightCapacityWarned = false;
+		previousCaptureAll = captureAll;
+	}
 	R_ApplyDLights( );
+	g_remixMapLightFirstSlot = captureAll ? g_dxFixedLightCount : DX_REMIX_DYNAMIC_LIGHT_SLOTS;
 	R_ApplyRemixMapLights( );
 	R_UpdateDLightOverlay( );
 }
@@ -6531,7 +6573,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		const float aspect = viewport.Height
 			? static_cast<float>( viewport.Width ) / viewport.Height : 1.0f;
 
-		if( !g_dxOverviewView && r_nocull.value == 0.0f )
+		if( !g_dxOverviewView && !R_RemixCaptureAll() && r_nocull.value == 0.0f )
 		{
 			VectorCopy( g_vOrigin, g_dxCullOrigin );
 			VectorCopy( g_vForward, g_dxCullForward );
@@ -6584,7 +6626,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		{
 			D3DXMatrixPerspectiveFovLH( &projection,
 				D3DXToRadian( rvp->fov_y ),
-				aspect, 4.0f, 8192.0f );
+				aspect, 4.0f, R_RemixCaptureAll() ? 131072.0f : 8192.0f );
 		}
 
 		device->SetTransform( D3DTS_PROJECTION, &projection );
