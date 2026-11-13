@@ -497,7 +497,7 @@ convar_t r_viewmodel_fov = { (char *)"r_viewmodel_fov", (char *)"60", 0 };
 convar_t r_viewmodel_near = { (char *)"r_viewmodel_near", (char *)"4.0", 0 };
 convar_t r_viewmodel_offset_x = { (char *)"r_viewmodel_offset_x", (char *)"0", 0 };
 convar_t r_viewmodel_offset_y = { (char *)"r_viewmodel_offset_y", (char *)"0", 0 };
-convar_t r_viewmodel_offset_z = { (char *)"r_viewmodel_offset_z", (char *)"0.5", 0 };
+convar_t r_viewmodel_offset_z = { (char *)"r_viewmodel_offset_z", (char *)"0", 0 };
 
 convar_t dx_viewmodel_attachment_fov =
 { (char *)"dx_viewmodel_attachment_fov", (char *)"1", FCVAR_ARCHIVE };
