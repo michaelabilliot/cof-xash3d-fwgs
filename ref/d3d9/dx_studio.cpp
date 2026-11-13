@@ -3750,6 +3750,105 @@ static bool R_LakeForestStudioTextureSuppressed(const cl_entity_s* ent,int textu
     return false;
 }
 
+// Co-op viewmodel hands. In co-op the CoF client draws the police officers'
+// hands by binding its own textures over the viewmodel's "fingers" and
+// "sleeve" textures with direct OpenGL calls, which never reach this renderer,
+// so Simon's single-player hands showed instead. Mirror the client: "fingers"
+// becomes police/police_hands.tga (police/police3_hands.tga when the local
+// player model contains "police3") and "sleeve" becomes police/police_sleeve.tga.
+// "glove" keeps the authored texture, as in the original client. Only the
+// viewmodel being drawn by R_DrawStudioEntityModel is affected.
+static const cl_entity_s *g_studioViewHandsEntity = nullptr;
+
+static bool R_StudioNameContains( const char *text, const char *part )
+{
+	if( !text || !part || !part[0] )
+		return false;
+	const size_t partLength = strlen( part );
+	for( ; *text; ++text )
+		if( !_strnicmp( text, part, partLength ) )
+			return true;
+	return false;
+}
+
+static int R_StudioCoopHandsTexture( const char *path )
+{
+	struct slot_t { const char *path; int id; bool missing; };
+	static slot_t slots[] = {
+		{ "police/police_hands.tga", 0, false },
+		{ "police/police3_hands.tga", 0, false },
+		{ "police/police_sleeve.tga", 0, false },
+	};
+	for( auto &slot : slots )
+	{
+		if( strcmp( slot.path, path ) )
+			continue;
+		if( slot.missing )
+			return 0;
+		// Texture ids can be freed and reused between maps; check the name.
+		if( slot.id <= 0 || _stricmp( DX_TextureName( static_cast<unsigned int>( slot.id ) ), slot.path ) )
+		{
+			slot.id = DX_LoadTexture( slot.path, nullptr, 0, 0 );
+			if( slot.id <= 0 )
+			{
+				slot.id = 0;
+				slot.missing = true;
+				gEngfuncs.Con_Printf( "^3Warning:^7 co-op viewmodel hands: cannot load %s\n", slot.path );
+			}
+		}
+		return slot.id;
+	}
+	return 0;
+}
+
+static int R_StudioViewHandsTexture( const cl_entity_s *ent, int textureId )
+{
+	if( !ent || ent != g_studioViewHandsEntity || !ent->model ||
+		!gp_cl || gp_cl->maxclients <= 1 || !R_CofClientPresent( ) ||
+		!gEngfuncs.Mod_Extradata )
+		return textureId;
+	const auto *hdr = static_cast<const studiohdr_t *>( gEngfuncs.Mod_Extradata( mod_studio, ent->model ) );
+	if( !hdr || hdr->numtextures <= 0 || hdr->numtextures > 4096 ||
+		!R_StudioRangeValid( hdr, hdr->textureindex, size_t( hdr->numtextures ) * sizeof( mstudiotexture_t ) ) )
+		return textureId;
+	const auto *textures = reinterpret_cast<const mstudiotexture_t *>(
+		reinterpret_cast<const byte *>( hdr ) + hdr->textureindex );
+	for( int i = 0; i < hdr->numtextures; ++i )
+	{
+		if( textures[i].index != textureId )
+			continue;
+		const char *path = nullptr;
+		if( R_StudioNameContains( textures[i].name, "fingers" ) )
+		{
+			const player_info_t *info = gEngfuncs.pfnPlayerInfo
+				? gEngfuncs.pfnPlayerInfo( gp_cl->playernum ) : nullptr;
+			path = info && R_StudioNameContains( info->model, "police3" )
+				? "police/police3_hands.tga" : "police/police_hands.tga";
+		}
+		else if( R_StudioNameContains( textures[i].name, "sleeve" ) )
+		{
+			path = "police/police_sleeve.tga";
+		}
+		if( !path )
+			return textureId;
+		const int replacement = R_StudioCoopHandsTexture( path );
+		return replacement > 0 ? replacement : textureId;
+	}
+	return textureId;
+}
+
+struct studio_view_hands_scope_t
+{
+	const cl_entity_s *previous;
+	studio_view_hands_scope_t( const cl_entity_s *ent, bool viewModel )
+		: previous( g_studioViewHandsEntity )
+	{
+		if( viewModel )
+			g_studioViewHandsEntity = ent;
+	}
+	~studio_view_hands_scope_t( ) { g_studioViewHandsEntity = previous; }
+};
+
 static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 	const cl_entity_s *ent, bool glowShellPass = false )
 {
@@ -3904,7 +4003,7 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 		{
 			if( batch.textureId != boundTexture )
 			{
-				DX_Bind( 0, batch.textureId );
+				DX_Bind( 0, R_StudioViewHandsTexture( ent, batch.textureId ) );
 				boundTexture = batch.textureId;
 			}
 			R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
@@ -4080,7 +4179,7 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 			continue;
 		if( batch.textureId != boundTexture )
 		{
-			DX_Bind( 0, batch.textureId );
+			DX_Bind( 0, R_StudioViewHandsTexture( ent, batch.textureId ) );
 			boundTexture = batch.textureId;
 		}
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
@@ -4293,7 +4392,7 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 
 		if( batch.textureId != boundTexture )
 		{
-			DX_Bind( 0, batch.textureId );
+			DX_Bind( 0, R_StudioViewHandsTexture( ent, batch.textureId ) );
 			boundTexture = batch.textureId;
 		}
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
@@ -4336,7 +4435,7 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 
 		if( batch.textureId != boundTexture )
 		{
-			DX_Bind( 0, batch.textureId );
+			DX_Bind( 0, R_StudioViewHandsTexture( ent, batch.textureId ) );
 			boundTexture = batch.textureId;
 		}
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
@@ -5704,7 +5803,7 @@ static void R_DrawStudioBatches( model_drawdata_t &drawData,
 		if( R_LakeForestStudioTextureSuppressed(ent,textureId) )continue;
 		const unsigned int flags =
 			R_StudioCpuBatchStateFlags( batchKey );
-		DX_Bind( 0, textureId );
+		DX_Bind( 0, R_StudioViewHandsTexture( ent, textureId ) );
 		R_ApplyStudioMaterialState( flags, ent, materialState );
 		R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
 			static_cast<UINT>( rd.verts.size( ) ),
@@ -5721,6 +5820,8 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 	bool processRendererMuzzleEvents = true, int hiddenArm = 0 )
 {
 	DX_MODEL_PROFILE_SCOPE( studioProfileScope, DX_PROFILE_PHASE_STUDIOMODEL );
+	// forceOverlayDepth is only set for the first-person viewmodel draws.
+	const studio_view_hands_scope_t viewHandsScope( ent, forceOverlayDepth );
 	model_drawdata_t *mdd = R_FindStudioModelDrawData( mod );
 	if( !mdd || !mdd->loaded )
 		return;
