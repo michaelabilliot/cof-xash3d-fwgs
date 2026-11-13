@@ -6535,15 +6535,20 @@ static void R_BuildViewModelWorld(const cl_entity_s* ent,const float* viewOrigin
 	R_ApplyEntityScale( ent, &viewModelWorld );
 }
 
-int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror) {
+// Transforms two bone-local points of a posed viewmodel into world space.
+// pick(hdr,attachments,bone,local) selects the bones and local points.
+template<class Pick>
+static int R_StudioViewModelPointPair(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror,int minAttachments,Pick pick) {
  if(!ent||!ent->model||ent->model->type!=mod_studio||!viewOrigin||!viewAngles||!offsets||!points||!std::isfinite(time)||!gEngfuncs.Mod_Extradata)return 0;
  if(ent->curstate.effects&EF_NODRAW)return 0;
  for(int i=0;i<3;++i)if(!std::isfinite(viewOrigin[i])||!std::isfinite(viewAngles[i])||!std::isfinite(offsets[i])||!std::isfinite(ent->origin[i])||!std::isfinite(ent->angles[i]))return 0;
  auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
- if(!R_StudioHeaderValid(hdr)||hdr->numattachments<2||hdr->numbones>MAXSTUDIOBONES||
-  !R_StudioRangeValid(hdr,hdr->attachmentindex,2*sizeof(mstudioattachment_t)))return 0;
+ if(!R_StudioHeaderValid(hdr)||hdr->numattachments<minAttachments||hdr->numbones>MAXSTUDIOBONES||
+  !R_StudioRangeValid(hdr,hdr->attachmentindex,size_t(minAttachments)*sizeof(mstudioattachment_t)))return 0;
  const auto attachments=reinterpret_cast<const mstudioattachment_t*>(reinterpret_cast<const byte*>(hdr)+hdr->attachmentindex);
- for(int i=0;i<2;++i)if(attachments[i].bone<0||attachments[i].bone>=hdr->numbones)return 0;
+ int bone[2];float localPoint[2][3];
+ if(!pick(attachments,bone,localPoint))return 0;
+ for(int i=0;i<2;++i)if(bone[i]<0||bone[i]>=hdr->numbones)return 0;
  R_RegisterModelCvars();
  const float poseTime=R_StudioQuantizePoseTime(ent,time,true);
  BoneMat34 bones[MAXSTUDIOBONES]{};
@@ -6551,11 +6556,31 @@ int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* v
  vec3_t forward,right,up;AngleVectors(viewAngles,forward,right,up);
  D3DMATRIX world;R_BuildViewModelWorld(ent,viewOrigin,viewAngles,forward,right,up,offsets[0],offsets[1],offsets[2],world,mirror);
  float result[6];
- for(int i=0;i<2;++i){float local[3];VectorTransform(attachments[i].org,bones[attachments[i].bone],local);R_StudioTransformPointByWorld(world,local,result+i*3);}
+ for(int i=0;i<2;++i){float local[3];VectorTransform(localPoint[i],bones[bone[i]],local);R_StudioTransformPointByWorld(world,local,result+i*3);}
  float length=0;for(int i=0;i<6;++i)if(!std::isfinite(result[i]))return 0;
  for(int i=0;i<3;++i){const float d=result[3+i]-result[i];length+=d*d;}
  if(!std::isfinite(length)||length<1e-8f)return 0;
  memcpy(points,result,sizeof(result));return 1;
+}
+int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror) {
+ return R_StudioViewModelPointPair(ent,time,viewOrigin,viewAngles,offsets,points,mirror,2,
+  [](const mstudioattachment_t* a,int* bone,float (*local)[3]){
+   for(int i=0;i<2;++i){bone[i]=a[i].bone;VectorCopy(a[i].org,local[i]);}
+   return true;});
+}
+// Glock taclight (v_glock / v_glock_doctor, bodygroup "taclight"). The model
+// has no lens attachment: attachments 1->2 run along the barrel axis but sit
+// 9.2u under the muzzle, below the light. The lens glow quad is centred at
+// (0,-2.26,-3.61) in muzzle-bone space (attachment 0's bone), so emit from
+// there and aim along attachment 1->2. points = {lens, lens+barrel}.
+int R_StudioViewModelTacLightPoints(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror) {
+ return R_StudioViewModelPointPair(ent,time,viewOrigin,viewAngles,offsets,points,mirror,3,
+  [](const mstudioattachment_t* a,int* bone,float (*local)[3]){
+   if(a[0].bone!=a[1].bone||a[1].bone!=a[2].bone)return false;
+   constexpr float lens[3]={0.f,-2.26f,-3.61f};
+   bone[0]=bone[1]=a[0].bone;
+   for(int i=0;i<3;++i){local[0][i]=lens[i];local[1][i]=lens[i]+a[2].org[i]-a[1].org[i];}
+   return true;});
 }
 extern "C" __declspec(dllexport) int __cdecl DX_StudioViewModelLightAttachmentsV1(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points) {
  return R_StudioViewModelLightAttachments(ent,time,viewOrigin,viewAngles,offsets,points);
