@@ -453,6 +453,8 @@ convar_t dx_triapi_batch_max_vertices =
 { (char *)"dx_triapi_batch_max_vertices", (char *)"32768", 0 };
 convar_t dx_remix_glass_batch =
 { (char *)"dx_remix_glass_batch", (char *)"1", 0 };
+static convar_t dx_remix_stable_sprites =
+{ (char *)"dx_remix_stable_sprites", (char *)"1", 0 };
 
 convar_t dx_remix_glass_single_sided =
 { (char *)"dx_remix_glass_single_sided", (char *)"1", 0 };
@@ -2125,6 +2127,7 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_decal_alpha_ref );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_glass_single_sided );
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix_glass_batch );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_stable_sprites );
 	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_batch );
 	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_debug );
 	gEngfuncs.Cvar_RegisterVariable( &dx_triapi_batch_max_vertices );
@@ -5911,6 +5914,26 @@ static bool R_TranslucentLess( const translucent_entity_t &a,
 	return a.submissionOrder < b.submissionOrder;
 }
 
+// Remix pairs a batch's vertices with the previous frame's by index to build
+// motion vectors. Distance sorting reorders the sprite quads every time the eye
+// moves, so frame generation warps each sprite towards another sprite's position.
+// Remix path traces the scene, so blending order does not matter there.
+static bool R_RemixTranslucentLess( const translucent_entity_t &a,
+	const translucent_entity_t &b )
+{
+	const bool aSprite = a.entity->model->type == mod_sprite;
+	const bool bSprite = b.entity->model->type == mod_sprite;
+	if( aSprite != bSprite )
+		return bSprite;
+	if( !aSprite )
+		return R_TranslucentLess( a, b );
+	if( a.entity->model != b.entity->model )
+		return a.entity->model < b.entity->model;
+	if( a.entity->curstate.rendermode != b.entity->curstate.rendermode )
+		return a.entity->curstate.rendermode < b.entity->curstate.rendermode;
+	return a.submissionOrder < b.submissionOrder;
+}
+
 static void R_SetWorldIdentity( const D3DXMATRIX &identity, bool &isIdentity )
 {
 	if( isIdentity )
@@ -6108,7 +6131,9 @@ static int R_BuildTranslucentList( const vec3_t viewOrigin )
 	if( g_translucentDrawList.size( ) > 1 )
 	{
 		std::stable_sort( g_translucentDrawList.begin( ),
-			g_translucentDrawList.end( ), R_TranslucentLess );
+			g_translucentDrawList.end( ),
+			dx_remix.value != 0.0f && dx_remix_stable_sprites.value != 0.0f
+				? R_RemixTranslucentLess : R_TranslucentLess );
 	}
 	return static_cast<int>( g_translucentDrawList.size( ) );
 }
