@@ -1,0 +1,12 @@
+_ImageFileType@4
+_NumOfSections@4
+_ImageDirectoryOffset@8
+_GetSectionNames@12
+_GetSectionHdrByName@12
+_IsDebugInfoStripped@4
+_GetExportNamesPtr_guess
+_GetExportNamesSize_guess
+_GetExportNames_guess
+_GetExportNamesFromFile_guess
+_StripMangledName_guess
+_BuildExportTable_guess

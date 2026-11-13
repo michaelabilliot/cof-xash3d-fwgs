@@ -1,0 +1,11 @@
+??0CVGUIBillboard@@QAE@XZ
+?ActionSignal@CVGUIBillboard@@QAEXH@Z
+?Initialize@CVGUIBillboard@@QAEXXZ
+?KeyInput@CVGUIBillboard@@QAEHHHPBD@Z
+?VGUI_BoardInit_guess@@YAXXZ
+?actionPerformed@CBillboardHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?paint@CVGUIBillboard@@MAEXXZ
+?setVisible@CVGUIBillboard@@UAEX_N@Z
+?MsgBoard_guess@@YAHPBDHPAX@Z
+?paintBackground@CVGUIBillboard@@MAEXXZ
+??1CVGUIBillboard@@QAE@XZ

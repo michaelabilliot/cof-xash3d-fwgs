@@ -1,0 +1,6 @@
+_Mem_Malloc
+_Mem_ZeroMalloc
+_Mem_Realloc
+_Mem_Calloc
+_Mem_Strdup
+_Mem_Free

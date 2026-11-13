@@ -1,0 +1,13 @@
+??$GetClassPtr@VCRealCamera@@@@YAPAVCRealCamera@@PAV0@@Z
+??$GetClassPtr@VCViewPoint@@@@YAPAVCViewPoint@@PAV0@@Z
+?CameraUse@CRealCamera@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?HandleAnimEvent@CRealCamera@@UAEXPAUMonsterEvent_t@@@Z
+?Precache@CRealCamera@@UAEXXZ
+?Precache@CViewPoint@@UAEXXZ
+?Spawn@CRealCamera@@UAEXXZ
+?Spawn@CViewPoint@@UAEXXZ
+?StartAnimation@CRealCamera@@QAEXXZ
+?Think@CRealCamera@@UAEXXZ
+_real_camera
+_view_point
+?SetSequenceByName@CRealCamera@@QAEXPAD@Z

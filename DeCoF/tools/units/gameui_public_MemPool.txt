@@ -1,0 +1,5 @@
+??0CMemoryPool@@QAE@HH@Z
+??1CMemoryPool@@QAE@XZ
+?AddNewBlob@CMemoryPool@@AAEXXZ
+?Alloc@CMemoryPool@@QAEPAXI@Z
+?Free@CMemoryPool@@QAEXPAX@Z

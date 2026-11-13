@@ -1,0 +1,8 @@
+_Log_Printf
+_Log_PrintServerVars
+_Log_Close
+_Log_Open
+_SV_SetLogAddress_f
+_SV_AddLogAddress_f
+_SV_DelLogAddress_f
+_SV_ServerLog_f

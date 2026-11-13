@@ -1,0 +1,5 @@
+??0CNewGameDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CNewGameDialog@@UAE@XZ
+?OnCommand@CNewGameDialog@@MAEXPBD@Z
+?OnClose@CNewGameDialog@@MAEXXZ
+??_GCNewGameDialog@@UAEPAXI@Z

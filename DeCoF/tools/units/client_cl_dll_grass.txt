@@ -1,0 +1,14 @@
+?AlphaDist@@YAMABVVector@@0M@Z
+?DrawSpriteFacingPlayer@@YAXPAUgrass_sprite_s@@PAUgrass_type_s@@ABVVector@@M@Z
+?DrawSpriteParallel@@YAXPAUgrass_sprite_s@@PAUgrass_type_s@@ABVVector@@M@Z
+?GetSpriteRandomVec@@YAXAAVVector@@@Z
+?GrassCreateEntities@@YAXXZ
+?GrassInit@@YAXXZ
+?GrassVidInit@@YAXXZ
+?MsgGrassInfo@@YAHPBDHPAX@Z
+?PlaceGrassModel@@YAXPAUgrass_type_s@@PAUcl_entity_s@@@Z
+?PlaceGrassSprite@@YAXPAUgrass_type_s@@PAUgrass_sprite_s@@@Z
+?UpdateGrassModelPosition@@YAXPAUgrass_type_s@@PAUcl_entity_s@@ABVVector@@2@Z
+?UpdateGrassSpritePosition@@YAXPAUgrass_type_s@@PAUgrass_sprite_s@@ABVVector@@2@Z
+?GrassDraw@@YAXXZ
+??0grass_sprite_s@@QAE@XZ

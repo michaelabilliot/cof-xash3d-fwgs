@@ -1,0 +1,6 @@
+??$GetClassPtr@VCBowlingBall@@@@YAPAVCBowlingBall@@PAV0@@Z
+?BowlingUse@CBowlingBall@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_bowling_ball
+?ObjectCaps@CBowlingBall@@UAEHXZ
+?Precache@CBowlingBall@@UAEXXZ
+?Spawn@CBowlingBall@@UAEXXZ

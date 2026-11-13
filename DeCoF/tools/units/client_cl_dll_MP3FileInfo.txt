@@ -1,0 +1,9 @@
+??_GID3_Tag@@UAEPAXI@Z
+?Free@MP3FileInfo@@QAEXXZ
+?GetTitle_guess@MP3FileInfo@@QAEPADPBD@Z
+?Init@MP3FileInfo@@QAE_NPBD@Z
+?ShowAllFrames@MP3FileInfo@@QAEXXZ
+?m_getNewString@MP3FileInfo@@IAEPADW4ID3_FrameID@@@Z
+?m_getString@MP3FileInfo@@IAE_NW4ID3_FrameID@@PAD@Z
+?m_parseGenre@MP3FileInfo@@IAEXXZ
+?m_parseHeader@MP3FileInfo@@IAEXXZ

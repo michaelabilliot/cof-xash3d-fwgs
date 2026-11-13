@@ -1,0 +1,15 @@
+?DrawDebugFrustumPlane@@YAXXZ
+?GL_DisableClipPlanes@FrustumCheck@@QAEXXZ
+?GL_FrustumSetClipPlanes@FrustumCheck@@QAEXXZ
+?Mod_PointInLeaf@@YAPAUmleaf_s@@VVector@@PAUmodel_s@@@Z
+?ProjectPointOnPlane@@YAXAAVVector@@ABV1@1@Z
+?R_ConcatRotations@@YAXQAY02M00@Z
+?R_CullBox@FrustumCheck@@QAEHVVector@@0@Z
+?R_LightPoint@@YAHAAVVector@@0@Z
+?RecursiveLightPoint@@YAHPAUmnode_s@@ABVVector@@1AAV2@@Z
+?SignbitsForPlane@@YAHPAUmplane_s@@@Z
+?PerpendicularVector@@YAXAAVVector@@ABV1@@Z
+?R_SetFrustum@FrustumCheck@@QAEXVVector@@0M@Z
+?R_SetFrustum@FrustumCheck@@QAEXVVector@@0MMM@Z
+?RotatePointAroundVector@@YAXAAVVector@@ABV1@1M@Z
+?BoxOnPlaneSide@@YAHAAVVector@@0PAUmplane_s@@@Z

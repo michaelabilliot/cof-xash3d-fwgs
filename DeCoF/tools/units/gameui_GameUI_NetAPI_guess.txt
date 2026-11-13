@@ -1,0 +1,12 @@
+?NetAdrToSockAddr_guess@CNetAPI@@UAEXPAUnetadr_s@@PAUsockaddr@@@Z
+_$E2
+_$E1
+?SockAddrToNetAdr_guess@CNetAPI@@UAEXPAUsockaddr@@PAUnetadr_s@@@Z
+?AdrToString_guess@CNetAPI@@UAEPADPAUnetadr_s@@@Z
+?StringToAdr_guess@CNetAPI@@UAE_NPBDPAUnetadr_s@@@Z
+?StringToSockaddr_guess@@YA_NPBDPAUsockaddr@@@Z
+?GetSocketAddress_guess@CNetAPI@@UAEXHPAUnetadr_s@@@Z
+?CompareAdr_guess@CNetAPI@@UAE_NPAUnetadr_s@@0@Z
+?GetLocalIP_guess@CNetAPI@@UAEXPAUnetadr_s@@@Z
+??0CNetAPI@@QAE@XZ
+??0INetAPI@@QAE@XZ

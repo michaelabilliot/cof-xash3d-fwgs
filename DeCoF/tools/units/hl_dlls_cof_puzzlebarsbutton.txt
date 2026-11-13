@@ -1,0 +1,7 @@
+?Precache@CPuzzleBarButton@@UAEXXZ
+?Restore@CPuzzleBarButton@@UAEHAAVCRestore@@@Z
+?Save@CPuzzleBarButton@@UAEHAAVCSave@@@Z
+?Spawn@CPuzzleBarButton@@UAEXXZ
+?Use@CPuzzleBarButton@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_cof_puzzlebarbutton
+?ToggleBar@CPuzzleBarButton@@QAEXHPAVCBasePlayer@@@Z

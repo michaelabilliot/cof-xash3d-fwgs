@@ -1,0 +1,11 @@
+_HUD_AddEntity
+_HUD_CreateEntities
+_HUD_GetUserEntity
+_HUD_ProcessPlayerState
+_HUD_StudioEvent
+_HUD_TempEntUpdate
+_HUD_TxferLocalOverrides
+_HUD_TxferPredictionData
+?MuzzleFlash_guess@@YAXPAUcl_entity_s@@H_NM@Z
+?DlightFlash@@YAXPAM@Z
+?MuzzleFlash_guess@@YAXPBDHVVector@@1@Z

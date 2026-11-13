@@ -1,0 +1,5 @@
+?FIsBlob@@YADPBD@Z
+?NLoadBlobFile@@YAPAXPBDPAUBlobFootprint_s@@PAXD@Z
+?LoadBlobFile_guess@@YAPAXPAEPAUBlobFootprint_s@@PAXH@Z
+?ProcessBlobImports_guess@@YAXPAUBlobHeader_s_guess@@@Z
+?FreeBlob@@YAXPAUBlobFootprint_s@@@Z

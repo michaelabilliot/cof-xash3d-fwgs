@@ -1,0 +1,15 @@
+??$GetClassPtr@VCSlowerstuck@@@@YAPAVCSlowerstuck@@PAV0@@Z
+?AlertSound@CSlowerstuck@@UAEXXZ
+?CheckRangeAttack1@CSlowerstuck@@UAEHMM@Z
+?CheckRangeAttack2@CSlowerstuck@@UAEHMM@Z
+?Classify@CSlowerstuck@@UAEHXZ
+?HandleAnimEvent@CSlowerstuck@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CSlowerstuck@@UAEHXZ
+?Killed@CSlowerstuck@@UAEXPAUentvars_s@@H@Z
+?PainSound@CSlowerstuck@@UAEXXZ
+?Precache@CSlowerstuck@@UAEXXZ
+?SetYawSpeed@CSlowerstuck@@UAEXXZ
+?Spawn@CSlowerstuck@@UAEXXZ
+?TakeDamage@CSlowerstuck@@UAEHPAUentvars_s@@0MH@Z
+_monster_slowerstuck
+?AttackSound@CSlowerstuck@@QAEXXZ

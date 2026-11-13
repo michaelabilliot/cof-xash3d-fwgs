@@ -1,0 +1,10 @@
+??0LabelSliderCombo@@QAE@PAVPanel@vgui2@@PBD1@Z
+??1LabelSliderCombo@@UAE@XZ
+?OnCursorMoved@LabelSliderCombo@@UAEXHH@Z
+?SetValue@LabelSliderCombo@@UAEXH_N@Z
+?SetVisible@LabelSliderCombo@@UAEX_N@Z
+?UpdateTextEntry@LabelSliderCombo@@AAEX_N@Z
+??_GLabelSliderCombo@@UAEPAXI@Z
+??1Slider@vgui2@@UAE@XZ
+?GetMessageMap@Slider@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@Slider@vgui2@@SAPBDXZ

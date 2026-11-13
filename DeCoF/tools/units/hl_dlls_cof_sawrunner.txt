@@ -1,0 +1,15 @@
+??$GetClassPtr@VCSawrunner@@@@YAPAVCSawrunner@@PAV0@@Z
+?AlertSound@CSawrunner@@UAEXXZ
+?CheckRangeAttack1@CSawrunner@@UAEHMM@Z
+?CheckRangeAttack2@CSawrunner@@UAEHMM@Z
+?Classify@CSawrunner@@UAEHXZ
+?HandleAnimEvent@CSawrunner@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CSawrunner@@UAEHXZ
+?Killed@CSawrunner@@UAEXPAUentvars_s@@H@Z
+?PainSound@CSawrunner@@UAEXXZ
+?Precache@CSawrunner@@UAEXXZ
+?SetYawSpeed@CSawrunner@@UAEXXZ
+?Spawn@CSawrunner@@UAEXXZ
+?TakeDamage@CSawrunner@@UAEHPAUentvars_s@@0MH@Z
+_monster_sawrunner
+?AttackSound@CSawrunner@@QAEXXZ

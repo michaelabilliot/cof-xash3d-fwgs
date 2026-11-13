@@ -1,0 +1,14 @@
+??0CBitmapImagePanel@vgui2@@QAE@PAVPanel@1@PBD1@Z
+?CloneString@@YAPADPBD@Z
+?ComputeImagePosition@CBitmapImagePanel@vgui2@@EAEXAAH000@Z
+?PaintBorder@CBitmapImagePanel@vgui2@@MAEXXZ
+?PaintBackground@CBitmapImagePanel@vgui2@@UAEXXZ
+?setTexture@CBitmapImagePanel@vgui2@@UAEXPBD_N@Z
+?SetContentAlignment@CBitmapImagePanel@vgui2@@UAEXW4Alignment@Label@2@@Z
+?GetSettings@CBitmapImagePanel@vgui2@@MAEXPAVKeyValues@@@Z
+?ApplySettings@CBitmapImagePanel@vgui2@@MAEXPAVKeyValues@@@Z
+?ApplySchemeSettings@CBitmapImagePanel@vgui2@@MAEXPAVIScheme@2@@Z
+?GetDescription@CBitmapImagePanel@vgui2@@MAEPBDXZ
+??_GCBitmapImagePanel@vgui2@@UAEPAXI@Z
+??1CBitmapImagePanel@vgui2@@UAE@XZ
+?setImageColor@CBitmapImagePanel@vgui2@@QAEXVColor@@@Z

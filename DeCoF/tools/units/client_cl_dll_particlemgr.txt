@@ -1,0 +1,11 @@
+?FindSystem@ParticleSystemManager@@QAEPAVParticleSystem@@PAUcl_entity_s@@@Z
+?SortSystems@ParticleSystemManager@@QAEXXZ
+??0ParticleSystemManager@@QAE@XZ
+?AddSystem@ParticleSystemManager@@QAEXPAVParticleSystem@@@Z
+?UpdateSystems@ParticleSystemManager@@QAEXMH@Z
+?DeleteViewModelSystems_guess@ParticleSystemManager@@QAEX_N@Z
+??1ParticleSystemManager@@QAE@XZ
+?ClearSystems@ParticleSystemManager@@QAEXXZ
+?DeleteSystemWithEntity@ParticleSystemManager@@QAEXH@Z
+??__Eg_pParticleSystems@@YAXXZ
+??__Fg_pParticleSystems@@YAXXZ

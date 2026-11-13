@@ -1,0 +1,11 @@
+??$GetClassPtr@VCSledgeHammer@@@@YAPAVCSledgeHammer@@PAV0@@Z
+?Deploy@CSledgeHammer@@UAEHXZ
+?GetItemInfo@CSledgeHammer@@UAEHPAUItemInfo@@@Z
+?Holster@CSledgeHammer@@UAEXXZ
+?ItemPostFrame@CSledgeHammer@@UAEXXZ
+?Precache@CSledgeHammer@@UAEXXZ
+?PrimaryAttack@CSledgeHammer@@UAEXXZ
+?ShouldWeaponIdle@CSledgeHammer@@UAEHXZ
+?Spawn@CSledgeHammer@@UAEXXZ
+?WeaponIdle@CSledgeHammer@@UAEXXZ
+_weapon_sledgehammer

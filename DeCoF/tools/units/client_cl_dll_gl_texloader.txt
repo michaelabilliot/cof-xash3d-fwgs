@@ -1,0 +1,17 @@
+??0DetailTexture@@QAE@PADH@Z
+??0ExtTextureData@@QAE@PAD@Z
+??1DetailTexture@@QAE@XZ
+??1ExtTextureData@@QAE@XZ
+?CompareDetailIDs@@YAHPAUtexture_s@@0@Z
+?CreateExtDataForTextures@@YAXXZ
+?CreateTexture@@YAHPBDHH@Z
+?Create_DSDT_Texture@@YAHPBD@Z
+?DeleteExtTextures@@YAXXZ
+?FindTextureExtraData@@YAPAVExtTextureData@@PAD@Z
+?GenerateMipMap@@YAXPAUcolor24@@HH@Z
+?GetDetailTextureData@@YAHPADAAH11@Z
+?LoadCacheTexture@@YAHPBDHH@Z
+?NormalizeMipMap@@YAXPAUcolor24@@HH@Z
+?ParseDetailTextureDataFile@@YAHXZ
+?SortTexturesByDetailTexID@@YAXXZ
+?CheckTexture_guess@@YAHPBD@Z

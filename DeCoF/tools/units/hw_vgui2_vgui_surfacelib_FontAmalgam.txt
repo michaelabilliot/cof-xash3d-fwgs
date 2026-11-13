@@ -1,0 +1,13 @@
+??0CFontAmalgam@@QAE@XZ
+??1CFontAmalgam@@QAE@XZ
+?Name@CFontAmalgam@@QAEPBDXZ
+?SetName@CFontAmalgam@@QAEXPBD@Z
+?AddFont@CFontAmalgam@@QAEXPAVCWin32Font@@HH@Z
+?GetFontForChar@CFontAmalgam@@QAEPAVCWin32Font@@H@Z
+?GetFontHeight@CFontAmalgam@@QAEHXZ
+?GetFontMaxWidth@CFontAmalgam@@QAEHXZ
+?GetFontName@CFontAmalgam@@QAEPBDH@Z
+?GetFlags@CFontAmalgam@@QAEHH@Z
+?GetCount@CFontAmalgam@@QAEHXZ
+?GetUnderlined@CFontAmalgam@@QAE_NXZ
+?Grow@?$CUtlMemory@UTFontRange@CFontAmalgam@@@@QAEXH@Z

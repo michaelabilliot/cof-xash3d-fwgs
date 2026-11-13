@@ -1,0 +1,7 @@
+va,name,unit,evidence
+01D05E29,??3@YAXPAX@Z,engine/vgui2/BaseUISurface_Font,"file-local operator delete (free) of BaseUISurface_Font.cpp, called by ~VFontData and the FontPlat scalar deleting destructors; the CRT copy is 01E6F9FC"
+01D06014,??2@YAPAXI@Z,engine/vgui2/BaseUISurface_Font,"file-local operator new (malloc) of BaseUISurface_Font.cpp, called by LoadVFontDataFrom32BitTGA; the CRT copy is 01E701EE"
+01E3DC9A,?CloneString@@YAPADPBD@Z,vgui2/controls/BitmapImagePanel,"static inline in BitmapImagePanel.cpp"
+01D15400,??1?$CUtlMemory@E@@QAE@XZ,iga/IGA_Engine_guess,"CUtlMemory<unsigned char> COMDAT in the tail of IGA_Engine_guess.cpp (paired by position); public/KeyValues.cpp of the vgui2 library block has its own copy (01E32FD0, 01E33040, 01E33250)"
+01D16120,??A?$CUtlMemory@E@@QAEAAEH@Z,iga/IGA_Engine_guess,"CUtlMemory<unsigned char> COMDAT in the tail of IGA_Engine_guess.cpp (paired by position); public/KeyValues.cpp of the vgui2 library block has its own copy (01E32FD0, 01E33040, 01E33250)"
+01D16200,?Purge@?$CUtlMemory@E@@QAEXXZ,iga/IGA_Engine_guess,"CUtlMemory<unsigned char> COMDAT in the tail of IGA_Engine_guess.cpp (paired by position); public/KeyValues.cpp of the vgui2 library block has its own copy (01E32FD0, 01E33040, 01E33250)"

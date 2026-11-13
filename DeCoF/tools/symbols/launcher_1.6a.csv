@@ -1,0 +1,189 @@
+va,name,kind,evidence
+0140102A,??0CCommandLine@@QAE@XZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401037,??_GCCommandLine@@UAEPAXI@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401053,??1CCommandLine@@UAE@XZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401063,?CreateCmdLine@CCommandLine@@UAEXPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401162,?CopyString_guess@@YAPADPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140118E,?RemoveParm@CCommandLine@@UAEXPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401251,?AppendParm@CCommandLine@@UAEXPBD0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401329,?SetParm@CCommandLine@@UAEXPBD0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401348,?SetParm@CCommandLine@@UAEXPBDH@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140137A,?GetCmdLine@CCommandLine@@UAEPBDXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140137E,?CheckParm@CCommandLine@@UAEPADPBDPAPAD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014013F9,??0InterfaceReg@@QAE@P6APAVIBaseInterface@@XZPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401419,_CreateInterface,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140145C,?Sys_GetProcAddress@@YAPAXPAXPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140146B,?Sys_LoadModule@@YAPAVCSysModule@@PBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014014AC,?Sys_UnloadModule@@YAXPAVCSysModule@@@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014014BE,?Sys_GetFactory@@YAP6APAVIBaseInterface@@PBDPAH@ZPAVCSysModule@@@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014014D8,?Sys_GetFactoryThis@@YAP6APAVIBaseInterface@@PBDPAH@ZXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014014DE,?Sys_GetFactory@@YAP6APAVIBaseInterface@@PBDPAH@Z0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014014EF,?Sys_GetProcAddress@@YAPAXPBD0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401505,?UTIL_GetBaseDir@@YAPADXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140158C,?SetEngineDLL@@YAXPAPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401646,?OnVideoModeFailed@@YA_NXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014016B2,?Sys_GetExecutableName@@YAHPADH@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014016D0,?LoadFilesystemModule@@YAPAVCSysModule@@PBD_N@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401853,_WinMain@16,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401DA0,?FIsBlob@@YADPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401DEB,?NLoadBlobFile@@YAPAXPBDPAUBlobFootprint_s@@PAXD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401EA5,?LoadBlobFile_guess@@YAPAXPAEPAUBlobFootprint_s@@PAXH@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401F51,?ProcessBlobImports_guess@@YAXPAUBlobHeader_s_guess@@@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01401FCE,?FreeBlob@@YAXPAUBlobFootprint_s@@@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402005,??0CRegistry@@QAE@XZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402016,??_GCRegistry@@UAEPAXI@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402032,??1CRegistry@@UAE@XZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402039,?ReadInt@CRegistry@@UAEHPBDH@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140207E,?WriteInt@CRegistry@@UAEXPBDH@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140209F,?ReadString@CRegistry@@UAEPBDPBD0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014020EB,?WriteString@CRegistry@@UAEXPBD0@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402119,?Init@CRegistry@@UAEXXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402177,?GetGameName_guess@@YAPBDXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+0140217D,?Shutdown@CRegistry@@UAEXXZ,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402191,?FileExists_guess@@YA_NPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014021AC,?ShouldLaunchAppViaSteam_guess@@YA_NPBD00@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+01402211,?LaunchSelfViaSteam_guess@@YAXPBD@Z,func,"launcher code, address from the disassembly; name from the hl_linux DWARF (launcher.cpp, commandline.cpp, interface.cpp), hw.so DWARF (LoadBlob.cpp, registry.cpp) or _guess"
+014025A6,_atexit,func,LIBCMT function called by the launcher code
+01402696,??3@YAXPAX@Z,func,LIBCMT function called by the launcher code
+01402774,_isspace,func,LIBCMT function called by the launcher code
+01402905,_printf,func,LIBCMT function called by the launcher code
+01402946,_fclose,func,LIBCMT function called by the launcher code
+014029C3,_fgetc,func,LIBCMT function called by the launcher code
+01402A30,_fopen,func,LIBCMT function called by the launcher code
+01402A50,__chkstk,func,LIBCMT function called by the launcher code
+01402A80,_strcpy,func,LIBCMT function called by the launcher code
+01402A90,_strcat,func,LIBCMT function called by the launcher code
+01402B70,??2@YAPAXI@Z,func,LIBCMT function called by the launcher code
+01402B80,_strlen,func,LIBCMT function called by the launcher code
+01402C00,_memset,func,LIBCMT function called by the launcher code
+01402C60,_memcpy,func,LIBCMT function called by the launcher code
+01402FA0,_strstr,func,LIBCMT function called by the launcher code
+01403020,__snprintf,func,LIBCMT function called by the launcher code
+01403080,_strcmp,func,LIBCMT function called by the launcher code
+01403110,_strrchr,func,LIBCMT function called by the launcher code
+01403150,_strchr,func,LIBCMT function called by the launcher code
+0140320C,__findfirst,func,LIBCMT function called by the launcher code
+014033A1,__findclose,func,LIBCMT function called by the launcher code
+01403425,__putenv,func,LIBCMT function called by the launcher code
+014034DA,_sprintf,func,LIBCMT function called by the launcher code
+0140352C,_getenv,func,LIBCMT function called by the launcher code
+014035D0,_strncpy,func,LIBCMT function called by the launcher code
+014036D4,__set_sbh_threshold,func,LIBCMT function called by the launcher code
+0140462A,_free,func,LIBCMT function called by the launcher code
+01404672,_malloc,func,LIBCMT function called by the launcher code
+014047B6,__stat,func,LIBCMT function called by the launcher code
+01404AE1,__spawnv,func,LIBCMT function called by the launcher code
+01404AF8,__chdir,func,LIBCMT function called by the launcher code
+0140A2A0,_stricmp,func,LIBCMT function called by the launcher code
+0140E1D0,_strnicmp,func,LIBCMT function called by the launcher code
+0140F000,__imp__RegCloseKey@4,data,import address table slot of RegCloseKey
+0140F004,__imp__RegCreateKeyExA@36,data,import address table slot of RegCreateKeyExA
+0140F008,__imp__RegSetValueExA@24,data,import address table slot of RegSetValueExA
+0140F00C,__imp__RegQueryValueExA@24,data,import address table slot of RegQueryValueExA
+0140F010,__imp__RegOpenKeyA@12,data,import address table slot of RegOpenKeyA
+0140F018,__imp__GetModuleHandleA@4,data,import address table slot of GetModuleHandleA
+0140F01C,__imp__GetLongPathNameA@12,data,import address table slot of GetLongPathNameA
+0140F020,__imp__GetModuleFileNameA@12,data,import address table slot of GetModuleFileNameA
+0140F024,__imp__CloseHandle@4,data,import address table slot of CloseHandle
+0140F028,__imp__ReleaseMutex@4,data,import address table slot of ReleaseMutex
+0140F02C,__imp__GetCommandLineA@0,data,import address table slot of GetCommandLineA
+0140F030,__imp__WaitForSingleObject@8,data,import address table slot of WaitForSingleObject
+0140F034,__imp__FreeLibrary@4,data,import address table slot of FreeLibrary
+0140F038,__imp__CreateMutexA@12,data,import address table slot of CreateMutexA
+0140F03C,__imp__GetCurrentDirectoryA@8,data,import address table slot of GetCurrentDirectoryA
+0140F054,__imp__LoadLibraryA@4,data,import address table slot of LoadLibraryA
+0140F058,__imp__GetProcAddress@8,data,import address table slot of GetProcAddress
+0140F064,__imp__GetLastError@0,data,import address table slot of GetLastError
+0140F184,__imp__FindWindowA@8,data,import address table slot of FindWindowA
+0140F188,__imp__PostMessageA@16,data,import address table slot of PostMessageA
+0140F18C,__imp__wsprintfA,data,import address table slot of wsprintfA
+0140F190,__imp__MessageBoxA@16,data,import address table slot of MessageBoxA
+0140F198,__imp__WSAStartup@8,data,import address table slot of WSAStartup
+0140F19C,__imp__WSACleanup@0,data,import address table slot of WSACleanup
+0140F1D0,??_7CCommandLine@@6B@,data,"launcher global, referenced from the disassembly"
+0140F1F4,??_7CRegistry@@6B@,data,"launcher global, referenced from the disassembly"
+01411040,?cmdline@@3PAVICommandLine@@A,data,"launcher global, referenced from the disassembly"
+01411084,??_C@_0CL@OMIN@Parameter?5file?5?8?$CFs?8?5not?5found?0?5s@,data,"string literal, matched by content"
+014110B0,??_C@_01LHO@r?$AA@,data,"string literal, matched by content"
+014110B4,??_C@_01FCOA@?5?$AA@,data,"string literal, matched by content"
+014110B8,??_C@_02MECO@?$CFd?$AA@,data,"string literal, matched by content"
+014110BC,??_C@_06NBDG@?$CFs?4dll?$AA@,data,"string literal, matched by content"
+014110C4,??_C@_0BA@PKLD@CreateInterface?$AA@,data,"string literal, matched by content"
+014110D4,??_C@_04GGJF@?9d3d?$AA@,data,"string literal, matched by content"
+014110DC,??_C@_03NPEK@?9gl?$AA@,data,"string literal, matched by content"
+014110E0,??_C@_09CLHK@?9software?$AA@,data,"string literal, matched by content"
+014110EC,??_C@_05PEIP@?9soft?$AA@,data,"string literal, matched by content"
+014110F4,??_C@_06BOGI@sw?4dll?$AA@,data,"string literal, matched by content"
+014110FC,??_C@_09KNEG@EngineDLL?$AA@,data,"string literal, matched by content"
+01411108,??_C@_06FHIL@hw?4dll?$AA@,data,"string literal, matched by content"
+01411110,??_C@_0FD@CAJH@The?5specified?5video?5mode?5is?5not?5@,data,"string literal, matched by content"
+01411164,??_C@_0BK@KMGN@Video?5mode?5change?5failure?$AA@,data,"string literal, matched by content"
+01411180,??_C@_0M@KHJK@ScreenWidth?$AA@,data,"string literal, matched by content"
+0141118C,??_C@_0N@PIKM@ScreenHeight?$AA@,data,"string literal, matched by content"
+0141119C,??_C@_09DBBL@ScreenBPP?$AA@,data,"string literal, matched by content"
+014111A8,??_C@_0CH@EHPG@Could?5not?5find?5filesystem?5dll?5to@,data,"string literal, matched by content"
+014111D0,??_C@_0EH@CGNO@Could?5not?5load?5filesystem?5dll?4?6F@,data,"string literal, matched by content"
+01411218,??_C@_0EO@HEDK@Game?5cannot?5be?5run?5from?5director@,data,"string literal, matched by content"
+01411268,??_C@_0M@MMAJ@Fatal?5Error?$AA@,data,"string literal, matched by content"
+01411274,??_C@_0BF@EAN@filesystem_stdio?4dll?$AA@,data,"string literal, matched by content"
+0141128C,??_C@_0L@HJGB@PATH?$DN?$CFs?$DL?$CFs?$AA@,data,"string literal, matched by content"
+01411298,??_C@_04NCOD@path?$AA@,data,"string literal, matched by content"
+014112A0,??_C@_0BF@MHND@filesystem_steam?4dll?$AA@,data,"string literal, matched by content"
+014112B8,??_C@_09NKHA@steam?4dll?$AA@,data,"string literal, matched by content"
+014112C4,??_C@_05HJHK@?$CLload?$AA@,data,"string literal, matched by content"
+014112CC,??_C@_06LDNA@?9novid?$AA@,data,"string literal, matched by content"
+014112D4,??_C@_08KLFM@?$CLconnect?$AA@,data,"string literal, matched by content"
+014112E0,??_C@_07NICM@?9height?$AA@,data,"string literal, matched by content"
+014112E8,??_C@_02IPJO@?9h?$AA@,data,"string literal, matched by content"
+014112EC,??_C@_06CHDI@?9width?$AA@,data,"string literal, matched by content"
+014112F4,??_C@_02CHLD@?9w?$AA@,data,"string literal, matched by content"
+014112F8,??_C@_0M@JAI@?9fullscreen?$AA@,data,"string literal, matched by content"
+01411304,??_C@_05GBIP@?9full?$AA@,data,"string literal, matched by content"
+0141130C,??_C@_07NEJJ@?9window?$AA@,data,"string literal, matched by content"
+01411314,??_C@_09FACO@?9windowed?$AA@,data,"string literal, matched by content"
+01411320,??_C@_0P@NBLP@?9startwindowed?$AA@,data,"string literal, matched by content"
+01411330,??_C@_03ONDI@?9sw?$AA@,data,"string literal, matched by content"
+01411334,??_C@_0DF@BDEH@Could?5not?5load?5?$CFs?4?6Please?5try?5ag@,data,"string literal, matched by content"
+0141136C,??_C@_0CA@FHMB@VENGINE_LAUNCHER_API_VERSION002?$AA@,data,"string literal, matched by content"
+0141138C,??_C@_04DIDG@ROOT?$AA@,data,"string literal, matched by content"
+01411394,??_C@_0P@MFHD@VFileSystem009?$AA@,data,"string literal, matched by content"
+014113A4,??_C@_0HO@DGD@The?5game?5has?5detected?5that?5the?5p@,data,"string literal, matched by content"
+01411424,??_C@_0II@GLIK@The?5game?5has?5detected?5that?5the?5p@,data,"string literal, matched by content"
+014114AC,??_C@_09DIKB@EngineD3D?$AA@,data,"string literal, matched by content"
+014114B8,??_C@_0BL@IPNP@CrashInitializingVideoMode?$AA@,data,"string literal, matched by content"
+014114D4,??_C@_05JODL@valve?$AA@,data,"string literal, matched by content"
+014114DC,??_C@_05DFAG@czero?$AA@,data,"string literal, matched by content"
+014114E4,??_C@_05MFGI@?9game?$AA@,data,"string literal, matched by content"
+014114EC,??_C@_06CIKB@hl?4exe?$AA@,data,"string literal, matched by content"
+014114F4,??_C@_06BMHC@?9steam?$AA@,data,"string literal, matched by content"
+014114FC,??_C@_0EM@LDPP@Could?5not?5launch?5game?4?6Only?5one?5@,data,"string literal, matched by content"
+01411548,??_C@_05CKBG@Error?$AA@,data,"string literal, matched by content"
+01411550,??_C@_0BL@BLEN@ValveHalfLifeLauncherMutex?$AA@,data,"string literal, matched by content"
+0141156C,??_C@_02JKAF@rb?$AA@,data,"string literal, matched by content"
+01411570,??_C@_07FBJK@cstrike?$AA@,data,"string literal, matched by content"
+01411578,?registry@@3PAVIRegistry@@A,data,"launcher global, referenced from the disassembly"
+014115B0,??_C@_0BM@BBDC@Software?2Valve?2?$CFs?2Settings?2?$AA@,data,"string literal, matched by content"
+014115CC,??_C@_09OKKL@Half?9Life?$AA@,data,"string literal, matched by content"
+014115D8,??_C@_0L@PAEI@?9applaunch?$AA@,data,"string literal, matched by content"
+014115E4,??_C@_07HDLI@?9silent?$AA@,data,"string literal, matched by content"
+014115EC,??_C@_0DH@OAMA@Error?5running?5game?3?5could?5not?5fi@,data,"string literal, matched by content"
+01411624,??_C@_08GLFD@SteamExe?$AA@,data,"string literal, matched by content"
+01411630,??_C@_09EGEK@steam?4exe?$AA@,data,"string literal, matched by content"
+0141163C,??_C@_0O@PCBH@steam_dev?4exe?$AA@,data,"string literal, matched by content"
+0141164C,??_C@_0BF@MHEN@Valve_SteamIPC_Class?$AA@,data,"string literal, matched by content"
+01411664,??_C@_0O@BFMN@Hidden?5Window?$AA@,data,"string literal, matched by content"
+01411674,??_C@_09CKLC@TempAppID?$AA@,data,"string literal, matched by content"
+01411680,??_C@_0P@JLOC@TempAppCmdLine?$AA@,data,"string literal, matched by content"
+01411690,??_C@_0M@ONGC@TempAppPath?$AA@,data,"string literal, matched by content"
+0141169C,??_C@_0BF@MFEA@Software?2Valve?2Steam?$AA@,data,"string literal, matched by content"
+01412B30,_?sz@?1??CheckParm@CCommandLine@@UAEPADPBDPAPAD@Z@4PADA,data,"launcher global, referenced from the disassembly"
+01412BB0,_g_CmdLine,data,"launcher global, referenced from the disassembly"
+01412BB8,?s_pInterfaceRegs@InterfaceReg@@2PAV1@A,data,"launcher global, referenced from the disassembly"
+01412BBC,?szNewCommandParams@@3PADA,data,"launcher global, referenced from the disassembly"
+014133BC,?szBaseDir@@3PADA,data,"launcher global, referenced from the disassembly"
+014134C0,?com_gamedir@@3PADA,data,"launcher global, referenced from the disassembly"
+014135C4,?g_pFileSystem@@3PAVIFileSystem@@A,data,"launcher global, referenced from the disassembly"
+014139B0,?g_szEXEName_guess@@3PADA,data,"launcher global, referenced from the disassembly"
+035135C8,?szDefaultEngineDLL_guess@@3PADA,data,"launcher global, referenced from the disassembly"
+035135D0,_?value@?1??ReadString@CRegistry@@UAEPBDPBD0@Z@4PADA,data,"launcher global, referenced from the disassembly"
+035137D0,_g_Registry,data,"launcher global, referenced from the disassembly"

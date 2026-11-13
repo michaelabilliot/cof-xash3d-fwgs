@@ -1,0 +1,9 @@
+_Info_SetValueForStarKey
+_Info_SetValueForKey
+_Info_Print
+_Info_ValueForKey
+_Info_RemoveKey
+_Info_RemovePrefixedKeys
+_Info_IsKeyImportant
+_Info_FindLargestKey
+_Info_IsValid

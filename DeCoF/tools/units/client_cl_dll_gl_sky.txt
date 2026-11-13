@@ -1,0 +1,8 @@
+?InitSky@@YAXXZ
+?MsgSkyMarker_Sky@@YAHPBDHPAX@Z
+?MsgSkyMarker_World@@YAHPBDHPAX@Z
+?ResetSky@@YAXXZ
+?SetSkyAngles@@YAXXZ
+?StoreSkyboxEntity@@YAXPAUcl_entity_s@@@Z
+?DrawSky@@YAXXZ
+?CheckSky@@YAXXZ

@@ -1,0 +1,17 @@
+_memfgets
+_IsComment
+_IsStartOfText
+_IsEndOfText
+_IsWhiteSpace
+_SkipSpace
+_SkipText
+_ParseFloats
+_TrimSpace
+_IsToken
+_ParseDirective
+_TextMessageShutdown
+_TextMessageInit
+_TextMessageParse
+_SetDemoMessage
+_TextMessageGet
+_TextMessageDrawCharacter

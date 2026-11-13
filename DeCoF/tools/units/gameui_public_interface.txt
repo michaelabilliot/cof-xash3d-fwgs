@@ -1,0 +1,9 @@
+??0InterfaceReg@@QAE@P6APAVIBaseInterface@@XZPBD@Z
+_CreateInterface
+?Sys_GetProcAddress@@YAPAXPAXPBD@Z
+?Sys_LoadModule@@YAPAVCSysModule@@PBD@Z
+?Sys_UnloadModule@@YAXPAVCSysModule@@@Z
+?Sys_GetFactory@@YAP6APAVIBaseInterface@@PBDPAH@ZPAVCSysModule@@@Z
+?Sys_GetFactoryThis@@YAP6APAVIBaseInterface@@PBDPAH@ZXZ
+?Sys_GetFactory@@YAP6APAVIBaseInterface@@PBDPAH@Z0@Z
+?Sys_GetProcAddress@@YAPAXPBD0@Z

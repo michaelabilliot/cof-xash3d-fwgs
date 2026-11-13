@@ -1,0 +1,8 @@
+_CL_InitExtrap
+_CL_FindInterpolationUpdates
+_CL_BoundInterpolationFraction
+_CL_UpdatePositions
+_CL_ResetPositions
+_CL_PureOrigin
+_CL_ComputePlayerOrigin
+_CL_InterpolateEntity

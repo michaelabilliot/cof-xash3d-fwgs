@@ -1,0 +1,17 @@
+??0CListBox@vgui@@QAE@XZ
+??1CListBox@vgui@@QAE@XZ
+?GetItemWidth@CListBox@vgui@@QAEHXZ
+?InternalLayout@CListBox@vgui@@IAEXXZ
+?SetScrollRange@CListBox@vgui@@QAEXH@Z
+?Term@CListBox@vgui@@QAEXXZ
+?setPixelScroll@CListBox@vgui@@UAEXH@Z
+?AddItem@CListBox@vgui@@QAEXPAVPanel@2@@Z
+?GetNumItems@CListBox@vgui@@QAEHXZ
+?GetScrollMax@CListBox@vgui@@QAEHXZ
+?SetScrollPos@CListBox@vgui@@QAEXH@Z
+?intChanged@ListBoxSignal@CListBox@vgui@@UAEXHPAVPanel@3@@Z
+?paintBackground@CListBox@vgui@@UAEXXZ
+?setPos@CListBox@vgui@@UAEXHH@Z
+?setSize@CListBox@vgui@@UAEXHH@Z
+?GetScrollPos@CListBox@vgui@@QAEHXZ
+?Init@CListBox@vgui@@QAEXXZ

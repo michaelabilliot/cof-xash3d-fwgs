@@ -1,0 +1,14 @@
+??$GetClassPtr@VCKeypadNew@@@@YAPAVCKeypadNew@@PAV0@@Z
+?HandleAnimEvent@CKeypadNew@@EAEXPAUMonsterEvent_t@@@Z
+?KeyValue@CKeypadNew@@EAEXPAUKeyValueData_s@@@Z
+?KeypadThink@CKeypadNew@@AAEXXZ
+?KeypadUse@CKeypadNew@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?ObjectCaps@CKeypadNew@@EAEHXZ
+?Precache@CKeypadNew@@EAEXXZ
+?Restore@CKeypadNew@@EAEHAAVCRestore@@@Z
+?Save@CKeypadNew@@EAEHAAVCSave@@@Z
+?Spawn@CKeypadNew@@EAEXXZ
+_cof_keypadnew
+?EnterNumber@CKeypadNew@@AAEXH@Z
+?SetSequenceByName@CKeypadNew@@AAEXPAD@Z
+?ItemUse@CItem@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z

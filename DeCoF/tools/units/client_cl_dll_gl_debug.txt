@@ -1,0 +1,9 @@
+?DrawTextureVecs@@YAXXZ
+?DrawVectorDir@@YAXABVVector@@0MMMMM@Z
+?DumpLeafInfo@@YAXXZ
+?DumpLevel@@YAXXZ
+?PrintOtherDebugInfo@@YAXXZ
+?RecursiveDrawTextureVecs@@YAHPAUmnode_s@@ABVVector@@1@Z
+?TextureId@@YAHPBD@Z
+?WriteTGA_24@@YAHPAUcolor24@@GGPBD@Z
+?DumpTextures@@YAXXZ

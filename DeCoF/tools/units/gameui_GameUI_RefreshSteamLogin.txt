@@ -1,0 +1,12 @@
+??0CRefreshSteamLogin@@QAE@PAVPanel@vgui2@@PBD@Z
+??1CRefreshSteamLogin@@UAE@XZ
+?OnCommand@CRefreshSteamLogin@@MAEXPBD@Z
+?OnClose@CRefreshSteamLogin@@MAEXXZ
+?OnThink@CRefreshSteamLogin@@MAEXXZ
+?Activate@CRefreshSteamLogin@@UAEXXZ
+??_GCRefreshSteamLogin@@UAEPAXI@Z
+??0CRefreshSteamLogin_RegisterMap@CRefreshSteamLogin@@QAE@XZ
+?ChainToMap@CRefreshSteamLogin@@SAXXZ
+?GetMessageMap@CRefreshSteamLogin@@UAEPAUPanelMessageMap@vgui2@@XZ
+?GetPanelClassName@CRefreshSteamLogin@@SAPBDXZ
+?GetPanelBaseClassName@CRefreshSteamLogin@@SAPBDXZ

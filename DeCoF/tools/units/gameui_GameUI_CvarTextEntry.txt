@@ -1,0 +1,16 @@
+??0CCvarTextEntry@@QAE@PAVPanel@vgui2@@PBD1@Z
+??1CCvarTextEntry@@UAE@XZ
+?ApplySchemeSettings@CCvarTextEntry@@UAEXPAVIScheme@vgui2@@@Z
+?ApplyChanges@CCvarTextEntry@@QAEX_N@Z
+?Reset@CCvarTextEntry@@QAEXXZ
+?HasBeenModified@CCvarTextEntry@@QAE_NXZ
+?OnTextChanged@CCvarTextEntry@@UAEXXZ
+??_GCCvarTextEntry@@UAEPAXI@Z
+??0CCvarTextEntry_RegisterMap@CCvarTextEntry@@QAE@XZ
+?ChainToMap@CCvarTextEntry@@SAXXZ
+?GetMessageMap@CCvarTextEntry@@UAEPAUPanelMessageMap@vgui2@@XZ
+?GetPanelClassName@CCvarTextEntry@@SAPBDXZ
+?GetPanelBaseClassName@CCvarTextEntry@@SAPBDXZ
+??0PanelMessageFunc_OnTextChanged@CCvarTextEntry@@QAE@XZ
+?InitVar@PanelMessageFunc_OnTextChanged@CCvarTextEntry@@SAXXZ
+?AddToMap@CCvarTextEntry@@SAXPBDP8Panel@vgui2@@AEXXZHH0H0@Z

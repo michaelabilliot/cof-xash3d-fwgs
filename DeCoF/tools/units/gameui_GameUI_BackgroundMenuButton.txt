@@ -1,0 +1,6 @@
+??0CBackgroundMenuButton@@QAE@PAVPanel@vgui2@@PBD@Z
+??1CBackgroundMenuButton@@UAE@XZ
+?OnCommand@CBackgroundMenuButton@@UAEXPBD@Z
+?ApplySchemeSettings@CBackgroundMenuButton@@EAEXPAVIScheme@vgui2@@@Z
+??_GCBackgroundMenuButton@@UAEPAXI@Z
+?SetArmed@CBackgroundMenuButton@@UAEX_N@Z

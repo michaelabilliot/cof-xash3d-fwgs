@@ -1,0 +1,17 @@
+?fgetLittleShort@@YAHPAPAE@Z
+?fgetLittleLong@@YAHPAPAE@Z
+?AveragePixels@@YAEH@Z
+?GrabMip@@YAHPAXPAEPADKPAH3@Z
+?UpdateLogoWAD@@YA_NPAXHHH@Z
+?GrabMipFromTGA@@YAHPAE0PADKHH@Z
+?UpdateLogoWADFromTGA@@YA_NPBD@Z
+?LoadTGA@@YA_NPBDPAEHPAH2H@Z
+??1CUtlBuffer@@QAE@XZ
+?TellPut@CUtlBuffer@@QBEHXZ
+?Base@CUtlBuffer@@QAEPAXXZ
+?Size@CUtlBuffer@@QBEHXZ
+??1?$CUtlMemory@E@@QAE@XZ
+?Base@?$CUtlMemory@E@@QAEPAEXZ
+?NumAllocated@?$CUtlMemory@E@@QBEHXZ
+?Purge@?$CUtlMemory@E@@QAEXXZ
+?IsExternallyAllocated@?$CUtlMemory@E@@QBE_NXZ

@@ -1,0 +1,17 @@
+?GetPainColor@CHudHealth@@QAEXAAH00@Z
+?__MsgFunc_Damage@@YAHPBDHPAX@Z
+?__MsgFunc_Health@@YAHPBDHPAX@Z
+?CalcDamageDirection@CHudHealth@@AAEXVVector@@@Z
+?Draw@CHudHealth@@UAEHM@Z
+?DrawDamage@CHudHealth@@AAEHM@Z
+?DrawPain@CHudHealth@@AAEHM@Z
+?Init@CHudHealth@@UAEHXZ
+?Reset@CHudHealth@@UAEXXZ
+?UpdateTiles@CHudHealth@@AAEXMJ@Z
+?__MsgFunc_Syringe@@YAHPBDHPAX@Z
+?MsgFunc_AdLib@CHudHealth@@QAEHPBDHPAX@Z
+?MsgFunc_Damage@CHudHealth@@QAEHPBDHPAX@Z
+?MsgFunc_Health@CHudHealth@@QAEHPBDHPAX@Z
+?MsgFunc_Syringe@CHudHealth@@QAEHPBDHPAX@Z
+?__MsgFunc_AdLib@@YAHPBDHPAX@Z
+?VidInit@CHudHealth@@UAEHXZ

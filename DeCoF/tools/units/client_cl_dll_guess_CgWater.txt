@@ -1,0 +1,11 @@
+?DrawBlackQuad_guess@CCgWater_guess@@QAEXXZ
+?Init_guess@CCgWater_guess@@QAEXXZ
+?PostDraw_guess@CCgWater_guess@@QAEXXZ
+?PreDraw_guess@CCgWater_guess@@QAEXXZ
+?ScreenQuad_guess@CCgWater_guess@@QAEXXZ
+?SetBlackShader_guess@CCgWater_guess@@QAEXXZ
+?UpdateEntities_guess@CCgWater_guess@@QAEXXZ
+?Render_guess@CCgWater_guess@@QAEXXZ
+??0CCgWater_guess@@QAE@XZ
+?EndShaders_guess@CCgWater_guess@@QAEXXZ
+??__Eg_CgWater_guess@@YAXXZ

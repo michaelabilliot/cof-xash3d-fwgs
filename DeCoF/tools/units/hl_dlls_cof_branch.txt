@@ -1,0 +1,13 @@
+??$GetClassPtr@VCBranch@@@@YAPAVCBranch@@PAV0@@Z
+?Deploy@CBranch@@UAEHXZ
+?Fidget@CBranch@@UAEXXZ
+?GetItemInfo@CBranch@@UAEHPAUItemInfo@@@Z
+?Holster@CBranch@@UAEXXZ
+?ItemPostFrame@CBranch@@UAEXXZ
+?Precache@CBranch@@UAEXXZ
+?PrimaryAttack@CBranch@@UAEXXZ
+?SecondaryAttack@CBranch@@UAEXXZ
+?ShouldWeaponIdle@CBranch@@UAEHXZ
+?Spawn@CBranch@@UAEXXZ
+?WeaponIdle@CBranch@@UAEXXZ
+_weapon_branch

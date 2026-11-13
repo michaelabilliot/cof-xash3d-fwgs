@@ -1,0 +1,9 @@
+_BZ2_bsInitWrite
+_BZ2_compressBlock
+_bsFinishWrite
+_bsW
+_bsPutUInt32
+_bsPutUChar
+_generateMTFValues
+_makeMaps_e
+_sendMTFValues

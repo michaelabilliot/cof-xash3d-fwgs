@@ -1,0 +1,7 @@
+??$GetClassPtr@VCSubwayBreakWall@@@@YAPAVCSubwayBreakWall@@PAV0@@Z
+?ObjectCaps@CSubwayBreakWall@@UAEHXZ
+?Precache@CSubwayBreakWall@@UAEXXZ
+?Spawn@CSubwayBreakWall@@UAEXXZ
+?TakeDamage@CSubwayBreakWall@@UAEHPAUentvars_s@@0MH@Z
+?Use@CSubwayBreakWall@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_trigger_subwaywall

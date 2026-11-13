@@ -1,0 +1,12 @@
+??0CVoiceBanMgr@@QAE@XZ
+?Clear@CVoiceBanMgr@@IAEXXZ
+?ForEachBannedPlayer@CVoiceBanMgr@@QAEXP6AXQAD@Z@Z
+?HashPlayerID@@YAEQBD@Z
+?Init@CVoiceBanMgr@@QAE_NPBD@Z
+?SaveState@CVoiceBanMgr@@QAEXPBD@Z
+?GetPlayerBan@CVoiceBanMgr@@QAE_NQBD@Z
+?InternalFindPlayerSquelch@CVoiceBanMgr@@IAEPAVBannedPlayer@1@QBD@Z
+?SetPlayerBan@CVoiceBanMgr@@QAEXQBD_N@Z
+?AddBannedPlayer@CVoiceBanMgr@@IAEPAVBannedPlayer@1@QBD@Z
+?Term@CVoiceBanMgr@@QAEXXZ
+??1CVoiceBanMgr@@QAE@XZ

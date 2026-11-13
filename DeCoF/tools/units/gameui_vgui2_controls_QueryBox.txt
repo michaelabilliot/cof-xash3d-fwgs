@@ -1,0 +1,16 @@
+??0QueryBox@vgui2@@QAE@PBD0PAVPanel@1@@Z
+??0QueryBox@vgui2@@QAE@PBG0PAVPanel@1@@Z
+??1QueryBox@vgui2@@UAE@XZ
+?PerformLayout@QueryBox@vgui2@@UAEXXZ
+?OnCommand@QueryBox@vgui2@@MAEXPBD@Z
+?SetOKCommand@QueryBox@vgui2@@QAEXPAVKeyValues@@@Z
+?SetOKCommandValue@QueryBox@vgui2@@QAEXPBDH@Z
+?SetCancelCommand@QueryBox@vgui2@@QAEXPAVKeyValues@@@Z
+?SetCancelButtonText@QueryBox@vgui2@@QAEXPBD@Z
+?SetCancelButtonText@QueryBox@vgui2@@QAEXPBG@Z
+?OnKeyCodeTyped@QueryBox@vgui2@@MAEXW4KeyCode@2@@Z
+?SetKeyFocusOnCancelButton@QueryBox@vgui2@@QAEXXZ
+??_GQueryBox@vgui2@@UAEPAXI@Z
+??0QueryBox_RegisterMap@QueryBox@vgui2@@QAE@XZ
+?ChainToMap@QueryBox@vgui2@@SAXXZ
+?GetPanelBaseClassName@QueryBox@vgui2@@SAPBDXZ

@@ -1,0 +1,11 @@
+?SetJoinTeamCombo@CCreateMultiplayerGameBotPage@@AAEXPBD@Z
+?SetChatterCombo@CCreateMultiplayerGameBotPage@@AAEXPBD@Z
+??0CCreateMultiplayerGameBotPage@@QAE@PAVPanel@vgui2@@PBDPAVKeyValues@@@Z
+??1CCreateMultiplayerGameBotPage@@UAE@XZ
+?OnResetChanges@CCreateMultiplayerGameBotPage@@MAEXXZ
+?UpdateKeys@CCreateMultiplayerGameBotPage@@QAEXPAVKeyValues@@@Z
+?OnApplyChanges@CCreateMultiplayerGameBotPage@@MAEXXZ
+?GetMessageMap@PropertyPage@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@PropertyPage@vgui2@@SAPBDXZ
+?SetPaintBorder@PropertyPage@vgui2@@UAEX_N@Z
+??_GCCreateMultiplayerGameBotPage@@UAEPAXI@Z

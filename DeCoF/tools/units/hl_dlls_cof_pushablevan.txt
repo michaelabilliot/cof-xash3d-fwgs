@@ -1,0 +1,7 @@
+??$GetClassPtr@VCPushableVan@@@@YAPAVCPushableVan@@PAV0@@Z
+?ObjectCaps@CPushableVan@@EAEHXZ
+?Precache@CPushableVan@@EAEXXZ
+?Spawn@CPushableVan@@EAEXXZ
+?VanThink@CPushableVan@@AAEXXZ
+?VanUse@CPushableVan@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_cof_pushablevan

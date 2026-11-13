@@ -1,0 +1,142 @@
+va,name,kind,evidence
+100B4AA0,?GiveFnptrsToDll@@YGXPAUenginefuncs_s@@PAUglobalvars_t@@@Z,func,export GiveFnptrsToDll@8 (ordinal 1)
+100B4AD0,_DllMain@12,func,called by the CRT DLL entry (dllmain_dispatch) with the DllMain arguments; same body as the 1.55 DllMain
+10222F48,?g_engfuncs@@3Uenginefuncs_s@@A,data,GiveFnptrsToDll copies 0x90 dwords of pengfuncsFromEngine here (rep movsd)
+10223188,?gpGlobals@@3PAUglobalvars_t@@A,data,GiveFnptrsToDll stores pGlobals here
+1016F5EC,_atof,func,libucrt.lib (SDK 10.0.19041) atof.obj: _atof follows __wtof in section order; both call common_atof; __wtof is the other one
+1016F5CE,__wtof,func,libucrt.lib (SDK 10.0.19041) atof.obj: __wtof precedes _atof in section order
+1013DF50,__ftol2_sse,func,code: SSE3 check then fisttp dword (32-bit result); __ftol2 at 1013E080 is the fisttp qword (64-bit) variant
+1017BCBB,_stricmp,func,code: __locale_changed check then __ascii_stricmp (UCRT _stricmp)
+100099E0,_PM_UpdateStepSound,func,1.55 name carry of PM_UpdateStepSound (C function: underscore decoration)
+10226728,?gSkillData@@3Uskilldata_t@@A,data,"RefreshSkillData stores the skill level here after the ""GAME SKILL LEVEL:%d"" alert; ""sk_syringe_heal"" goes to +4 and ""sk_cof_glock"" to +0x128 (skilldata_t of the 1.55 PDB: iSkillLevel, syringeHeal, ... DmgGlock)"
+10231F50,?m_usThirdFlash@@3GA,data,"holds PRECACHE_EVENT( 1 ""events/muzzleflash.sc"" ); the 1.55 m_usThirdFlash (PDB) holds the same event"
+1016BE90,__libm_sse2_sqrt_precise,func,CRT bytes (crt_bytes match); listed here so DelinkUnits removes a stale ?Length2D label at this address
+101011D0,?ScheduleChange@CSquadMonster@@UAEXXZ,func,CSquadMonster vtable slot +0x194 (ScheduleChange in the 1.55 PDB vtable layout) points here; body is jmp 10101980
+10101980,?VacateSlot@CSquadMonster@@QAEXXZ,func,jmp target of ScheduleChange (101011D0); the 1.55 ScheduleChange body is a single call to VacateSlot
+1000DA20,?GiveAmmo@CBaseEntity@@UAEHHPADH_N@Z,func,"code pops 16 bytes (or eax,-1; ret 0x10): four parameters in 1.6a, the 1.55 PDB name has three; the fourth is a bool (CBasePlayer::GiveAmmo tests it as a byte); tools/sigcheck.py"
+100E04D0,?GiveAmmo@CBasePlayer@@UAEHHPADH_N@Z,func,"ret 0x10: four parameters in 1.6a, the 1.55 PDB name has three; cmp byte ptr [ebp+0x14],0 makes the fourth a bool; tools/sigcheck.py"
+100E0A80,?GiveNamedItem@CBasePlayer@@QAEXPBD_N1@Z,func,"ret 0xc: three parameters in 1.6a, the 1.55 PDB name has two; [ebp+0xc] and [ebp+0x10] are both tested as bytes (bool); CGamePlayerEquip::EquipPlayer pushes three arguments; tools/sigcheck.py"
+100F5DA0,?SufficientlyOffTheGround@CBasePlayer@@QAEHXZ,func,"1.55 PDB CBasePlayer::SufficientlyOffTheGround (10122190) returns TRUE when m_bJustJumped (0x39A in 1.55) is set; this 1.6a body returns m_bJustJumped (0x3AA in 1.6a) != 0, and the weapons' ItemPostFrame call it where 1.55 calls SufficientlyOffTheGround; callers test eax (int return)"
+1002A8E0,??$GetClassPtr@VCGib@@@@YAPAVCGib@@PAV0@@Z,func,"bytes identical to our GetClassPtr<CGib> (combat.obj, relocated fields masked); the 1.55 transfer named it ??0CGib@@QAE@XZ, whose body 1.6a inlines into GetClassPtr; CGibShooter::CreateGib calls it where our source calls GetClassPtr( (CGib *)NULL )"
+100B80B0,??$GetClassPtr@VCMark@@@@YAPAVCMark@@PAV0@@Z,func,"bytes identical to our GetClassPtr<CMark> (locus.obj, relocated fields masked); the 1.55 transfer named it ??0CMark@@QAE@XZ (constructor inlined in 1.6a); CLocusVariable::Use calls it where our source calls GetClassPtr"
+10107BF0,??$GetClassPtr@VCMotionThread@@@@YAPAVCMotionThread@@PAV0@@Z,func,"bytes identical to our GetClassPtr<CMotionThread> (triggers.obj, relocated fields masked); the 1.55 transfer named it ??0CMotionThread@@QAE@XZ (constructor inlined in 1.6a)"
+10107CB0,??$GetClassPtr@VCRenderFxFader@@@@YAPAVCRenderFxFader@@PAV0@@Z,func,"bytes identical to our GetClassPtr<CRenderFxFader> (triggers.obj, relocated fields masked); the 1.55 transfer named it ??0CRenderFxFader@@QAE@XZ (constructor inlined in 1.6a)"
+10018440,??$GetClassPtr@VCBasePlayerWeapon@@@@YAPAVCBasePlayerWeapon@@PAV0@@Z,func,"bytes identical to our GetClassPtr<CBasePlayerWeapon> (client.obj, relocated fields masked); the 1.55 transfer named it ??0CBasePlayerWeapon@@QAE@XZ (constructor inlined in 1.6a); FireBulletsPlayer calls it where our source calls GetClassPtr"
+1010BA80,?InitTrigger@CBaseTrigger@@QAEXXZ,func,"bytes identical to our CBaseTrigger::InitTrigger (triggers.obj, 185 bytes, relocated fields masked); the 1.55 transfer named it ?Spawn@CTriggerCDAudio@@UAEXXZ, which in 1.6a is a 5-byte jmp to this function"
+10040040,?ToggleSwitch@CFlashlight@@QAEXXZ,func,"bytes identical to our CFlashlight::ToggleSwitch (cof_flashlight.obj, 208 bytes, relocated fields masked); the 1.55 PDB has it at cof_flashlight.cpp:179; CFlashlight::PrimaryAttack ends with a jump to it; Ghidra had no function here and folded it into CFlashlightAmmo::Spawn"
+100534D0,?MessageGet@CMobile@@QAEXXZ,func,"bytes identical to our CMobile::MessageGet (cof_mobilephone.obj, 808 bytes, relocated fields masked); the 1.55 PDB has it at cof_mobilephone.cpp:581; called from CMobile::ItemPostFrame"
+100BBB30,?MakeMonster@CMonsterMaker@@QAEPAVCBaseMonster@@XZ,func,"bytes identical to our CMonsterMaker::MakeMonster (monstermaker.obj, relocated fields masked); CMonsterMaker::TryMakeMonster calls it and uses its return value (a MakeMonsterThink returns nothing); the 1.55 transfer had named it MakeMonsterThink"
+100BBDC0,?MakeMonsterThink@CMonsterMaker@@QAEXXZ,func,"bytes identical to our CMonsterMaker::MakeMonsterThink (monstermaker.obj, relocated fields masked); unnamed before, its name had gone to 100BBB30"
+100FC8F0,?EMIT_GROUPID_SUIT@@YAXPAUedict_s@@H@Z,func,"bytes identical to ?EMIT_GROUPID_SUIT@@YAXPAUedict_s@@H@Z in hl/dlls/sound (113 bytes, relocated fields masked); EMIT_GROUPNAME_SUIT is 115 bytes and differs; was EMIT_GROUPNAME_SUIT from refbytes:spirit score5"
+100921A0,??$GetClassPtr@VCShot@@@@YAPAVCShot@@PAV0@@Z,func,"bytes identical to GetClassPtr<CShot> in hl/dlls/effects (bytematch --at, relocated fields masked); was ??0CShot@@QAE@XZ from hl_1.55_to_1.6a.csv"
+100D9F00,??$GetClassPtr@VCBloodSplat@@@@YAPAVCBloodSplat@@PAV0@@Z,func,"GetClassPtr template body: pfnCreateEntity, pfnPvAllocEntPrivateData(0xdc), stores ??_7CBloodSplat@@6B@; was ??0CBloodSplat@@QAE@XZ from hl_1.55_to_1.6a.csv"
+100DA1A0,??$GetClassPtr@VCSprayCan@@@@YAPAVCSprayCan@@PAV0@@Z,func,"GetClassPtr template body: pfnCreateEntity, pfnPvAllocEntPrivateData(0xdc), stores ??_7CSprayCan@@6B@; was ??0CSprayCan@@QAE@XZ from hl_1.55_to_1.6a.csv"
+100D9EA0,??$GetClassPtr@VCBasePlayerItem@@@@YAPAVCBasePlayerItem@@PAV0@@Z,func,"GetClassPtr template body: pfnCreateEntity, pfnPvAllocEntPrivateData(0x16c = sizeof CBasePlayerItem); was ??0CBasePlayerItem@@QAE@XZ from hl_1.55_to_1.6a.csv"
+10226650,?gmsgFaggot@@3HA,data,"1.55 PDB name of the variable LinkUserMessages registers at this position (player.obj, message Faggot in 1.55); 1.6a only renamed the message string to BigPrick; was ?gmsgBigPrick@@3HA (named after the message)"
+100D2FA0,??$GetClassPtr@VCPlatTrigger@@@@YAPAVCPlatTrigger@@PAV0@@Z,func,"GetClassPtr template body: pfnCreateEntity, pfnPvAllocEntPrivateData(0xe0), stores ??_7CPlatTrigger@@6B@; was ??0CPlatTrigger@@QAE@XZ from hl_1.55_to_1.6a.csv"
+10100BD0,?SpectatorThink@CBaseSpectator@@QAEXXZ,func,"bytes identical to our CBaseSpectator::SpectatorThink (68 bytes, relocations masked); the client.cpp wrapper at 1001ECC0 tail-jumps here; was named SpectatorImpulseCommand"
+10100AE0,?SpectatorImpulseCommand@CBaseSpectator@@AAEXXZ,func,"bytes identical to our CBaseSpectator::SpectatorImpulseCommand (226 bytes, relocations masked); no function row there before"
+10100AA0,?SpectatorConnect@CBaseSpectator@@QAEXXZ,func,bytes identical to our SpectatorConnect and Spawn (folded by /OPT:ICF); the client.cpp wrapper at 1001EC80 tail-jumps here
+10100AD0,?SpectatorDisconnect@CBaseSpectator@@QAEXXZ,func,"the client.cpp wrapper at 1001ECA0 tail-jumps here; 3 bytes (ret), as our SpectatorDisconnect"
+1001EC80,?SpectatorConnect@@YAXPAUedict_s@@@Z,func,"edict wrapper (GET_PRIVATE then tail jump to 10100AA0, CBaseSpectator::SpectatorConnect); bytes identical to ours"
+1001ECA0,?SpectatorDisconnect@@YAXPAUedict_s@@@Z,func,edict wrapper tail-jumping to 10100AD0 (CBaseSpectator::SpectatorDisconnect); bytes identical to ours
+1001ECC0,?SpectatorThink@@YAXPAUedict_s@@@Z,func,edict wrapper tail-jumping to 10100BD0 (CBaseSpectator::SpectatorThink); bytes identical to ours; was named CBaseSpectator::SpectatorThink
+101A1F78,__real@c2b40000,data,"float constant -90.0, value checked against the retail bytes (0000b4c2)"
+100180E0,?SetModelCollisionBox@CBaseEntity@@QAEXXZ,func,"1.55 PDB name (cbase.obj, line 543) of the function with this body: GET_MODEL_PTR, ALERT Unable to fetch model pointer, UTIL_SetSize from the sequence bbox; called by CoF_KeyItem and CoF_PushableVan Spawn; was UTIL_AutoSetSize from a similarity match to Spirit"
+1005B2E0,?Precache@CMp5@@UAEXXZ,func,"CMp5 vtable slot of Precache; precaches the MP5 models and sounds (recorded by the MP5 agent, confirmed by objdiff)"
+1005B400,?PrimaryAttack@CMp5@@UAEXXZ,func,"CMp5 vtable slot of PrimaryAttack; fires the MP5 bullets and fire sound (recorded by the MP5 agent, confirmed by objdiff)"
+1005BB60,?Reload@CMp5@@UAEXXZ,func,"CMp5 vtable slot of Reload; DefaultReload calls (recorded by the MP5 agent, confirmed by objdiff)"
+1005BC60,?SecondaryAttack@CMp5@@UAEXXZ,func,"CMp5 vtable slot of SecondaryAttack (recorded by the MP5 agent, confirmed by objdiff)"
+1005C5F0,?Use@CMP5ModeSaveRestoreMP5@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z,func,CMP5ModeSaveRestoreMP5 vtable slot of Use; reads the mapper mode fields of CHalfLifeRules (recorded by the MP5 agent)
+10211028,_PM_boxpnt,data,address of our _PM_boxpnt reference in _PM_DrawBBox (instructions identical to retail); retail spelled it as a neighbour global plus offset
+10213F14,?pUsernames@CCofComputer@@2PAPBDA,data,address of our pUsernames reference in CCofComputer::Spawn and CPasswordNote::NoteUse (instructions identical); retail spelled it as m_SaveData@CEnvELight plus offset
+10218EE8,?rgdpvpreset@@3PAUdynpitchvol@@A,data,address of our rgdpvpreset reference in CAmbientGeneric::InitModulationParms (instructions identical); retail spelled it as m_SaveData@CScriptedSentence plus offset
+10231E08,?AmmoInfoArray@CBasePlayerItem@@2PAUAmmoInfo@@A,data,address of our AmmoInfoArray reference in AddAmmoNameToAmmoRegistry (instructions identical); 0x100 bytes end at g_sModelIndexLaser (10231F08)
+100089F0,_PM_PlayWaterSounds,func,1.55 PDB: PM_PlayWaterSounds (pm_shared.obj); PM_PlayerMove tail-jumps here and the body is ret 0
+1011E860,?Restore@CCSAug@@UAEHAAVCRestore@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSAug, CBasePlayerWeapon ): calls CBasePlayerWeapon::Restore and passes the string ""CCSAug"" with the class save table"
+1011E8E0,?Restore@CCSElites@@UAEHAAVCRestore@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSElites, CBasePlayerWeapon ): calls CBasePlayerWeapon::Restore and passes the string ""CCSElites"" with the class save table"
+1011E9A0,?Restore@CCSG3SG1@@UAEHAAVCRestore@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSG3SG1, CBasePlayerWeapon ): calls CBasePlayerWeapon::Restore and passes the string ""CCSG3SG1"" with the class save table"
+1011E9E0,?Restore@CCSM4A1@@UAEHAAVCRestore@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSM4A1, CBasePlayerWeapon ): calls CBasePlayerWeapon::Restore and passes the string ""CCSM4A1"" with the class save table"
+1011EF00,?Save@CCSAug@@UAEHAAVCSave@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSAug, CBasePlayerWeapon ): calls CBasePlayerWeapon::Save and passes the string ""CCSAug"" with the class save table"
+1011EFC0,?Save@CCSElites@@UAEHAAVCSave@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSElites, CBasePlayerWeapon ): calls CBasePlayerWeapon::Save and passes the string ""CCSElites"" with the class save table"
+1011F0E0,?Save@CCSG3SG1@@UAEHAAVCSave@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSG3SG1, CBasePlayerWeapon ): calls CBasePlayerWeapon::Save and passes the string ""CCSG3SG1"" with the class save table"
+1011F140,?Save@CCSM4A1@@UAEHAAVCSave@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSM4A1, CBasePlayerWeapon ): calls CBasePlayerWeapon::Save and passes the string ""CCSM4A1"" with the class save table"
+10119330,?UTIL_MonstersInSphere@@YAHPAPAVCBaseEntity@@HABVVector@@M@Z,func,"240 bytes like ours; loops over the edicts from gpGlobals->maxEntities with flags & (FL_CLIENT|FL_MONSTER) tests and a radius check, as HLSDK UTIL_MonstersInSphere; Ghidra had split it at 1011934F"
+1011A7A0,?UTIL_TeamsMatch@@YAHPBD0@Z,func,"g_pGameRules->IsTeamplay() then stricmp of the two names, as HLSDK UTIL_TeamsMatch"
+1011AB30,?UTIL_dtos1@@YAPADH@Z,func,"sprintf( buf, ""%d"", d ) into the first of four consecutive static 8-byte buffers, as HLSDK UTIL_dtos1"
+1011AB50,?UTIL_dtos2@@YAPADH@Z,func,"sprintf( buf, ""%d"", d ) into the second static buffer, as HLSDK UTIL_dtos2"
+1011AB70,?UTIL_dtos3@@YAPADH@Z,func,"sprintf( buf, ""%d"", d ) into the third static buffer, as HLSDK UTIL_dtos3"
+1011AB90,?UTIL_dtos4@@YAPADH@Z,func,"sprintf( buf, ""%d"", d ) into the fourth static buffer, as HLSDK UTIL_dtos4"
+1011B110,?WriteFloat@CSave@@QAEXPBDPBMH@Z,func,"forwards to CSave::BufferField; sits before CSave::WriteFunction in decorated-name order, as HLSDK CSave::WriteFloat"
+1011B190,?WriteInt@CSave@@QAEXPBDPBHH@Z,func,"forwards to CSave::BufferField; sits between CSave::WriteFunction and WritePositionVector in decorated-name order, as HLSDK CSave::WriteInt"
+1011E820,?Restore@CCSAWP@@UAEHAAVCRestore@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSAWP, CBasePlayerWeapon ): calls CBasePlayerWeapon::Restore and passes the string ""CCSAWP"" with the class save table"
+1011EEA0,?Save@CCSAWP@@UAEHAAVCSave@@@Z,func,"IMPLEMENT_SAVERESTORE( CCSAWP, CBasePlayerWeapon ): calls CBasePlayerWeapon::Save and passes the string ""CCSAWP"" with the class save table"
+100DB150,?AutoaimDeflection@CBasePlayer@@QAE?AVVector@@AAV2@MM@Z,func,UTIL_MakeVectors and UTIL_TraceLine loop of HLSDK CBasePlayer::AutoaimDeflection; size 1516 against our 1509
+100E0CE0,?GiveNamedItemAmmo@CBasePlayer@@QAEXPBDH@Z,func,"creates the named entity, DispatchSpawn and DispatchTouch it like GiveNamedItem; same size as ours (199)"
+100E1690,?GlobalSetEndingOrUnlockables@@YAXH_N@Z,func,reads and writes /scriptsettings.dat like the client SetEndingOrUnlockables; size 2564 against our 2565
+100E42F0,?InventoryIsFull@CBasePlayer@@QAEHXZ,func,calls CBasePlayer::IsSlotFree for the inventory slots; size 100 against our 101
+100E4D60,?IsDonator@CBasePlayer@@QAEHXZ,func,tests g_pGameRules and the donator state; same size as ours (156)
+100E4E00,?IsInCutscene@CBasePlayer@@QAE_NXZ,func,tests the EHANDLE at +0x2348 (the cutscene camera); same size as ours (76)
+100E8EB0,?MoveStatue@CBasePlayer@@QAEXHH@Z,func,"finds statue_eagle and the other statues by classname and moves them, as our CBasePlayer::MoveStatue"
+100DCE80,?CheckTimeBasedDamage@CBasePlayer@@QAEXXZ,func,"tests m_bitsDamageType & DMG_TIMEBASED (0xffffc000) and the 2-second gpGlobals->time interval, as HLSDK CBasePlayer::CheckTimeBasedDamage"
+100E4C30,?IsDeveloper@CBasePlayer@@QAEHXZ,func,"compares the player auth id with the developer STEAM_0 ids, as our CBasePlayer::IsDeveloper"
+100DC020,?CanBeDualWielded@CBasePlayer@@QAE_NH@Z,func,"switch on the weapon id 1..21 whose case 21 tests g_pWorld->pev->iuser3, as our CBasePlayer::CanBeDualWielded"
+100E4BF0,?IsAFlashlight@CBasePlayer@@QAE_NH@Z,func,"switch on the weapon id 1..13 returning true for the flashlight ids, as our CBasePlayer::IsAFlashlight"
+100DCE60,?CheckSuitUpdate@CBasePlayer@@QAEXXZ,func,"tests pev->weapons & (1<<WEAPON_SUIT) and tail-calls UpdateGeigerCounter, as our CheckSuitUpdate (the HEV voice part returns early)"
+100F8630,?UpdateGeigerCounter@CBasePlayer@@QAEXXZ,func,"tail-called by CheckSuitUpdate; same size as ours (161), HLSDK CBasePlayer::UpdateGeigerCounter; Ghidra had it inside CheckSuitUpdate"
+1005AB10,?ItemPostFrame@CMp5@@UAEXXZ,func,same size as our CMp5::ItemPostFrame (1961); CMp5 vtable slot of ItemPostFrame
+1005BD30,?SendInitMessage@CMP5Ammo@@EAEXPAVCBasePlayer@@@Z,func,same size as our CMP5Ammo::SendInitMessage (109)
+100358C0,?SetAmmoValues@CDualWeapon@@QAEXXZ,func,"called from CDualWeapon::Deploy at 100310A0 right after gDualWeapon.SetModel, the place of SetAmmoValues() in Deploy (added by an agent)"
+10035D50,?SetBodyForWeapons@CDualWeapon@@QAEX_N@Z,func,ret 4 stub between SetAmmoValues and Spawn in the alphabetical object order; 1.55 SetBodyForWeapons(bool) has an empty body (added by an agent)
+100360F0,?TMPShoot@CDualWeapon@@QAEX_N@Z,func,ret 4 stub between SwitchbladeSlash and ThrowRemove in the alphabetical object order; 1.55 TMPShoot(bool) has an empty body (added by an agent)
+100C82C0,?DeleteAllCFGFiles@@YAXXZ,func,"builds gamedir+txtfiles *.cfg search, FindFirstFile/stat/DeleteFile loop like 1.55 DeleteAllCFGFiles; sits between DeathNotice and DestroyMapCycle in the alphabetical object order (added by an agent)"
+100C5300,?ApplyCFGSettingToPlayer@@YAXPAVCBasePlayer@@@Z,func,"strings health/stamina/quicksel1-3/playerstats_*/weapon_action and the txtfiles netname .cfg path, same statements as 1.55 ApplyCFGSettingToPlayer; after AmmoShouldRespawn in the alphabetical object order (added by an agent)"
+100C6570,?ApplyCFGSettingToPlayerLate@@YAXPAVCBasePlayer@@@Z,func,"maps/<mapname>.cfg reader with gNoWeaponDrop around GiveNamedItem, same statements as 1.55 ApplyCFGSettingToPlayerLate; follows ApplyCFGSettingToPlayer in the object order (added by an agent)"
+100D49D0,?Fix@@YAMM@Z,func,"called three times from FixupAngles (x, y, z), the static Fix( float angle ) of plats.cpp; 1.55 has Fix in plats.obj (added by an agent)"
+100D6AE0,?PlatSpawnInsideTrigger@@YAXPAUentvars_s@@@Z,func,"GetClassPtr CFuncPlat and CPlatTrigger then CPlatTrigger::SpawnInsideTrigger, called from CFuncPlat::Precache: the static PlatSpawnInsideTrigger of plats.cpp (added by an agent)"
+100F4C30,?Spawn@CSprayCan@@QAEXPAUentvars_s@@@Z,func,"called from ImpulseCommands right after GetClassPtr( (CSprayCan *)NULL ) with pev: origin + (0,0,32), v_angle, owner, frame, SetNextThink( 0.1 ) like HLSDK CSprayCan::Spawn (added by an agent)"
+100DCAF0,?CheckPowerups@@YAXPAUentvars_s@@@Z,func,called from PostThink where our PostThink calls CheckPowerups( pev ); health <= 0 test then modelindex = g_ulModelIndexPlayer like HLSDK CheckPowerups (added by an agent)
+100E4E50,?IsInSteamGroup_guess@CBasePlayer@@QAE_NI@Z,func,"SteamFriends clan loop like IsDonator comparing the clan account id with its parameter, called twice from 100DC080 with group ids 4631050 and 764566; sits between IsInCutscene and IsOnLadder (added by an agent)"
+100DC080,?CanUseWeapon_guess@CBasePlayer@@QAE_NH@Z,func,weapon id 27 (MP5A3 in GetNameForId) allowed only when 100E4E50 finds one of two Steam groups or IsMapperMode_guess; sits between CanBeDualWielded and CheatImpulseCommands (added by an agent)
+100010A0,??0CVoiceGameMgr@@QAE@XZ,func,stores the CVoiceGameMgr vtable and zeroes m_nMaxPlayers and m_UpdateInterval; called from the g_VoiceGameMgr dynamic initializer at 10001000 (added by an agent)
+100179F0,?CreateWithScript@CBaseEntity@@SAPAV1@PADHABVVector@@1PAUedict_s@@H@Z,func,"Create with message and optional model before DispatchSpawn, same statements as 1.55 CBaseEntity::CreateWithScript; follows Create in the object order; called from DropKeyItem and the item_key spawners (added by an agent)"
+100B23A0,?FBoxVisible@@YAHPAUentvars_s@@0AAVVector@@M@Z,func,byte-identical to FBoxVisible of the Paranoia h_ai.cpp with relocations masked (scratch compile with the hl flags)
+100B2530,?VecCheckThrow@@YA?AVVector@@PAUentvars_s@@ABV1@V1@MM@Z,func,byte-identical to VecCheckThrow of the Paranoia h_ai.cpp with relocations masked (scratch compile with the hl flags)
+100B2740,?VecCheckToss@@YA?AVVector@@PAUentvars_s@@ABV1@V1@M@Z,func,byte-identical to VecCheckToss of the Paranoia h_ai.cpp with relocations masked (scratch compile with the hl flags)
+100017A0,___local_stdio_scanf_options,func,"UCRT inline: returns the address of its _OptionsStorage (10220AB0), right after __local_stdio_printf_options at 10001790; not CBaseEntity::TeamID"
+100AE130,?GameDLLInit@@YAXXZ,func,"the three CVAR_GET_POINTER calls (sv_gravity, sv_aim, mp_footsteps), 449 CVAR_REGISTER calls and SERVER_COMMAND exec skill.cfg of the HLSDK GameDLLInit (game.obj in the 1.55 PDB)"
+10017AA0,?DeadRemoveThink@CBaseEntity@@QAEXXZ,func,"jmp to CBaseEntity::SUB_Remove (101028E0); between CreateWithScript and DefaultUse in the name order of cbase.obj, which defines it in the 1.55 PDB (added by an agent)"
+10017720,??1CRestore@@QAE@XZ,func,"implicit destructor of CRestore (tail jump to ~CSaveRestoreBuffer); called from the unwind funclet of DispatchRestore (FuncInfo 102041ac); alphabetical slot before ??4EHANDLE, CRestore before CSave (added by an agent)"
+10017730,??1CSave@@QAE@XZ,func,"implicit destructor of CSave (tail jump to ~CSaveRestoreBuffer); called from unwind funclets of the CSave users; alphabetical slot after ??1CRestore, before ??4EHANDLE (added by an agent)"
+10018CC0,?AllowLagCompensation@@YAHXZ,func,"return 1; HLSDK client.cpp AllowLagCompensation, gNewDLLFunctions entry; alphabetical slot between AddWeapon and CBasePlayerByIndex (added by an agent)"
+1001DCD0,?CreateInstancedBaselines@@YAXXZ,func,"empty; HLSDK client.cpp CreateInstancedBaselines, gFunctionTable entry; alphabetical slot between CreateBaseline and Custom_Encode (added by an agent)"
+1001E070,?GetGameDescription@@YAPBDXZ,func,"returns the string Cry of Fear; client.cpp GetGameDescription, gFunctionTable entry; alphabetical slot between Fidget and GetHullBounds (added by an agent)"
+1001E6D0,?ParmsNewLevel@@YAXXZ,func,"empty; HLSDK client.cpp ParmsNewLevel, gFunctionTable entry; alphabetical slot between ParmsChangeLevel and PlayerCustomization (added by an agent)"
+1001ED40,?Sys_Error@@YAXPBD@Z,func,"empty; HLSDK client.cpp Sys_Error, gFunctionTable entry; alphabetical slot between StopSuicide and TertiaryAttack (added by an agent)"
+1002B230,?SpawnHeadGibs@CCrab@@QAEXVVector@@@Z,func,sprites/head_burst.spr and models/slower_headgibs.mdl; 1.55 PDB CCrab::SpawnHeadGibs; slot between Spawn and TakeDamage; COMDAT holds the switch table after a 3 byte nop (added by an agent)
+100580A0,?SpawnHeadGibs@CKrypande@@QAEXVVector@@@Z,func,sprites/head_burst.spr and models/slower_headgibs.mdl; 1.55 PDB CKrypande::SpawnHeadGibs; slot between Spawn and TakeDamage; COMDAT holds the switch table after a 3 byte nop (added by an agent)
+10059DC0,?SpawnHeadGibs@CSlower3@@QAEXVVector@@@Z,func,sprites/head_burst.spr and models/slower_headgibs.mdl; 1.55 PDB CSlower3::SpawnHeadGibs; slot between Spawn and TakeDamage; COMDAT holds the switch table after a 3 byte nop (added by an agent)
+100722B0,?SpawnHeadGibs@CZombie@@QAEXVVector@@@Z,func,sprites/head_burst.spr and models/slower_headgibs.mdl; 1.55 PDB CZombie::SpawnHeadGibs; slot between Spawn and TakeDamage; COMDAT holds the switch table after a 3 byte nop (added by an agent)
+10078CE0,?SpawnHeadGibs@CSuicider@@QAEXVVector@@@Z,func,sprites/head_burst.spr and models/slower_headgibs.mdl; 1.55 PDB CSuicider::SpawnHeadGibs; slot between Spawn and TakeDamage; COMDAT holds the switch table after a 3 byte nop (added by an agent)
+1002F2D0,??$_Destroy_in_place@PAD@std@@YAXAAPAD@Z,func,"empty STL template (ret 0), unreferenced; alphabetical slot between _Deallocate and _Fputc; only empty cdecl candidate of our object there (added by an agent)"
+10030730,??1error_category@std@@UAE@XZ,func,"empty virtual destructor (ret 0), unreferenced; slot among the std destructors between bad_* and exception (17 byte ___std_exception_destroy copies) (added by an agent)"
+100497D0,??$_Pocma@V?$allocator@D@std@@@std@@YAXAAV?$allocator@D@0@0@Z,func,"empty STL template (ret 0), unreferenced; alphabetical slot between _Maklocchr/_Maklocstr and flush; only empty candidate of our object there (added by an agent)"
+100CA6B0,??0CACHE_ENTRY@@QAE@XZ,func,"mov eax, ecx; ret, unreferenced; bytematch proposal (identical with ??0CGraph and other empty constructors); slot between GetClassPtr<CTestHull> and ??0CQueue (added by an agent)"
+100E9EA0,?PackDeadPlayerItems@CBasePlayer@@QAEXXZ,func,empty (ret 0); 1.55 PDB CBasePlayer::PackDeadPlayerItems 19 bytes debug (empty); alphabetical slot between ObjectCaps@CSprayCan and Pain (added by an agent)
+100F1430,?RenewItems@CBasePlayer@@QAEXXZ,func,empty (ret 0); HLSDK and 1.55 PDB CBasePlayer::RenewItems (empty); alphabetical slot between RemovePlayerItem and ResetAutoaim (added by an agent)
+100F88B0,?UpdateStatusBar@CBasePlayer@@QAEXXZ,func,empty (ret 0); 1.55 PDB CBasePlayer::UpdateStatusBar 19 bytes debug (empty); alphabetical slot between UpdatePlayerSound and Use (added by an agent)
+100F90F0,?VibrateCheck@CBasePlayer@@QAEXXZ,func,empty (ret 0); 1.55 PDB CBasePlayer::VibrateCheck 19 bytes debug (empty); alphabetical slot between VecVelocityForDamage and ViewKnock (added by an agent)
+10110B70,?Spawn@CTriggerCDAudio@@UAEXXZ,func,jmp InitTrigger; vtable 101E1B50; 1.55 PDB CTriggerCDAudio::Spawn; alphabetical slot between Spawn@CTriggerBounce and Spawn@CTriggerCamera (added by an agent)
+10110C30,?Spawn@CTriggerCofTeleport@@UAEXXZ,func,jmp InitTrigger; vtable 101E4854; 1.55 PDB CTriggerCofTeleport::Spawn; alphabetical slot between Spawn@CTriggerChangeTarget and Spawn@CTriggerCoopChangelevel (added by an agent)
+10116030,??0CSaveRestoreBuffer@@QAE@XZ,func,m_pdata = NULL; return this; 1.55 PDB CSaveRestoreBuffer::CSaveRestoreBuffer(void); slot between ??0CSaveRestoreBuffer(SAVERESTOREDATA*) and ??0UTIL_GroupTrace (added by an agent)
+10037D40,?imbue@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEXABVlocale@2@@Z,func,"last slot (imbue) of the basic_streambuf<char> vtable at 101ADAF8 (slot after sync); empty ret 4; replaces the byte-identical CameraShoot proposal, CameraShoot is 10031010 (added by an agent)"
+10031010,?CameraShoot@CDualWeapon@@QAEX_N@Z,func,"empty, ret 4 (one bool); 1.55 PDB CDualWeapon::CameraShoot(bool) 21 bytes debug; alphabetical slot between BranchHit and Deploy (added by an agent)"
+10110340,?SkipCutscene@CTriggerCamera@@QAEXXZ,func,"1.55 PDB CTriggerCamera::SkipCutscene (743 bytes debug): same statements (m_flWait 666 test, m_hPlayer SET_VIEW/EnableControl, gmsgHeadShield loop, m_sSkipManager Use); alphabetical slot between SetBoneController and Spawn@CChangeLevel (added by an agent)"
+1010E880,?NextLevel@@YAXXZ,func,"HLSDK triggers.cpp NextLevel: trigger_changelevel search, c_start fallback, ExecuteChangeLevel think; 1.55 PDB NextLevel; alphabetical slot between MultiWaitOver and ObjectCaps@CAutoTrigger (added by an agent)"
+10092540,?Animate@CGlow@@QAEXM@Z,func,"HLSDK effects.cpp CGlow::Animate (1.55 PDB CGlow::Animate, same statement): fmod of pev->frame + frames by m_maxFrame at +0xE0; alphabetical slot after AllowToContinue@CCofStressTest; found by the hl.dll link comparison (row was unnamed LIB)"
+100DF050,?EncryptStatsFile@CBasePlayer@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V23@0@Z,func,"1.55 PDB CBasePlayer::EncryptStatsFile; ret 0x34 (hidden return plus two std::string by value), 1.6a body builds the result from a null pointer (return NULL); alphabetical slot between EnableControl and EndSave; found by the hl.dll link comparison (row was unnamed LIB)"
+10001090,??0?$CBitVec@$0CA@@@QAE@XZ,func,"CBitVec<32> constructor (game_shared voice_common.h), first function of voice_gamemgr.obj; no Ghidra function before (FillGaps); same code as ours at the same address"
+1002F1E0,??$_Allocate@$07U_Default_allocate_traits@std@@$0A@@std@@YAPAXI@Z,func,"std::_Allocate<8> (MSVC 14.27 xmemory), cof_dualpistol.obj; Ghidra body shrunk to its own 39 bytes; same code as ours at the same address"
+1002F210,??$_Allocate_manually_vector_aligned@U_Default_allocate_traits@std@@@std@@YAPAXI@Z,func,"std::_Allocate_manually_vector_aligned (MSVC 14.27 xmemory), tail jump target of _Allocate; was inside the 1002F1E0 body (FillGaps); same code as ours"
+100B3930,?Pain@CLegacyCineMonster@@QAEXXZ,func,"HLSDK h_cine.cpp CLegacyCineMonster::Pain (EMIT_SOUND_DYN pain, 0.8 volume); 1.55 PDB; no Ghidra function before (FillGaps), after Die"
+100F0770,?PrintInventoryModelInfoDebug@CBasePlayer@@QAEXXZ,func,"1.55 PDB CBasePlayer::PrintInventoryModelInfoDebug; no Ghidra function before (FillGaps), after PrintInventoryInfoDebug; same code as ours"

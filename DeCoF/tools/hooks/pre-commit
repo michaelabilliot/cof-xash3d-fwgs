@@ -1,0 +1,37 @@
+#!/bin/sh
+# Regenerate the progress report (docs/progress.json, docs/progress.svg,
+# docs/PROGRESS.md) when docs/progress.csv is part of the commit, from the
+# staged copy of the CSV, and stage the outputs.
+#
+# Install (.git/hooks is not versioned):
+#   cp tools/hooks/pre-commit .git/hooks/pre-commit
+#
+# PROGRESS_FORCE=1 runs it even when the CSV is not staged (for testing).
+
+if [ -z "$PROGRESS_FORCE" ] && ! git diff --cached --name-only | grep -qx 'docs/progress.csv'; then
+	exit 0
+fi
+
+PY=
+for cand in python3 python py; do
+	if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys; sys.exit(sys.version_info[0] < 3)" >/dev/null 2>&1; then
+		PY=$cand
+		break
+	fi
+done
+if [ -z "$PY" ]; then
+	echo "pre-commit: no Python 3 found, cannot regenerate the progress report" >&2
+	exit 1
+fi
+
+root=$(git rev-parse --show-toplevel) || exit 1
+tmp=$(mktemp) || exit 1
+git show :docs/progress.csv > "$tmp" || { rm -f "$tmp"; exit 1; }
+"$PY" "$root/tools/progress.py" --csv "$tmp" >/dev/null
+status=$?
+rm -f "$tmp"
+if [ $status -ne 0 ]; then
+	echo "pre-commit: tools/progress.py failed" >&2
+	exit 1
+fi
+git add "$root/docs/progress.json" "$root/docs/progress.svg" "$root/docs/PROGRESS.md"

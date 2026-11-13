@@ -1,0 +1,17 @@
+?ChangeSchedule@CBaseMonster@@QAEXPAUSchedule_t@@@Z
+?ClearSchedule@CBaseMonster@@QAEXXZ
+?GetSchedule@CBaseMonster@@UAEPAUSchedule_t@@XZ
+?MaintainSchedule@CBaseMonster@@QAEXXZ
+?RunTask@CBaseMonster@@UAEXPAUTask_t@@@Z
+?StartTask@CBaseMonster@@UAEXPAUTask_t@@@Z
+?FScheduleDone@CBaseMonster@@QAEHXZ
+?FScheduleValid@CBaseMonster@@QAEHXZ
+?GetTask@CBaseMonster@@QAEPAUTask_t@@XZ
+?IScheduleFlags@CBaseMonster@@QAEHXZ
+?NextScheduledTask@CBaseMonster@@QAEXXZ
+?SetTurnActivity@CBaseMonster@@QAEXXZ
+?FClassnameIs@@YAHPAUentvars_s@@PBD@Z
+?FStrEq@@YAHPBD0@Z
+?IsAction@CCineMonster@@QAEHXZ
+?Normalize@Vector2D@@QBE?AV1@XZ
+?FHaveSchedule@CBaseMonster@@QAEHXZ

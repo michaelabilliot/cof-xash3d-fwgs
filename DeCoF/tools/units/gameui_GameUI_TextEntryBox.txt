@@ -1,0 +1,7 @@
+??0CTextEntryBox@@QAE@PBD00_NPAVPanel@vgui2@@@Z
+??1CTextEntryBox@@UAE@XZ
+?ShowWindow@CTextEntryBox@@UAEXPAVFrame@vgui2@@@Z
+?PerformLayout@CTextEntryBox@@UAEXXZ
+?OnCommand@CTextEntryBox@@MAEXPBD@Z
+?OnKeyCodeTyped@CTextEntryBox@@UAEXW4KeyCode@vgui2@@@Z
+??_GCTextEntryBox@@UAEPAXI@Z

@@ -1,0 +1,17 @@
+??0COptionsSubAdvanced@@QAE@PAVPanel@vgui2@@@Z
+?OnCommand@COptionsSubAdvanced@@UAEXPBD@Z
+??1COptionsSubAdvanced@@UAE@XZ
+?OnResetData@COptionsSubAdvanced@@UAEXXZ
+?OnApplyChanges@COptionsSubAdvanced@@UAEXXZ
+?OnContentControlClose@COptionsSubAdvanced@@EAEXXZ
+?OnOpenContentControlDialog@COptionsSubAdvanced@@AAEXXZ
+??_GCOptionsSubAdvanced@@UAEPAXI@Z
+??0COptionsSubAdvanced_RegisterMap@COptionsSubAdvanced@@QAE@XZ
+?ChainToMap@COptionsSubAdvanced@@SAXXZ
+?GetMessageMap@COptionsSubAdvanced@@UAEPAUPanelMessageMap@vgui2@@XZ
+?GetPanelClassName@COptionsSubAdvanced@@SAPBDXZ
+?GetPanelBaseClassName@COptionsSubAdvanced@@SAPBDXZ
+??0PanelMessageFunc_OnContentControlClose@COptionsSubAdvanced@@QAE@XZ
+?InitVar@PanelMessageFunc_OnContentControlClose@COptionsSubAdvanced@@SAXXZ
+?AddToMap@COptionsSubAdvanced@@SAXPBDP8Panel@vgui2@@AEXXZHH0H0@Z
+?IsPasswordEnabled@CContentControlDialog@@QAE_NXZ

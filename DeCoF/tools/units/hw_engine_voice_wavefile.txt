@@ -1,0 +1,6 @@
+?ReadWaveFile@@YA_NPBDAAPADAAH222@Z
+?ReadDWord@@YAKPAX@Z
+?ReadWord@@YAGPAX@Z
+?WriteWaveFile@@YA_NPBD0HHHH@Z
+?WriteDWord@@YAXPAXK@Z
+?WriteWord@@YAXPAXG@Z

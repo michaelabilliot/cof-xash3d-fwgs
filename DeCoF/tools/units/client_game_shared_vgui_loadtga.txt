@@ -1,0 +1,11 @@
+MemoryInputStream::readUChar
+MemoryInputStream::readUChar
+?vgui_LoadTGA@@YAPAVBitmapTGA@vgui@@PBD@Z
+?vgui_LoadTGANoInvertAlpha@@YAPAVBitmapTGA@vgui@@PBD@Z
+?close@MemoryInputStream@@UAEXAA_N@Z
+?getAvailable@MemoryInputStream@@UAEHAA_N@Z
+?readUChar@MemoryInputStream@@UAEEAA_N@Z
+?readUChar@MemoryInputStream@@UAEXPAEHAA_N@Z
+?seekEnd@MemoryInputStream@@UAEXAA_N@Z
+?seekRelative@MemoryInputStream@@UAEXHAA_N@Z
+?seekStart@MemoryInputStream@@UAEXAA_N@Z

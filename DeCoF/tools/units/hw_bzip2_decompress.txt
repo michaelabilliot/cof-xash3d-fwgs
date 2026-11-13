@@ -1,0 +1,2 @@
+_BZ2_decompress
+_makeMaps_d

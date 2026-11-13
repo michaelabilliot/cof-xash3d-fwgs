@@ -1,0 +1,5 @@
+?DrawGlows@@YAXXZ
+?DrawVector@@YAXABVVector@@0MMMM@Z
+?GlowFilterEntities@@YAHHPAUcl_entity_s@@PBD@Z
+?InitGlows@@YAXXZ
+?ResetGlows@@YAXXZ

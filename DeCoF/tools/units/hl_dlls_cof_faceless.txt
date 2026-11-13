@@ -1,0 +1,15 @@
+??$GetClassPtr@VCFaceless@@@@YAPAVCFaceless@@PAV0@@Z
+?AlertSound@CFaceless@@UAEXXZ
+?CheckRangeAttack1@CFaceless@@UAEHMM@Z
+?CheckRangeAttack2@CFaceless@@UAEHMM@Z
+?Classify@CFaceless@@UAEHXZ
+?HandleAnimEvent@CFaceless@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CFaceless@@UAEHXZ
+?Killed@CFaceless@@UAEXPAUentvars_s@@H@Z
+?PainSound@CFaceless@@UAEXXZ
+?Precache@CFaceless@@UAEXXZ
+?SetYawSpeed@CFaceless@@UAEXXZ
+?Spawn@CFaceless@@UAEXXZ
+?TakeDamage@CFaceless@@UAEHPAUentvars_s@@0MH@Z
+_monster_faceless
+?AttackSound@CFaceless@@QAEXXZ

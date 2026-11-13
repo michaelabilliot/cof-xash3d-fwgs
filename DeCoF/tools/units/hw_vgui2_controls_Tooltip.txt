@@ -1,0 +1,16 @@
+??0Tooltip@vgui2@@QAE@PAVPanel@1@PBD@Z
+??1Tooltip@vgui2@@QAE@XZ
+?GetText@Tooltip@vgui2@@QAEPBDXZ
+?SetText@Tooltip@vgui2@@QAEXPBD@Z
+?ApplySchemeSettings@Tooltip@vgui2@@EAEXPAVIScheme@2@@Z
+?ResetDelay@Tooltip@vgui2@@QAEXXZ
+?SetTooltipDelay@Tooltip@vgui2@@QAEXH@Z
+?GetTooltipDelay@Tooltip@vgui2@@QAEHXZ
+?ShowTooltip@Tooltip@vgui2@@QAEXPAVPanel@2@@Z
+?InvalidateLayout@Tooltip@vgui2@@QAEXXZ
+?PerformLayout@Tooltip@vgui2@@QAEXXZ
+?SizeTextWindow@Tooltip@vgui2@@QAEXXZ
+?SetTooltipFormatToSingleLine@Tooltip@vgui2@@QAEXXZ
+?SetTooltipFormatToMultiLine@Tooltip@vgui2@@QAEXXZ
+?HideTooltip@Tooltip@vgui2@@QAEXXZ
+?Size@?$CUtlVector@D@@QBEHXZ

@@ -1,0 +1,50 @@
+//========= Copyright (c) 1996-2003, Valve LLC, All rights reserved. ============
+//
+// Purpose:
+//
+// $NoKeywords: $
+//=============================================================================
+
+#ifndef OPTIONS_SUB_AUDIO_H
+#define OPTIONS_SUB_AUDIO_H
+
+#ifdef _WIN32
+#pragma once
+#endif
+
+#include <vgui_controls/PropertyPage.h>
+
+namespace vgui = vgui2;
+
+class CLabeledCommandComboBox;
+class CCvarSlider;
+class CCvarToggleCheckButton;
+
+//-----------------------------------------------------------------------------
+// Purpose: Audio Details, Part of OptionsDialog
+//-----------------------------------------------------------------------------
+class COptionsSubAudio : public vgui::PropertyPage
+{
+	DECLARE_CLASS_SIMPLE( COptionsSubAudio, vgui::PropertyPage );
+
+public:
+	COptionsSubAudio( vgui::Panel *parent );
+	~COptionsSubAudio();
+
+	virtual void OnResetData();
+	virtual void OnApplyChanges();
+
+private:
+	MESSAGE_FUNC( OnControlModified, "ControlModified" );
+
+	CCvarToggleCheckButton		*m_pEAXCheckButton_guess;
+	CCvarToggleCheckButton		*m_pA3DCheckButton_guess;
+
+	CCvarSlider					*m_pSFXSlider;
+	CCvarSlider					*m_pHEVSlider;
+	CCvarSlider					*m_pMP3Slider;
+
+	CLabeledCommandComboBox		*m_pSoundQualityCombo;
+};
+
+#endif // OPTIONS_SUB_AUDIO_H

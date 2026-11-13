@@ -1,0 +1,5 @@
+?Initialize@CScope@@QAEXXZ
+?ScopeInit_guess@@YAXXZ
+??0CScope@@QAE@XZ
+?MsgScope_guess@@YAHPBDHPAX@Z
+??1CScope@@QAE@XZ

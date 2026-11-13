@@ -1,0 +1,11 @@
+??$GetClassPtr@VCCutsceneModel@@@@YAPAVCCutsceneModel@@PAV0@@Z
+?Classify@CCutsceneModel@@UAEHXZ
+?KeyValue@CCutsceneModel@@UAEXPAUKeyValueData_s@@@Z
+?ModelCameraUse@CCutsceneModel@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?Precache@CCutsceneModel@@UAEXXZ
+?Restore@CCutsceneModel@@UAEHAAVCRestore@@@Z
+?Save@CCutsceneModel@@UAEHAAVCSave@@@Z
+?Spawn@CCutsceneModel@@UAEXXZ
+?StartNextAnimation@CCutsceneModel@@QAEXXZ
+_cutscene_model
+?SetSequenceByName@CCutsceneModel@@QAEXPAD@Z

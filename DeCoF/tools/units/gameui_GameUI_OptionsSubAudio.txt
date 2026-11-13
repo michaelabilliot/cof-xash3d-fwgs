@@ -1,0 +1,14 @@
+??0COptionsSubAudio@@QAE@PAVPanel@vgui2@@@Z
+??1COptionsSubAudio@@UAE@XZ
+?OnResetData@COptionsSubAudio@@UAEXXZ
+?OnApplyChanges@COptionsSubAudio@@UAEXXZ
+?OnControlModified@COptionsSubAudio@@EAEXXZ
+??_GCOptionsSubAudio@@UAEPAXI@Z
+??0COptionsSubAudio_RegisterMap@COptionsSubAudio@@QAE@XZ
+?ChainToMap@COptionsSubAudio@@SAXXZ
+?GetMessageMap@COptionsSubAudio@@UAEPAUPanelMessageMap@vgui2@@XZ
+?GetPanelClassName@COptionsSubAudio@@SAPBDXZ
+?GetPanelBaseClassName@COptionsSubAudio@@SAPBDXZ
+??0PanelMessageFunc_OnControlModified@COptionsSubAudio@@QAE@XZ
+?InitVar@PanelMessageFunc_OnControlModified@COptionsSubAudio@@SAXXZ
+?AddToMap@COptionsSubAudio@@SAXPBDP8Panel@vgui2@@AEXXZHH0H0@Z

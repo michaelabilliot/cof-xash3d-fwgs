@@ -1,0 +1,9 @@
+va,name,kind,evidence
+01401000,_$E4,func,"dynamic initializer of g_CmdLine (construct, then atexit); spelling from the compiled object"
+0140100A,_$E1,func,constructs g_CmdLine; spelling from the compiled object
+01401014,_$E3,func,atexit of the g_CmdLine destructor; spelling from the compiled object
+01401020,_$E2,func,destroys g_CmdLine; spelling from the compiled object
+01401FDB,_$E4,func,"dynamic initializer of g_Registry (construct, then atexit); spelling from the compiled object"
+01401FE5,_$E1,func,constructs g_Registry; spelling from the compiled object
+01401FEF,_$E3,func,atexit of the g_Registry destructor; spelling from the compiled object
+01401FFB,_$E2,func,destroys g_Registry; spelling from the compiled object

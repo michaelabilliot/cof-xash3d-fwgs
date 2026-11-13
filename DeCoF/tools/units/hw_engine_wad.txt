@@ -1,0 +1,7 @@
+_W_CleanupName
+_W_LoadWadFile
+_W_GetLumpinfo
+_W_GetLumpName
+_W_GetLumpNum
+_W_Shutdown
+_SwapPic

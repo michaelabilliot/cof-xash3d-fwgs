@@ -1,0 +1,11 @@
+??0CProfileButton@@QAE@PAVCCareerProfileFrame@@PBDPBGPA_N@Z
+?SetProfileName@CProfileButton@@QAEXPBD@Z
+?OnMouseDoublePressed@CProfileButton@@UAEXW4MouseCode@vgui2@@@Z
+?ApplySchemeSettings@CProfileButton@@UAEXPAVIScheme@vgui2@@@Z
+?GetBorder@CProfileButton@@MAEPAVIBorder@vgui2@@_N000@Z
+?GetBgColor@CProfileButton@@UAE?AVColor@@XZ
+?Paint@CProfileButton@@UAEXXZ
+_$E23
+_$E22
+??_GCProfileButton@@UAEPAXI@Z
+??1CProfileButton@@UAE@XZ

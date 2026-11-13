@@ -1,0 +1,11 @@
+?Create_guess@CPBuffer_guess@@QAEXXZ
+?MakeCurrent_guess@CPBuffer_guess@@QAEXXZ
+?Shutdown_guess@CPBuffer_guess@@QAEXXZ
+?SwitchToWindow_guess@CPBuffer_guess@@QAEXXZ
+??0CPBuffer_guess@@QAE@XZ
+?Prepare_guess@CPBuffer_guess@@QAEXXZ
+??1CPBuffer_guess@@QAE@XZ
+?BindTexture_guess@CPBuffer_guess@@QAEXXZ
+?ReleaseTexture_guess@CPBuffer_guess@@QAEXXZ
+??__Eg_PBuffer_guess@@YAXXZ
+??__Fg_PBuffer_guess@@YAXXZ

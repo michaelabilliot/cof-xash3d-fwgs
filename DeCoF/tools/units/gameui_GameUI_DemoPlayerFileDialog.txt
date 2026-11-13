@@ -1,0 +1,6 @@
+??0CDemoPlayerFileDialog@@QAE@PAVPanel@vgui2@@PBD@Z
+??1CDemoPlayerFileDialog@@UAE@XZ
+?LoadDemoList@CDemoPlayerFileDialog@@AAEXXZ
+?OnCommand@CDemoPlayerFileDialog@@UAEXPBD@Z
+?OnClose@CDemoPlayerFileDialog@@UAEXXZ
+??_GCDemoPlayerFileDialog@@UAEPAXI@Z

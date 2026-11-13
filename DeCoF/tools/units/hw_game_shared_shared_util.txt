@@ -1,0 +1,10 @@
+?SharedWVarArgs@@YAPAGPAGZZ
+?SharedVarArgs@@YAPADPADZZ
+?BufPrintf@@YAPADPADAAHPBDZZ
+?BufWPrintf@@YAPAGPAGAAHPBGZZ
+?NumAsWString@@YAPBGH@Z
+?NumAsString@@YAPBDH@Z
+?SharedGetToken@@YAPADXZ
+?SharedSetQuoteChar@@YAXD@Z
+?SharedParse@@YAPBDPBD@Z
+?SharedTokenWaiting@@YA_NPBD@Z

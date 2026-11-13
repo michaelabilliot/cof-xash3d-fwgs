@@ -1,0 +1,2 @@
+va,name,unit,evidence
+10066B9A,?CloneString@@YAPADPBD@Z,vgui2/controls/BitmapImagePanel,"static inline in BitmapImagePanel.cpp (same object layout as hw.dll 01E3DC9A); the shared_util.h inline at 1000E420 (CareerDefinitions.cpp) is the copy every other object calls"

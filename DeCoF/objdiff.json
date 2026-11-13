@@ -1,0 +1,5055 @@
+{
+  "$schema": "https://raw.githubusercontent.com/encounter/objdiff/main/config.schema.json",
+  "build_base": false,
+  "build_target": false,
+  "units": [
+    {
+      "name": "hl/dlls/h_export",
+      "target_path": "build/target/hl/dlls/h_export.obj",
+      "base_path": "build/base/hl/dlls/h_export.obj",
+      "metadata": {
+        "source_path": "src/dlls/h_export.cpp"
+      }
+    },
+    {
+      "name": "hl/pm_shared/pm_math",
+      "target_path": "build/target/hl/pm_shared/pm_math.obj",
+      "base_path": "build/base/hl/pm_shared/pm_math.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_math.c"
+      }
+    },
+    {
+      "name": "hl/pm_shared/pm_shared",
+      "target_path": "build/target/hl/pm_shared/pm_shared.obj",
+      "base_path": "build/base/hl/pm_shared/pm_shared.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_shared.c"
+      }
+    },
+    {
+      "name": "hl/pm_shared/pm_debug",
+      "target_path": "build/target/hl/pm_shared/pm_debug.obj",
+      "base_path": "build/base/hl/pm_shared/pm_debug.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_debug.c"
+      }
+    },
+    {
+      "name": "hl/game_shared/voice_gamemgr",
+      "target_path": "build/target/hl/game_shared/voice_gamemgr.obj",
+      "base_path": "build/base/hl/game_shared/voice_gamemgr.obj",
+      "metadata": {
+        "source_path": "src/game_shared/voice_gamemgr.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/ai_basenpc_schedule",
+      "target_path": "build/target/hl/dlls/ai_basenpc_schedule.obj",
+      "base_path": "build/base/hl/dlls/ai_basenpc_schedule.obj",
+      "metadata": {
+        "source_path": "src/dlls/AI_BaseNPC_Schedule.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/alias",
+      "target_path": "build/target/hl/dlls/alias.obj",
+      "base_path": "build/base/hl/dlls/alias.obj",
+      "metadata": {
+        "source_path": "src/dlls/alias.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/animating",
+      "target_path": "build/target/hl/dlls/animating.obj",
+      "base_path": "build/base/hl/dlls/animating.obj",
+      "metadata": {
+        "source_path": "src/dlls/animating.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/animation",
+      "target_path": "build/target/hl/dlls/animation.obj",
+      "base_path": "build/base/hl/dlls/animation.obj",
+      "metadata": {
+        "source_path": "src/dlls/animation.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/bmodels",
+      "target_path": "build/target/hl/dlls/bmodels.obj",
+      "base_path": "build/base/hl/dlls/bmodels.obj",
+      "metadata": {
+        "source_path": "src/dlls/bmodels.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/buttons",
+      "target_path": "build/target/hl/dlls/buttons.obj",
+      "base_path": "build/base/hl/dlls/buttons.obj",
+      "metadata": {
+        "source_path": "src/dlls/buttons.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cbase",
+      "target_path": "build/target/hl/dlls/cbase.obj",
+      "base_path": "build/base/hl/dlls/cbase.obj",
+      "metadata": {
+        "source_path": "src/dlls/cbase.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/client",
+      "target_path": "build/target/hl/dlls/client.obj",
+      "base_path": "build/base/hl/dlls/client.obj",
+      "metadata": {
+        "source_path": "src/dlls/client.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/spectator",
+      "target_path": "build/target/hl/dlls/spectator.obj",
+      "base_path": "build/base/hl/dlls/spectator.obj",
+      "metadata": {
+        "source_path": "src/dlls/spectator.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/combat",
+      "target_path": "build/target/hl/dlls/combat.obj",
+      "base_path": "build/base/hl/dlls/combat.obj",
+      "metadata": {
+        "source_path": "src/dlls/combat.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/defaultai",
+      "target_path": "build/target/hl/dlls/defaultai.obj",
+      "base_path": "build/base/hl/dlls/defaultai.obj",
+      "metadata": {
+        "source_path": "src/dlls/defaultai.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/doors",
+      "target_path": "build/target/hl/dlls/doors.obj",
+      "base_path": "build/base/hl/dlls/doors.obj",
+      "metadata": {
+        "source_path": "src/dlls/doors.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/effects",
+      "target_path": "build/target/hl/dlls/effects.obj",
+      "base_path": "build/base/hl/dlls/effects.obj",
+      "metadata": {
+        "source_path": "src/dlls/effects.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/explode",
+      "target_path": "build/target/hl/dlls/explode.obj",
+      "base_path": "build/base/hl/dlls/explode.obj",
+      "metadata": {
+        "source_path": "src/dlls/explode.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/flyingmonster",
+      "target_path": "build/target/hl/dlls/flyingmonster.obj",
+      "base_path": "build/base/hl/dlls/flyingmonster.obj",
+      "metadata": {
+        "source_path": "src/dlls/flyingmonster.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/func_break",
+      "target_path": "build/target/hl/dlls/func_break.obj",
+      "base_path": "build/base/hl/dlls/func_break.obj",
+      "metadata": {
+        "source_path": "src/dlls/func_break.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/gamerules",
+      "target_path": "build/target/hl/dlls/gamerules.obj",
+      "base_path": "build/base/hl/dlls/gamerules.obj",
+      "metadata": {
+        "source_path": "src/dlls/gamerules.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/genericmonster",
+      "target_path": "build/target/hl/dlls/genericmonster.obj",
+      "base_path": "build/base/hl/dlls/genericmonster.obj",
+      "metadata": {
+        "source_path": "src/dlls/genericmonster.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/ggrenade",
+      "target_path": "build/target/hl/dlls/ggrenade.obj",
+      "base_path": "build/base/hl/dlls/ggrenade.obj",
+      "metadata": {
+        "source_path": "src/dlls/ggrenade.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/h_battery",
+      "target_path": "build/target/hl/dlls/h_battery.obj",
+      "base_path": "build/base/hl/dlls/h_battery.obj",
+      "metadata": {
+        "source_path": "src/dlls/h_battery.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/h_cine",
+      "target_path": "build/target/hl/dlls/h_cine.obj",
+      "base_path": "build/base/hl/dlls/h_cine.obj",
+      "metadata": {
+        "source_path": "src/dlls/h_cine.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/h_cycler",
+      "target_path": "build/target/hl/dlls/h_cycler.obj",
+      "base_path": "build/base/hl/dlls/h_cycler.obj",
+      "metadata": {
+        "source_path": "src/dlls/h_cycler.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/items",
+      "target_path": "build/target/hl/dlls/items.obj",
+      "base_path": "build/base/hl/dlls/items.obj",
+      "metadata": {
+        "source_path": "src/dlls/items.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/lights",
+      "target_path": "build/target/hl/dlls/lights.obj",
+      "base_path": "build/base/hl/dlls/lights.obj",
+      "metadata": {
+        "source_path": "src/dlls/lights.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/locus",
+      "target_path": "build/target/hl/dlls/locus.obj",
+      "base_path": "build/base/hl/dlls/locus.obj",
+      "metadata": {
+        "source_path": "src/dlls/locus.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/maprules",
+      "target_path": "build/target/hl/dlls/maprules.obj",
+      "base_path": "build/base/hl/dlls/maprules.obj",
+      "metadata": {
+        "source_path": "src/dlls/maprules.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/monstermaker",
+      "target_path": "build/target/hl/dlls/monstermaker.obj",
+      "base_path": "build/base/hl/dlls/monstermaker.obj",
+      "metadata": {
+        "source_path": "src/dlls/monstermaker.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/monsters",
+      "target_path": "build/target/hl/dlls/monsters.obj",
+      "base_path": "build/base/hl/dlls/monsters.obj",
+      "metadata": {
+        "source_path": "src/dlls/monsters.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/monsterstate",
+      "target_path": "build/target/hl/dlls/monsterstate.obj",
+      "base_path": "build/base/hl/dlls/monsterstate.obj",
+      "metadata": {
+        "source_path": "src/dlls/monsterstate.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/mortar",
+      "target_path": "build/target/hl/dlls/mortar.obj",
+      "base_path": "build/base/hl/dlls/mortar.obj",
+      "metadata": {
+        "source_path": "src/dlls/mortar.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/movewith",
+      "target_path": "build/target/hl/dlls/movewith.obj",
+      "base_path": "build/base/hl/dlls/movewith.obj",
+      "metadata": {
+        "source_path": "src/dlls/movewith.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/multiplay_gamerules",
+      "target_path": "build/target/hl/dlls/multiplay_gamerules.obj",
+      "base_path": "build/base/hl/dlls/multiplay_gamerules.obj",
+      "metadata": {
+        "source_path": "src/dlls/multiplay_gamerules.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/nodes",
+      "target_path": "build/target/hl/dlls/nodes.obj",
+      "base_path": "build/base/hl/dlls/nodes.obj",
+      "metadata": {
+        "source_path": "src/dlls/nodes.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/paranoia_wpn",
+      "target_path": "build/target/hl/dlls/paranoia_wpn.obj",
+      "base_path": "build/base/hl/dlls/paranoia_wpn.obj",
+      "metadata": {
+        "source_path": "src/dlls/paranoia_wpn.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/pathcorner",
+      "target_path": "build/target/hl/dlls/pathcorner.obj",
+      "base_path": "build/base/hl/dlls/pathcorner.obj",
+      "metadata": {
+        "source_path": "src/dlls/pathcorner.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/plane",
+      "target_path": "build/target/hl/dlls/plane.obj",
+      "base_path": "build/base/hl/dlls/plane.obj",
+      "metadata": {
+        "source_path": "src/dlls/plane.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/plats",
+      "target_path": "build/target/hl/dlls/plats.obj",
+      "base_path": "build/base/hl/dlls/plats.obj",
+      "metadata": {
+        "source_path": "src/dlls/plats.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/player",
+      "target_path": "build/target/hl/dlls/player.obj",
+      "base_path": "build/base/hl/dlls/player.obj",
+      "metadata": {
+        "source_path": "src/dlls/player.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/scripted",
+      "target_path": "build/target/hl/dlls/scripted.obj",
+      "base_path": "build/base/hl/dlls/scripted.obj",
+      "metadata": {
+        "source_path": "src/dlls/scripted.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/singleplay_gamerules",
+      "target_path": "build/target/hl/dlls/singleplay_gamerules.obj",
+      "base_path": "build/base/hl/dlls/singleplay_gamerules.obj",
+      "metadata": {
+        "source_path": "src/dlls/singleplay_gamerules.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/skill",
+      "target_path": "build/target/hl/dlls/skill.obj",
+      "base_path": "build/base/hl/dlls/skill.obj",
+      "metadata": {
+        "source_path": "src/dlls/skill.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/sound",
+      "target_path": "build/target/hl/dlls/sound.obj",
+      "base_path": "build/base/hl/dlls/sound.obj",
+      "metadata": {
+        "source_path": "src/dlls/sound.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/soundent",
+      "target_path": "build/target/hl/dlls/soundent.obj",
+      "base_path": "build/base/hl/dlls/soundent.obj",
+      "metadata": {
+        "source_path": "src/dlls/soundent.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/squadmonster",
+      "target_path": "build/target/hl/dlls/squadmonster.obj",
+      "base_path": "build/base/hl/dlls/squadmonster.obj",
+      "metadata": {
+        "source_path": "src/dlls/squadmonster.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/subs",
+      "target_path": "build/target/hl/dlls/subs.obj",
+      "base_path": "build/base/hl/dlls/subs.obj",
+      "metadata": {
+        "source_path": "src/dlls/subs.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/talkmonster",
+      "target_path": "build/target/hl/dlls/talkmonster.obj",
+      "base_path": "build/base/hl/dlls/talkmonster.obj",
+      "metadata": {
+        "source_path": "src/dlls/talkmonster.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/teamplay_gamerules",
+      "target_path": "build/target/hl/dlls/teamplay_gamerules.obj",
+      "base_path": "build/base/hl/dlls/teamplay_gamerules.obj",
+      "metadata": {
+        "source_path": "src/dlls/teamplay_gamerules.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/triggers",
+      "target_path": "build/target/hl/dlls/triggers.obj",
+      "base_path": "build/base/hl/dlls/triggers.obj",
+      "metadata": {
+        "source_path": "src/dlls/triggers.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/util",
+      "target_path": "build/target/hl/dlls/util.obj",
+      "base_path": "build/base/hl/dlls/util.obj",
+      "metadata": {
+        "source_path": "src/dlls/util.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/weapons",
+      "target_path": "build/target/hl/dlls/weapons.obj",
+      "base_path": "build/base/hl/dlls/weapons.obj",
+      "metadata": {
+        "source_path": "src/dlls/weapons.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/world",
+      "target_path": "build/target/hl/dlls/world.obj",
+      "base_path": "build/base/hl/dlls/world.obj",
+      "metadata": {
+        "source_path": "src/dlls/world.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_3dkeypad",
+      "target_path": "build/target/hl/dlls/cof_3dkeypad.obj",
+      "base_path": "build/base/hl/dlls/cof_3dkeypad.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_3DKeypad.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_action",
+      "target_path": "build/target/hl/dlls/cof_action.obj",
+      "base_path": "build/base/hl/dlls/cof_action.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Action.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_animatedcamera",
+      "target_path": "build/target/hl/dlls/cof_animatedcamera.obj",
+      "base_path": "build/base/hl/dlls/cof_animatedcamera.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_AnimatedCamera.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_axe",
+      "target_path": "build/target/hl/dlls/cof_axe.obj",
+      "base_path": "build/base/hl/dlls/cof_axe.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Axe.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_barshoot",
+      "target_path": "build/target/hl/dlls/cof_barshoot.obj",
+      "base_path": "build/base/hl/dlls/cof_barshoot.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_BarShoot.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_boat",
+      "target_path": "build/target/hl/dlls/cof_boat.obj",
+      "base_path": "build/base/hl/dlls/cof_boat.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Boat.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_booklaser",
+      "target_path": "build/target/hl/dlls/cof_booklaser.obj",
+      "base_path": "build/base/hl/dlls/cof_booklaser.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_BookLaser.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_booksimonsledgehammer",
+      "target_path": "build/target/hl/dlls/cof_booksimonsledgehammer.obj",
+      "base_path": "build/base/hl/dlls/cof_booksimonsledgehammer.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_BookSimonSledgehammer.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_branch",
+      "target_path": "build/target/hl/dlls/cof_branch.obj",
+      "base_path": "build/base/hl/dlls/cof_branch.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Branch.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_browning_wheelchair",
+      "target_path": "build/target/hl/dlls/cof_browning_wheelchair.obj",
+      "base_path": "build/base/hl/dlls/cof_browning_wheelchair.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Browning_Wheelchair.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_camera",
+      "target_path": "build/target/hl/dlls/cof_camera.obj",
+      "base_path": "build/base/hl/dlls/cof_camera.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Camera.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_chainsawboss",
+      "target_path": "build/target/hl/dlls/cof_chainsawboss.obj",
+      "base_path": "build/base/hl/dlls/cof_chainsawboss.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_ChainsawBoss.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_checkbrush",
+      "target_path": "build/target/hl/dlls/cof_checkbrush.obj",
+      "base_path": "build/base/hl/dlls/cof_checkbrush.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_CheckBrush.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_coopbuttonpress",
+      "target_path": "build/target/hl/dlls/cof_coopbuttonpress.obj",
+      "base_path": "build/base/hl/dlls/cof_coopbuttonpress.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_CoopButtonPress.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_cooplevelchangemanager",
+      "target_path": "build/target/hl/dlls/cof_cooplevelchangemanager.obj",
+      "base_path": "build/base/hl/dlls/cof_cooplevelchangemanager.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_CoopLevelChangeManager.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_crab",
+      "target_path": "build/target/hl/dlls/cof_crab.obj",
+      "base_path": "build/base/hl/dlls/cof_crab.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Crab.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_cutscenemodel",
+      "target_path": "build/target/hl/dlls/cof_cutscenemodel.obj",
+      "base_path": "build/base/hl/dlls/cof_cutscenemodel.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_CutsceneModel.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_developercommentary",
+      "target_path": "build/target/hl/dlls/cof_developercommentary.obj",
+      "base_path": "build/base/hl/dlls/cof_developercommentary.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_DeveloperCommentary.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_doctorboss",
+      "target_path": "build/target/hl/dlls/cof_doctorboss.obj",
+      "base_path": "build/base/hl/dlls/cof_doctorboss.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_DoctorBoss.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_doctorbossshoot",
+      "target_path": "build/target/hl/dlls/cof_doctorbossshoot.obj",
+      "base_path": "build/base/hl/dlls/cof_doctorbossshoot.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_DoctorBossShoot.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_door_prop_view",
+      "target_path": "build/target/hl/dlls/cof_door_prop_view.obj",
+      "base_path": "build/base/hl/dlls/cof_door_prop_view.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Door_Prop_View.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_dual_weapon",
+      "target_path": "build/target/hl/dlls/cof_dual_weapon.obj",
+      "base_path": "build/base/hl/dlls/cof_dual_weapon.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Dual_Weapon.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_dualpistol",
+      "target_path": "build/target/hl/dlls/cof_dualpistol.obj",
+      "base_path": "build/base/hl/dlls/cof_dualpistol.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_DualPistol.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_faceless",
+      "target_path": "build/target/hl/dlls/cof_faceless.obj",
+      "base_path": "build/base/hl/dlls/cof_faceless.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Faceless.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_facelessvalve",
+      "target_path": "build/target/hl/dlls/cof_facelessvalve.obj",
+      "base_path": "build/base/hl/dlls/cof_facelessvalve.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_FacelessValve.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_famas",
+      "target_path": "build/target/hl/dlls/cof_famas.obj",
+      "base_path": "build/base/hl/dlls/cof_famas.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_FAMAS.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_faster",
+      "target_path": "build/target/hl/dlls/cof_faster.obj",
+      "base_path": "build/base/hl/dlls/cof_faster.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Faster.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_flare",
+      "target_path": "build/target/hl/dlls/cof_flare.obj",
+      "base_path": "build/base/hl/dlls/cof_flare.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Flare.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_flashlight",
+      "target_path": "build/target/hl/dlls/cof_flashlight.obj",
+      "base_path": "build/base/hl/dlls/cof_flashlight.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Flashlight.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_flygare",
+      "target_path": "build/target/hl/dlls/cof_flygare.obj",
+      "base_path": "build/base/hl/dlls/cof_flygare.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Flygare.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_funcvalve",
+      "target_path": "build/target/hl/dlls/cof_funcvalve.obj",
+      "base_path": "build/base/hl/dlls/cof_funcvalve.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_FuncValve.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_g43",
+      "target_path": "build/target/hl/dlls/cof_g43.obj",
+      "base_path": "build/base/hl/dlls/cof_g43.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_G43.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_glock",
+      "target_path": "build/target/hl/dlls/cof_glock.obj",
+      "base_path": "build/base/hl/dlls/cof_glock.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Glock.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_interdoor",
+      "target_path": "build/target/hl/dlls/cof_interdoor.obj",
+      "base_path": "build/base/hl/dlls/cof_interdoor.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_InterDoor.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_interdoorcoop",
+      "target_path": "build/target/hl/dlls/cof_interdoorcoop.obj",
+      "base_path": "build/base/hl/dlls/cof_interdoorcoop.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_InterDoorCoop.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_keyitem",
+      "target_path": "build/target/hl/dlls/cof_keyitem.obj",
+      "base_path": "build/base/hl/dlls/cof_keyitem.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_KeyItem.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_ladder",
+      "target_path": "build/target/hl/dlls/cof_ladder.obj",
+      "base_path": "build/base/hl/dlls/cof_ladder.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Ladder.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_lantern",
+      "target_path": "build/target/hl/dlls/cof_lantern.obj",
+      "base_path": "build/base/hl/dlls/cof_lantern.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Lantern.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_m16",
+      "target_path": "build/target/hl/dlls/cof_m16.obj",
+      "base_path": "build/base/hl/dlls/cof_m16.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_M16.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_mobilephone",
+      "target_path": "build/target/hl/dlls/cof_mobilephone.obj",
+      "base_path": "build/base/hl/dlls/cof_mobilephone.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MobilePhone.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monsterbaby",
+      "target_path": "build/target/hl/dlls/cof_monsterbaby.obj",
+      "base_path": "build/base/hl/dlls/cof_monsterbaby.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterBaby.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monsterchild",
+      "target_path": "build/target/hl/dlls/cof_monsterchild.obj",
+      "base_path": "build/base/hl/dlls/cof_monsterchild.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterChild.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monstercrazybitch",
+      "target_path": "build/target/hl/dlls/cof_monstercrazybitch.obj",
+      "base_path": "build/base/hl/dlls/cof_monstercrazybitch.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterCrazyBitch.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monstercustom",
+      "target_path": "build/target/hl/dlls/cof_monstercustom.obj",
+      "base_path": "build/base/hl/dlls/cof_monstercustom.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterCustom.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monsterkrypande",
+      "target_path": "build/target/hl/dlls/cof_monsterkrypande.obj",
+      "base_path": "build/base/hl/dlls/cof_monsterkrypande.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterKrypande.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monstersewmo",
+      "target_path": "build/target/hl/dlls/cof_monstersewmo.obj",
+      "base_path": "build/base/hl/dlls/cof_monstersewmo.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterSewmo.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_monsterslower3",
+      "target_path": "build/target/hl/dlls/cof_monsterslower3.obj",
+      "base_path": "build/base/hl/dlls/cof_monsterslower3.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MonsterSlower3.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_nicecamera",
+      "target_path": "build/target/hl/dlls/cof_nicecamera.obj",
+      "base_path": "build/base/hl/dlls/cof_nicecamera.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_NiceCamera.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_nightstick",
+      "target_path": "build/target/hl/dlls/cof_nightstick.obj",
+      "base_path": "build/base/hl/dlls/cof_nightstick.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_NightStick.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_numeralplate",
+      "target_path": "build/target/hl/dlls/cof_numeralplate.obj",
+      "base_path": "build/base/hl/dlls/cof_numeralplate.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_NumeralPlate.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_p345",
+      "target_path": "build/target/hl/dlls/cof_p345.obj",
+      "base_path": "build/base/hl/dlls/cof_p345.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_P345.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_phonecall",
+      "target_path": "build/target/hl/dlls/cof_phonecall.obj",
+      "base_path": "build/base/hl/dlls/cof_phonecall.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_PhoneCall.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_pushablevan",
+      "target_path": "build/target/hl/dlls/cof_pushablevan.obj",
+      "base_path": "build/base/hl/dlls/cof_pushablevan.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_PushableVan.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_puzzlebars",
+      "target_path": "build/target/hl/dlls/cof_puzzlebars.obj",
+      "base_path": "build/base/hl/dlls/cof_puzzlebars.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_PuzzleBars.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_puzzlebarsbutton",
+      "target_path": "build/target/hl/dlls/cof_puzzlebarsbutton.obj",
+      "base_path": "build/base/hl/dlls/cof_puzzlebarsbutton.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_PuzzleBarsButton.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_radio",
+      "target_path": "build/target/hl/dlls/cof_radio.obj",
+      "base_path": "build/base/hl/dlls/cof_radio.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Radio.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_revolver",
+      "target_path": "build/target/hl/dlls/cof_revolver.obj",
+      "base_path": "build/base/hl/dlls/cof_revolver.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Revolver.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_rifle",
+      "target_path": "build/target/hl/dlls/cof_rifle.obj",
+      "base_path": "build/base/hl/dlls/cof_rifle.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Rifle.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_roofboss",
+      "target_path": "build/target/hl/dlls/cof_roofboss.obj",
+      "base_path": "build/base/hl/dlls/cof_roofboss.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_RoofBoss.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_runningcrazy",
+      "target_path": "build/target/hl/dlls/cof_runningcrazy.obj",
+      "base_path": "build/base/hl/dlls/cof_runningcrazy.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_RunningCrazy.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_sawcrazy",
+      "target_path": "build/target/hl/dlls/cof_sawcrazy.obj",
+      "base_path": "build/base/hl/dlls/cof_sawcrazy.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SawCrazy.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_sawrunner",
+      "target_path": "build/target/hl/dlls/cof_sawrunner.obj",
+      "base_path": "build/base/hl/dlls/cof_sawrunner.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SawRunner.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_sewerboss",
+      "target_path": "build/target/hl/dlls/cof_sewerboss.obj",
+      "base_path": "build/base/hl/dlls/cof_sewerboss.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SewerBoss.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_shotgun",
+      "target_path": "build/target/hl/dlls/cof_shotgun.obj",
+      "base_path": "build/base/hl/dlls/cof_shotgun.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Shotgun.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_sicksimon",
+      "target_path": "build/target/hl/dlls/cof_sicksimon.obj",
+      "base_path": "build/base/hl/dlls/cof_sicksimon.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SickSimon.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_sledgehammer",
+      "target_path": "build/target/hl/dlls/cof_sledgehammer.obj",
+      "base_path": "build/base/hl/dlls/cof_sledgehammer.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Sledgehammer.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_slower",
+      "target_path": "build/target/hl/dlls/cof_slower.obj",
+      "base_path": "build/base/hl/dlls/cof_slower.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Slower.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_slowertentacled",
+      "target_path": "build/target/hl/dlls/cof_slowertentacled.obj",
+      "base_path": "build/base/hl/dlls/cof_slowertentacled.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SlowerTentacled.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_spitter",
+      "target_path": "build/target/hl/dlls/cof_spitter.obj",
+      "base_path": "build/base/hl/dlls/cof_spitter.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Spitter.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_statues",
+      "target_path": "build/target/hl/dlls/cof_statues.obj",
+      "base_path": "build/base/hl/dlls/cof_statues.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Statues.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_statueuse",
+      "target_path": "build/target/hl/dlls/cof_statueuse.obj",
+      "base_path": "build/base/hl/dlls/cof_statueuse.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_StatueUse.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_stranger",
+      "target_path": "build/target/hl/dlls/cof_stranger.obj",
+      "base_path": "build/base/hl/dlls/cof_stranger.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Stranger.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_strangle",
+      "target_path": "build/target/hl/dlls/cof_strangle.obj",
+      "base_path": "build/base/hl/dlls/cof_strangle.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Strangle.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_subtitlechange",
+      "target_path": "build/target/hl/dlls/cof_subtitlechange.obj",
+      "base_path": "build/base/hl/dlls/cof_subtitlechange.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SubtitleChange.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_subtitlemain",
+      "target_path": "build/target/hl/dlls/cof_subtitlemain.obj",
+      "base_path": "build/base/hl/dlls/cof_subtitlemain.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SubtitleMain.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_subwaybrickwall",
+      "target_path": "build/target/hl/dlls/cof_subwaybrickwall.obj",
+      "base_path": "build/base/hl/dlls/cof_subwaybrickwall.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_SubwayBrickWall.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_suicider",
+      "target_path": "build/target/hl/dlls/cof_suicider.obj",
+      "base_path": "build/base/hl/dlls/cof_suicider.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Suicider.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_switchblade",
+      "target_path": "build/target/hl/dlls/cof_switchblade.obj",
+      "base_path": "build/base/hl/dlls/cof_switchblade.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Switchblade.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_syringe",
+      "target_path": "build/target/hl/dlls/cof_syringe.obj",
+      "base_path": "build/base/hl/dlls/cof_syringe.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Syringe.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_taller",
+      "target_path": "build/target/hl/dlls/cof_taller.obj",
+      "base_path": "build/base/hl/dlls/cof_taller.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Taller.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_taperecorder",
+      "target_path": "build/target/hl/dlls/cof_taperecorder.obj",
+      "base_path": "build/base/hl/dlls/cof_taperecorder.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_TapeRecorder.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_telephone",
+      "target_path": "build/target/hl/dlls/cof_telephone.obj",
+      "base_path": "build/base/hl/dlls/cof_telephone.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Telephone.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_telescope",
+      "target_path": "build/target/hl/dlls/cof_telescope.obj",
+      "base_path": "build/base/hl/dlls/cof_telescope.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Telescope.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_thirdpersoninteraction",
+      "target_path": "build/target/hl/dlls/cof_thirdpersoninteraction.obj",
+      "base_path": "build/base/hl/dlls/cof_thirdpersoninteraction.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_ThirdPersonInteraction.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_tmp",
+      "target_path": "build/target/hl/dlls/cof_tmp.obj",
+      "base_path": "build/base/hl/dlls/cof_tmp.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_TMP.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_twitcher",
+      "target_path": "build/target/hl/dlls/cof_twitcher.obj",
+      "base_path": "build/base/hl/dlls/cof_twitcher.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Twitcher.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_twitcher2",
+      "target_path": "build/target/hl/dlls/cof_twitcher2.obj",
+      "base_path": "build/base/hl/dlls/cof_twitcher2.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Twitcher2.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_twitcher3",
+      "target_path": "build/target/hl/dlls/cof_twitcher3.obj",
+      "base_path": "build/base/hl/dlls/cof_twitcher3.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Twitcher3.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_twitcher4",
+      "target_path": "build/target/hl/dlls/cof_twitcher4.obj",
+      "base_path": "build/base/hl/dlls/cof_twitcher4.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Twitcher4.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_userpasswordnote",
+      "target_path": "build/target/hl/dlls/cof_userpasswordnote.obj",
+      "base_path": "build/base/hl/dlls/cof_userpasswordnote.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_UserPasswordNote.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_vp70",
+      "target_path": "build/target/hl/dlls/cof_vp70.obj",
+      "base_path": "build/base/hl/dlls/cof_vp70.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_VP70.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_watro",
+      "target_path": "build/target/hl/dlls/cof_watro.obj",
+      "base_path": "build/base/hl/dlls/cof_watro.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_Watro.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/cof_wheelchairplayer",
+      "target_path": "build/target/hl/dlls/cof_wheelchairplayer.obj",
+      "base_path": "build/base/hl/dlls/cof_wheelchairplayer.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_WheelchairPlayer.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/item_padlock",
+      "target_path": "build/target/hl/dlls/item_padlock.obj",
+      "base_path": "build/base/hl/dlls/item_padlock.obj",
+      "metadata": {
+        "source_path": "src/dlls/item_padlock.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/monster_ruben",
+      "target_path": "build/target/hl/dlls/monster_ruben.obj",
+      "base_path": "build/base/hl/dlls/monster_ruben.obj",
+      "metadata": {
+        "source_path": "src/dlls/monster_ruben.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/subtitle_multiple",
+      "target_path": "build/target/hl/dlls/subtitle_multiple.obj",
+      "base_path": "build/base/hl/dlls/subtitle_multiple.obj",
+      "metadata": {
+        "source_path": "src/dlls/Subtitle_Multiple.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/CoF_MP5_guess",
+      "target_path": "build/target/hl/dlls/CoF_MP5_guess.obj",
+      "base_path": "build/base/hl/dlls/CoF_MP5_guess.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MP5_guess.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/CoF_BowlingBall_guess",
+      "target_path": "build/target/hl/dlls/CoF_BowlingBall_guess.obj",
+      "base_path": "build/base/hl/dlls/CoF_BowlingBall_guess.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_BowlingBall_guess.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/h_ai",
+      "target_path": "build/target/hl/dlls/h_ai.obj",
+      "base_path": "build/base/hl/dlls/h_ai.obj",
+      "metadata": {
+        "source_path": "src/dlls/h_ai.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/game",
+      "target_path": "build/target/hl/dlls/game.obj",
+      "base_path": "build/base/hl/dlls/game.obj",
+      "metadata": {
+        "source_path": "src/dlls/game.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/globals",
+      "target_path": "build/target/hl/dlls/globals.obj",
+      "base_path": "build/base/hl/dlls/globals.obj",
+      "metadata": {
+        "source_path": "src/dlls/globals.cpp"
+      }
+    },
+    {
+      "name": "hl/dlls/CoF_MP5ModeSaveRestore_guess",
+      "target_path": "build/target/hl/dlls/CoF_MP5ModeSaveRestore_guess.obj",
+      "base_path": "build/base/hl/dlls/CoF_MP5ModeSaveRestore_guess.obj",
+      "metadata": {
+        "source_path": "src/dlls/CoF_MP5ModeSaveRestore_guess.cpp"
+      }
+    },
+    {
+      "name": "opengl32/opengl32",
+      "target_path": "build/target/opengl32/opengl32.obj",
+      "base_path": "build/base/opengl32/opengl32.obj",
+      "metadata": {
+        "source_path": "src/opengl32/opengl32.cpp"
+      }
+    },
+    {
+      "name": "opengl32/OtherOGL",
+      "target_path": "build/target/opengl32/OtherOGL.obj",
+      "base_path": "build/base/opengl32/OtherOGL.obj",
+      "metadata": {
+        "source_path": "src/opengl32/OtherOGL.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/parsemsg",
+      "target_path": "build/target/client/cl_dll/parsemsg.obj",
+      "base_path": "build/base/client/cl_dll/parsemsg.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/parsemsg.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/studio_util",
+      "target_path": "build/target/client/cl_dll/studio_util.obj",
+      "base_path": "build/base/client/cl_dll/studio_util.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/studio_util.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/train",
+      "target_path": "build/target/client/cl_dll/train.obj",
+      "base_path": "build/base/client/cl_dll/train.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/train.cpp"
+      }
+    },
+    {
+      "name": "client/pm_shared/pm_shared",
+      "target_path": "build/target/client/pm_shared/pm_shared.obj",
+      "base_path": "build/base/client/pm_shared/pm_shared.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_shared.c"
+      }
+    },
+    {
+      "name": "client/pm_shared/pm_math",
+      "target_path": "build/target/client/pm_shared/pm_math.obj",
+      "base_path": "build/base/client/pm_shared/pm_math.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_math.c"
+      }
+    },
+    {
+      "name": "client/pm_shared/pm_debug",
+      "target_path": "build/target/client/pm_shared/pm_debug.obj",
+      "base_path": "build/base/client/pm_shared/pm_debug.obj",
+      "metadata": {
+        "source_path": "src/pm_shared/pm_debug.c"
+      }
+    },
+    {
+      "name": "client/common/interface",
+      "target_path": "build/target/client/common/interface.obj",
+      "base_path": "build/base/client/common/interface.obj",
+      "metadata": {
+        "source_path": "src/common/interface.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/voice_banmgr",
+      "target_path": "build/target/client/game_shared/voice_banmgr.obj",
+      "base_path": "build/base/client/game_shared/voice_banmgr.obj",
+      "metadata": {
+        "source_path": "src/game_shared/voice_banmgr.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/health",
+      "target_path": "build/target/client/cl_dll/health.obj",
+      "base_path": "build/base/client/cl_dll/health.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/health.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/battery",
+      "target_path": "build/target/client/cl_dll/battery.obj",
+      "base_path": "build/base/client/cl_dll/battery.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/battery.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/flashlight",
+      "target_path": "build/target/client/cl_dll/flashlight.obj",
+      "base_path": "build/base/client/cl_dll/flashlight.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/flashlight.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/geiger",
+      "target_path": "build/target/client/cl_dll/geiger.obj",
+      "base_path": "build/base/client/cl_dll/geiger.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/geiger.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/statusbar",
+      "target_path": "build/target/client/cl_dll/statusbar.obj",
+      "base_path": "build/base/client/cl_dll/statusbar.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/statusbar.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/status_icons",
+      "target_path": "build/target/client/cl_dll/status_icons.obj",
+      "base_path": "build/base/client/cl_dll/status_icons.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/status_icons.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/saytext",
+      "target_path": "build/target/client/cl_dll/saytext.obj",
+      "base_path": "build/base/client/cl_dll/saytext.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/saytext.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/message",
+      "target_path": "build/target/client/cl_dll/message.obj",
+      "base_path": "build/base/client/cl_dll/message.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/message.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/menu",
+      "target_path": "build/target/client/cl_dll/menu.obj",
+      "base_path": "build/base/client/cl_dll/menu.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/menu.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/death",
+      "target_path": "build/target/client/cl_dll/death.obj",
+      "base_path": "build/base/client/cl_dll/death.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/death.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/text_message",
+      "target_path": "build/target/client/cl_dll/text_message.obj",
+      "base_path": "build/base/client/cl_dll/text_message.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/text_message.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ammo_secondary",
+      "target_path": "build/target/client/cl_dll/ammo_secondary.obj",
+      "base_path": "build/base/client/cl_dll/ammo_secondary.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ammo_secondary.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ammohistory",
+      "target_path": "build/target/client/cl_dll/ammohistory.obj",
+      "base_path": "build/base/client/cl_dll/ammohistory.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ammohistory.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/input",
+      "target_path": "build/target/client/cl_dll/input.obj",
+      "base_path": "build/base/client/cl_dll/input.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/input.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/inputw32",
+      "target_path": "build/target/client/cl_dll/inputw32.obj",
+      "base_path": "build/base/client/cl_dll/inputw32.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/inputw32.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/in_camera",
+      "target_path": "build/target/client/cl_dll/in_camera.obj",
+      "base_path": "build/base/client/cl_dll/in_camera.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/in_camera.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ev_common",
+      "target_path": "build/target/client/cl_dll/ev_common.obj",
+      "base_path": "build/base/client/cl_dll/ev_common.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ev_common.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud_msg",
+      "target_path": "build/target/client/cl_dll/hud_msg.obj",
+      "base_path": "build/base/client/cl_dll/hud_msg.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud_msg.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud_redraw",
+      "target_path": "build/target/client/cl_dll/hud_redraw.obj",
+      "base_path": "build/base/client/cl_dll/hud_redraw.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud_redraw.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/HUDControl_guess",
+      "target_path": "build/target/client/cl_dll/HUDControl_guess.obj",
+      "base_path": "build/base/client/cl_dll/HUDControl_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/HUDControl_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_light_dynamic",
+      "target_path": "build/target/client/cl_dll/gl_light_dynamic.obj",
+      "base_path": "build/base/client/cl_dll/gl_light_dynamic.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_light_dynamic.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_lightmap",
+      "target_path": "build/target/client/cl_dll/gl_lightmap.obj",
+      "base_path": "build/base/client/cl_dll/gl_lightmap.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_lightmap.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_model",
+      "target_path": "build/target/client/cl_dll/gl_model.obj",
+      "base_path": "build/base/client/cl_dll/gl_model.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_model.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_postprocess",
+      "target_path": "build/target/client/cl_dll/gl_postprocess.obj",
+      "base_path": "build/base/client/cl_dll/gl_postprocess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_postprocess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_sky",
+      "target_path": "build/target/client/cl_dll/gl_sky.obj",
+      "base_path": "build/base/client/cl_dll/gl_sky.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_sky.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_texloader",
+      "target_path": "build/target/client/cl_dll/gl_texloader.obj",
+      "base_path": "build/base/client/cl_dll/gl_texloader.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_texloader.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/glows",
+      "target_path": "build/target/client/cl_dll/glows.obj",
+      "base_path": "build/base/client/cl_dll/glows.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/glows.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/grass",
+      "target_path": "build/target/client/cl_dll/grass.obj",
+      "base_path": "build/base/client/cl_dll/grass.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/grass.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/particlemgr",
+      "target_path": "build/target/client/cl_dll/particlemgr.obj",
+      "base_path": "build/base/client/cl_dll/particlemgr.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/particlemgr.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/particlemsg",
+      "target_path": "build/target/client/cl_dll/particlemsg.obj",
+      "base_path": "build/base/client/cl_dll/particlemsg.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/particlemsg.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/particlesys",
+      "target_path": "build/target/client/cl_dll/particlesys.obj",
+      "base_path": "build/base/client/cl_dll/particlesys.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/particlesys.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/rain",
+      "target_path": "build/target/client/cl_dll/rain.obj",
+      "base_path": "build/base/client/cl_dll/rain.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/rain.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/triapiobjects",
+      "target_path": "build/target/client/cl_dll/triapiobjects.obj",
+      "base_path": "build/base/client/cl_dll/triapiobjects.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/triapiobjects.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/StudioModelRenderer",
+      "target_path": "build/target/client/cl_dll/StudioModelRenderer.obj",
+      "base_path": "build/base/client/cl_dll/StudioModelRenderer.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/StudioModelRenderer.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/GameStudioModelRenderer",
+      "target_path": "build/target/client/cl_dll/GameStudioModelRenderer.obj",
+      "base_path": "build/base/client/cl_dll/GameStudioModelRenderer.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/GameStudioModelRenderer.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_debug",
+      "target_path": "build/target/client/cl_dll/gl_debug.obj",
+      "base_path": "build/base/client/cl_dll/gl_debug.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_debug.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_decals",
+      "target_path": "build/target/client/cl_dll/gl_decals.obj",
+      "base_path": "build/base/client/cl_dll/gl_decals.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_decals.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_renderer",
+      "target_path": "build/target/client/cl_dll/gl_renderer.obj",
+      "base_path": "build/base/client/cl_dll/gl_renderer.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_renderer.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_rsurf",
+      "target_path": "build/target/client/cl_dll/gl_rsurf.obj",
+      "base_path": "build/base/client/cl_dll/gl_rsurf.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_rsurf.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/gl_studiomodel",
+      "target_path": "build/target/client/cl_dll/gl_studiomodel.obj",
+      "base_path": "build/base/client/cl_dll/gl_studiomodel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/gl_studiomodel.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/quake_bsp",
+      "target_path": "build/target/client/cl_dll/quake_bsp.obj",
+      "base_path": "build/base/client/cl_dll/quake_bsp.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/quake_bsp.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/tri",
+      "target_path": "build/target/client/cl_dll/tri.obj",
+      "base_path": "build/base/client/cl_dll/tri.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/tri.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud_spectator",
+      "target_path": "build/target/client/cl_dll/hud_spectator.obj",
+      "base_path": "build/base/client/cl_dll/hud_spectator.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud_spectator.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud_servers",
+      "target_path": "build/target/client/cl_dll/hud_servers.obj",
+      "base_path": "build/base/client/cl_dll/hud_servers.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud_servers.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/cdll_int",
+      "target_path": "build/target/client/cl_dll/cdll_int.obj",
+      "base_path": "build/base/client/cl_dll/cdll_int.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/cdll_int.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/entity",
+      "target_path": "build/target/client/cl_dll/entity.obj",
+      "base_path": "build/base/client/cl_dll/entity.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/entity.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/events",
+      "target_path": "build/target/client/cl_dll/events.obj",
+      "base_path": "build/base/client/cl_dll/events.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/events.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/demo",
+      "target_path": "build/target/client/cl_dll/demo.obj",
+      "base_path": "build/base/client/cl_dll/demo.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/demo.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/exception",
+      "target_path": "build/target/client/cl_dll/exception.obj",
+      "base_path": "build/base/client/cl_dll/exception.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/exception.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/log",
+      "target_path": "build/target/client/cl_dll/log.obj",
+      "base_path": "build/base/client/cl_dll/log.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/log.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ammo",
+      "target_path": "build/target/client/cl_dll/ammo.obj",
+      "base_path": "build/base/client/cl_dll/ammo.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ammo.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud",
+      "target_path": "build/target/client/cl_dll/hud.obj",
+      "base_path": "build/base/client/cl_dll/hud.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/view",
+      "target_path": "build/target/client/cl_dll/view.obj",
+      "base_path": "build/base/client/cl_dll/view.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/view.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ev_hldm",
+      "target_path": "build/target/client/cl_dll/ev_hldm.obj",
+      "base_path": "build/base/client/cl_dll/ev_hldm.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ev_hldm.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_ScorePanel",
+      "target_path": "build/target/client/cl_dll/vgui_ScorePanel.obj",
+      "base_path": "build/base/client/cl_dll/vgui_ScorePanel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_ScorePanel.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_ServerBrowser",
+      "target_path": "build/target/client/cl_dll/vgui_ServerBrowser.obj",
+      "base_path": "build/base/client/cl_dll/vgui_ServerBrowser.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_ServerBrowser.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_SchemeManager",
+      "target_path": "build/target/client/cl_dll/vgui_SchemeManager.obj",
+      "base_path": "build/base/client/cl_dll/vgui_SchemeManager.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_SchemeManager.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_CustomObjects",
+      "target_path": "build/target/client/cl_dll/vgui_CustomObjects.obj",
+      "base_path": "build/base/client/cl_dll/vgui_CustomObjects.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_CustomObjects.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_ControlConfigPanel",
+      "target_path": "build/target/client/cl_dll/vgui_ControlConfigPanel.obj",
+      "base_path": "build/base/client/cl_dll/vgui_ControlConfigPanel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_ControlConfigPanel.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_ConsolePanel",
+      "target_path": "build/target/client/cl_dll/vgui_ConsolePanel.obj",
+      "base_path": "build/base/client/cl_dll/vgui_ConsolePanel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_ConsolePanel.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_gamma",
+      "target_path": "build/target/client/cl_dll/vgui_gamma.obj",
+      "base_path": "build/base/client/cl_dll/vgui_gamma.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_gamma.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_hud",
+      "target_path": "build/target/client/cl_dll/vgui_hud.obj",
+      "base_path": "build/base/client/cl_dll/vgui_hud.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_hud.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_int",
+      "target_path": "build/target/client/cl_dll/vgui_int.obj",
+      "base_path": "build/base/client/cl_dll/vgui_int.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_int.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_MOTDWindow",
+      "target_path": "build/target/client/cl_dll/vgui_MOTDWindow.obj",
+      "base_path": "build/base/client/cl_dll/vgui_MOTDWindow.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_MOTDWindow.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_paranoiatext",
+      "target_path": "build/target/client/cl_dll/vgui_paranoiatext.obj",
+      "base_path": "build/base/client/cl_dll/vgui_paranoiatext.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_paranoiatext.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_SpectatorPanel",
+      "target_path": "build/target/client/cl_dll/vgui_SpectatorPanel.obj",
+      "base_path": "build/base/client/cl_dll/vgui_SpectatorPanel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_SpectatorPanel.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_subtitles",
+      "target_path": "build/target/client/cl_dll/vgui_subtitles.obj",
+      "base_path": "build/base/client/cl_dll/vgui_subtitles.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_subtitles.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_teammenu",
+      "target_path": "build/target/client/cl_dll/vgui_teammenu.obj",
+      "base_path": "build/base/client/cl_dll/vgui_teammenu.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_teammenu.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_tips",
+      "target_path": "build/target/client/cl_dll/vgui_tips.obj",
+      "base_path": "build/base/client/cl_dll/vgui_tips.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_tips.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_ClassMenu",
+      "target_path": "build/target/client/cl_dll/vgui_ClassMenu.obj",
+      "base_path": "build/base/client/cl_dll/vgui_ClassMenu.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_ClassMenu.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_TeamFortressViewport",
+      "target_path": "build/target/client/cl_dll/vgui_TeamFortressViewport.obj",
+      "base_path": "build/base/client/cl_dll/vgui_TeamFortressViewport.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_TeamFortressViewport.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_helpers",
+      "target_path": "build/target/client/game_shared/vgui_helpers.obj",
+      "base_path": "build/base/client/game_shared/vgui_helpers.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_helpers.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_loadtga",
+      "target_path": "build/target/client/game_shared/vgui_loadtga.obj",
+      "base_path": "build/base/client/game_shared/vgui_loadtga.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_loadtga.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_scrollbar2",
+      "target_path": "build/target/client/game_shared/vgui_scrollbar2.obj",
+      "base_path": "build/base/client/game_shared/vgui_scrollbar2.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_scrollbar2.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/voice_status",
+      "target_path": "build/target/client/game_shared/voice_status.obj",
+      "base_path": "build/base/client/game_shared/voice_status.obj",
+      "metadata": {
+        "source_path": "src/game_shared/voice_status.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/voice_vgui_tweakdlg",
+      "target_path": "build/target/client/game_shared/voice_vgui_tweakdlg.obj",
+      "base_path": "build/base/client/game_shared/voice_vgui_tweakdlg.obj",
+      "metadata": {
+        "source_path": "src/game_shared/voice_vgui_tweakdlg.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/AmmoInventory_guess",
+      "target_path": "build/target/client/cl_dll/AmmoInventory_guess.obj",
+      "base_path": "build/base/client/cl_dll/AmmoInventory_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/AmmoInventory_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/BookMenu_guess",
+      "target_path": "build/target/client/cl_dll/BookMenu_guess.obj",
+      "base_path": "build/base/client/cl_dll/BookMenu_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/BookMenu_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/ClothesMenu_guess",
+      "target_path": "build/target/client/cl_dll/ClothesMenu_guess.obj",
+      "base_path": "build/base/client/cl_dll/ClothesMenu_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/ClothesMenu_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/CoopStats_guess",
+      "target_path": "build/target/client/cl_dll/CoopStats_guess.obj",
+      "base_path": "build/base/client/cl_dll/CoopStats_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/CoopStats_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Credits_guess",
+      "target_path": "build/target/client/cl_dll/Credits_guess.obj",
+      "base_path": "build/base/client/cl_dll/Credits_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Credits_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/CutsceneSkip_guess",
+      "target_path": "build/target/client/cl_dll/CutsceneSkip_guess.obj",
+      "base_path": "build/base/client/cl_dll/CutsceneSkip_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/CutsceneSkip_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Documents_guess",
+      "target_path": "build/target/client/cl_dll/Documents_guess.obj",
+      "base_path": "build/base/client/cl_dll/Documents_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Documents_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/VGUIExtraMenu_guess",
+      "target_path": "build/target/client/cl_dll/VGUIExtraMenu_guess.obj",
+      "base_path": "build/base/client/cl_dll/VGUIExtraMenu_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/VGUIExtraMenu_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/GameMenu_guess",
+      "target_path": "build/target/client/cl_dll/GameMenu_guess.obj",
+      "base_path": "build/base/client/cl_dll/GameMenu_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/GameMenu_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Language_guess",
+      "target_path": "build/target/client/cl_dll/Language_guess.obj",
+      "base_path": "build/base/client/cl_dll/Language_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Language_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/BlackBar_guess",
+      "target_path": "build/target/client/cl_dll/BlackBar_guess.obj",
+      "base_path": "build/base/client/cl_dll/BlackBar_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/BlackBar_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Neffect_guess",
+      "target_path": "build/target/client/cl_dll/Neffect_guess.obj",
+      "base_path": "build/base/client/cl_dll/Neffect_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Neffect_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Padlock_guess",
+      "target_path": "build/target/client/cl_dll/Padlock_guess.obj",
+      "base_path": "build/base/client/cl_dll/Padlock_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Padlock_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/SaveLoad_guess",
+      "target_path": "build/target/client/cl_dll/SaveLoad_guess.obj",
+      "base_path": "build/base/client/cl_dll/SaveLoad_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/SaveLoad_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Scope_guess",
+      "target_path": "build/target/client/cl_dll/Scope_guess.obj",
+      "base_path": "build/base/client/cl_dll/Scope_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Scope_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Telephone_guess",
+      "target_path": "build/target/client/cl_dll/Telephone_guess.obj",
+      "base_path": "build/base/client/cl_dll/Telephone_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Telephone_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/TVFrame_guess",
+      "target_path": "build/target/client/cl_dll/TVFrame_guess.obj",
+      "base_path": "build/base/client/cl_dll/TVFrame_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/TVFrame_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Unlockables_guess",
+      "target_path": "build/target/client/cl_dll/Unlockables_guess.obj",
+      "base_path": "build/base/client/cl_dll/Unlockables_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Unlockables_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/AnimalStatue_guess",
+      "target_path": "build/target/client/cl_dll/AnimalStatue_guess.obj",
+      "base_path": "build/base/client/cl_dll/AnimalStatue_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/AnimalStatue_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/VGUIBillboard_guess",
+      "target_path": "build/target/client/cl_dll/VGUIBillboard_guess.obj",
+      "base_path": "build/base/client/cl_dll/VGUIBillboard_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/VGUIBillboard_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/BossBar_guess",
+      "target_path": "build/target/client/cl_dll/BossBar_guess.obj",
+      "base_path": "build/base/client/cl_dll/BossBar_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/BossBar_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Computer_guess",
+      "target_path": "build/target/client/cl_dll/Computer_guess.obj",
+      "base_path": "build/base/client/cl_dll/Computer_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Computer_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Difficulty_guess",
+      "target_path": "build/target/client/cl_dll/Difficulty_guess.obj",
+      "base_path": "build/base/client/cl_dll/Difficulty_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Difficulty_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/GameOver_guess",
+      "target_path": "build/target/client/cl_dll/GameOver_guess.obj",
+      "base_path": "build/base/client/cl_dll/GameOver_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/GameOver_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/RECBInventory_guess",
+      "target_path": "build/target/client/cl_dll/RECBInventory_guess.obj",
+      "base_path": "build/base/client/cl_dll/RECBInventory_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/RECBInventory_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Keypad_guess",
+      "target_path": "build/target/client/cl_dll/Keypad_guess.obj",
+      "base_path": "build/base/client/cl_dll/Keypad_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Keypad_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/NoteDocument_guess",
+      "target_path": "build/target/client/cl_dll/NoteDocument_guess.obj",
+      "base_path": "build/base/client/cl_dll/NoteDocument_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/NoteDocument_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Phone_guess",
+      "target_path": "build/target/client/cl_dll/Phone_guess.obj",
+      "base_path": "build/base/client/cl_dll/Phone_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Phone_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/PuzzleBar_guess",
+      "target_path": "build/target/client/cl_dll/PuzzleBar_guess.obj",
+      "base_path": "build/base/client/cl_dll/PuzzleBar_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/PuzzleBar_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Save_guess",
+      "target_path": "build/target/client/cl_dll/Save_guess.obj",
+      "base_path": "build/base/client/cl_dll/Save_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Save_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/UserDocument_guess",
+      "target_path": "build/target/client/cl_dll/UserDocument_guess.obj",
+      "base_path": "build/base/client/cl_dll/UserDocument_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/UserDocument_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Yesno_guess",
+      "target_path": "build/target/client/cl_dll/Yesno_guess.obj",
+      "base_path": "build/base/client/cl_dll/Yesno_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Yesno_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/util",
+      "target_path": "build/target/client/cl_dll/util.obj",
+      "base_path": "build/base/client/cl_dll/util.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/util.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hl/hl_events",
+      "target_path": "build/target/client/cl_dll/hl/hl_events.obj",
+      "base_path": "build/base/client/cl_dll/hl/hl_events.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hl/hl_events.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hl/hl_objects",
+      "target_path": "build/target/client/cl_dll/hl/hl_objects.obj",
+      "base_path": "build/base/client/cl_dll/hl/hl_objects.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hl/hl_objects.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hl/hl_weapons",
+      "target_path": "build/target/client/cl_dll/hl/hl_weapons.obj",
+      "base_path": "build/base/client/cl_dll/hl/hl_weapons.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hl/hl_weapons.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/glmanager",
+      "target_path": "build/target/client/cl_dll/glmanager.obj",
+      "base_path": "build/base/client/cl_dll/glmanager.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/glmanager.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/mp3",
+      "target_path": "build/target/client/cl_dll/mp3.obj",
+      "base_path": "build/base/client/cl_dll/mp3.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/mp3.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_tabpanel",
+      "target_path": "build/target/client/cl_dll/vgui_tabpanel.obj",
+      "base_path": "build/base/client/cl_dll/vgui_tabpanel.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_tabpanel.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_checkbutton2",
+      "target_path": "build/target/client/game_shared/vgui_checkbutton2.obj",
+      "base_path": "build/base/client/game_shared/vgui_checkbutton2.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_checkbutton2.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_grid",
+      "target_path": "build/target/client/game_shared/vgui_grid.obj",
+      "base_path": "build/base/client/game_shared/vgui_grid.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_grid.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_listbox",
+      "target_path": "build/target/client/game_shared/vgui_listbox.obj",
+      "base_path": "build/base/client/game_shared/vgui_listbox.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_listbox.cpp"
+      }
+    },
+    {
+      "name": "client/game_shared/vgui_slider2",
+      "target_path": "build/target/client/game_shared/vgui_slider2.obj",
+      "base_path": "build/base/client/game_shared/vgui_slider2.obj",
+      "metadata": {
+        "source_path": "src/game_shared/vgui_slider2.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/vgui_radio",
+      "target_path": "build/target/client/cl_dll/vgui_radio.obj",
+      "base_path": "build/base/client/cl_dll/vgui_radio.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/vgui_radio.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/TGALoader_guess",
+      "target_path": "build/target/client/cl_dll/TGALoader_guess.obj",
+      "base_path": "build/base/client/cl_dll/TGALoader_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/TGALoader_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/hud_update",
+      "target_path": "build/target/client/cl_dll/hud_update.obj",
+      "base_path": "build/base/client/cl_dll/hud_update.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/hud_update.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/CgContext_guess",
+      "target_path": "build/target/client/cl_dll/CgContext_guess.obj",
+      "base_path": "build/base/client/cl_dll/CgContext_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/CgContext_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/CgWater_guess",
+      "target_path": "build/target/client/cl_dll/CgWater_guess.obj",
+      "base_path": "build/base/client/cl_dll/CgWater_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/CgWater_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/PBuffer_guess",
+      "target_path": "build/target/client/cl_dll/PBuffer_guess.obj",
+      "base_path": "build/base/client/cl_dll/PBuffer_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/PBuffer_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/TextureManager_guess",
+      "target_path": "build/target/client/cl_dll/TextureManager_guess.obj",
+      "base_path": "build/base/client/cl_dll/TextureManager_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/TextureManager_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/lensflare",
+      "target_path": "build/target/client/cl_dll/lensflare.obj",
+      "base_path": "build/base/client/cl_dll/lensflare.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/lensflare.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/Blur_guess",
+      "target_path": "build/target/client/cl_dll/Blur_guess.obj",
+      "base_path": "build/base/client/cl_dll/Blur_guess.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/Blur_guess.cpp"
+      }
+    },
+    {
+      "name": "client/cl_dll/MP3FileInfo",
+      "target_path": "build/target/client/cl_dll/MP3FileInfo.obj",
+      "base_path": "build/base/client/cl_dll/MP3FileInfo.obj",
+      "metadata": {
+        "source_path": "src/cl_dll/MP3FileInfo.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/crc",
+      "target_path": "build/target/hw/engine/crc.obj",
+      "base_path": "build/base/hw/engine/crc.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/crc.c"
+      }
+    },
+    {
+      "name": "hw/engine/cvar",
+      "target_path": "build/target/hw/engine/cvar.obj",
+      "base_path": "build/base/hw/engine/cvar.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cvar.c"
+      }
+    },
+    {
+      "name": "hw/engine/cmd",
+      "target_path": "build/target/hw/engine/cmd.obj",
+      "base_path": "build/base/hw/engine/cmd.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cmd.c"
+      }
+    },
+    {
+      "name": "hw/engine/zone",
+      "target_path": "build/target/hw/engine/zone.obj",
+      "base_path": "build/base/hw/engine/zone.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/zone.c"
+      }
+    },
+    {
+      "name": "hw/engine/math",
+      "target_path": "build/target/hw/engine/math.obj",
+      "base_path": "build/base/hw/engine/math.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/math.asm"
+      }
+    },
+    {
+      "name": "hw/engine/snd_mixa",
+      "target_path": "build/target/hw/engine/snd_mixa.obj",
+      "base_path": "build/base/hw/engine/snd_mixa.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/snd_mixa.asm"
+      }
+    },
+    {
+      "name": "hw/engine/sys_wina",
+      "target_path": "build/target/hw/engine/sys_wina.obj",
+      "base_path": "build/base/hw/engine/sys_wina.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_wina.asm"
+      }
+    },
+    {
+      "name": "hw/engine/worlda",
+      "target_path": "build/target/hw/engine/worlda.obj",
+      "base_path": "build/base/hw/engine/worlda.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/worlda.asm"
+      }
+    },
+    {
+      "name": "hw/engine/info",
+      "target_path": "build/target/hw/engine/info.obj",
+      "base_path": "build/base/hw/engine/info.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/info.c"
+      }
+    },
+    {
+      "name": "hw/engine/CONSOLE",
+      "target_path": "build/target/hw/engine/CONSOLE.obj",
+      "base_path": "build/base/hw/engine/CONSOLE.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CONSOLE.C"
+      }
+    },
+    {
+      "name": "hw/engine/KEYS",
+      "target_path": "build/target/hw/engine/KEYS.obj",
+      "base_path": "build/base/hw/engine/KEYS.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/KEYS.C"
+      }
+    },
+    {
+      "name": "hw/engine/common",
+      "target_path": "build/target/hw/engine/common.obj",
+      "base_path": "build/base/hw/engine/common.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/common.c"
+      }
+    },
+    {
+      "name": "hw/engine/delta",
+      "target_path": "build/target/hw/engine/delta.obj",
+      "base_path": "build/base/hw/engine/delta.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/delta.c"
+      }
+    },
+    {
+      "name": "hw/engine/net_chan",
+      "target_path": "build/target/hw/engine/net_chan.obj",
+      "base_path": "build/base/hw/engine/net_chan.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/net_chan.c"
+      }
+    },
+    {
+      "name": "hw/engine/pmovetst",
+      "target_path": "build/target/hw/engine/pmovetst.obj",
+      "base_path": "build/base/hw/engine/pmovetst.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pmovetst.c"
+      }
+    },
+    {
+      "name": "hw/engine/world",
+      "target_path": "build/target/hw/engine/world.obj",
+      "base_path": "build/base/hw/engine/world.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/world.c"
+      }
+    },
+    {
+      "name": "hw/engine/hashpak",
+      "target_path": "build/target/hw/engine/hashpak.obj",
+      "base_path": "build/base/hw/engine/hashpak.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/hashpak.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_log",
+      "target_path": "build/target/hw/engine/sv_log.obj",
+      "base_path": "build/base/hw/engine/sv_log.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_log.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_upld",
+      "target_path": "build/target/hw/engine/sv_upld.obj",
+      "base_path": "build/base/hw/engine/sv_upld.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_upld.c"
+      }
+    },
+    {
+      "name": "hw/engine/CL_MAIN",
+      "target_path": "build/target/hw/engine/CL_MAIN.obj",
+      "base_path": "build/base/hw/engine/CL_MAIN.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CL_MAIN.C"
+      }
+    },
+    {
+      "name": "hw/engine/qgl",
+      "target_path": "build/target/hw/engine/qgl.obj",
+      "base_path": "build/base/hw/engine/qgl.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/qgl.c"
+      }
+    },
+    {
+      "name": "hw/engine/GL_DRAW",
+      "target_path": "build/target/hw/engine/GL_DRAW.obj",
+      "base_path": "build/base/hw/engine/GL_DRAW.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_DRAW.C"
+      }
+    },
+    {
+      "name": "hw/engine/GL_RMAIN",
+      "target_path": "build/target/hw/engine/GL_RMAIN.obj",
+      "base_path": "build/base/hw/engine/GL_RMAIN.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_RMAIN.C"
+      }
+    },
+    {
+      "name": "hw/engine/GL_RMISC",
+      "target_path": "build/target/hw/engine/GL_RMISC.obj",
+      "base_path": "build/base/hw/engine/GL_RMISC.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_RMISC.C"
+      }
+    },
+    {
+      "name": "hw/engine/GL_WARP",
+      "target_path": "build/target/hw/engine/GL_WARP.obj",
+      "base_path": "build/base/hw/engine/GL_WARP.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_WARP.C"
+      }
+    },
+    {
+      "name": "hw/engine/sv_main",
+      "target_path": "build/target/hw/engine/sv_main.obj",
+      "base_path": "build/base/hw/engine/sv_main.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_main.c"
+      }
+    },
+    {
+      "name": "hw/engine/CL_PARSE",
+      "target_path": "build/target/hw/engine/CL_PARSE.obj",
+      "base_path": "build/base/hw/engine/CL_PARSE.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CL_PARSE.C"
+      }
+    },
+    {
+      "name": "hw/engine/cl_ents",
+      "target_path": "build/target/hw/engine/cl_ents.obj",
+      "base_path": "build/base/hw/engine/cl_ents.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_ents.c"
+      }
+    },
+    {
+      "name": "hw/engine/cl_pred",
+      "target_path": "build/target/hw/engine/cl_pred.obj",
+      "base_path": "build/base/hw/engine/cl_pred.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_pred.c"
+      }
+    },
+    {
+      "name": "hw/engine/cl_parsefn",
+      "target_path": "build/target/hw/engine/cl_parsefn.obj",
+      "base_path": "build/base/hw/engine/cl_parsefn.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_parsefn.c"
+      }
+    },
+    {
+      "name": "hw/engine/host",
+      "target_path": "build/target/hw/engine/host.obj",
+      "base_path": "build/base/hw/engine/host.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/host.c"
+      }
+    },
+    {
+      "name": "hw/engine/host_cmd",
+      "target_path": "build/target/hw/engine/host_cmd.obj",
+      "base_path": "build/base/hw/engine/host_cmd.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/host_cmd.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_phys",
+      "target_path": "build/target/hw/engine/sv_phys.obj",
+      "base_path": "build/base/hw/engine/sv_phys.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_phys.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_user",
+      "target_path": "build/target/hw/engine/sv_user.obj",
+      "base_path": "build/base/hw/engine/sv_user.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_user.c"
+      }
+    },
+    {
+      "name": "hw/engine/pr_cmds",
+      "target_path": "build/target/hw/engine/pr_cmds.obj",
+      "base_path": "build/base/hw/engine/pr_cmds.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pr_cmds.c"
+      }
+    },
+    {
+      "name": "hw/engine/r_studio",
+      "target_path": "build/target/hw/engine/r_studio.obj",
+      "base_path": "build/base/hw/engine/r_studio.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/r_studio.c"
+      }
+    },
+    {
+      "name": "hw/engine/CL_TENT",
+      "target_path": "build/target/hw/engine/CL_TENT.obj",
+      "base_path": "build/base/hw/engine/CL_TENT.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CL_TENT.C"
+      }
+    },
+    {
+      "name": "hw/engine/r_efx",
+      "target_path": "build/target/hw/engine/r_efx.obj",
+      "base_path": "build/base/hw/engine/r_efx.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/r_efx.c"
+      }
+    },
+    {
+      "name": "hw/engine/R_PART",
+      "target_path": "build/target/hw/engine/R_PART.obj",
+      "base_path": "build/base/hw/engine/R_PART.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/R_PART.C"
+      }
+    },
+    {
+      "name": "hw/engine/SND_DMA",
+      "target_path": "build/target/hw/engine/SND_DMA.obj",
+      "base_path": "build/base/hw/engine/SND_DMA.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/SND_DMA.C"
+      }
+    },
+    {
+      "name": "hw/engine/SND_MIX",
+      "target_path": "build/target/hw/engine/SND_MIX.obj",
+      "base_path": "build/base/hw/engine/SND_MIX.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/SND_MIX.C"
+      }
+    },
+    {
+      "name": "hw/engine/SND_MEM",
+      "target_path": "build/target/hw/engine/SND_MEM.obj",
+      "base_path": "build/base/hw/engine/SND_MEM.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/SND_MEM.C"
+      }
+    },
+    {
+      "name": "hw/engine/net_ws",
+      "target_path": "build/target/hw/engine/net_ws.obj",
+      "base_path": "build/base/hw/engine/net_ws.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/net_ws.c"
+      }
+    },
+    {
+      "name": "hw/engine/Sequence",
+      "target_path": "build/target/hw/engine/Sequence.obj",
+      "base_path": "build/base/hw/engine/Sequence.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/Sequence.c"
+      }
+    },
+    {
+      "name": "hw/engine/CL_DEMO",
+      "target_path": "build/target/hw/engine/CL_DEMO.obj",
+      "base_path": "build/base/hw/engine/CL_DEMO.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CL_DEMO.C"
+      }
+    },
+    {
+      "name": "hw/bzip2/blocksort",
+      "target_path": "build/target/hw/bzip2/blocksort.obj",
+      "base_path": "build/base/hw/bzip2/blocksort.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/blocksort.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/huffman",
+      "target_path": "build/target/hw/bzip2/huffman.obj",
+      "base_path": "build/base/hw/bzip2/huffman.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/huffman.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/crctable",
+      "target_path": "build/target/hw/bzip2/crctable.obj",
+      "base_path": "build/base/hw/bzip2/crctable.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/crctable.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/randtable",
+      "target_path": "build/target/hw/bzip2/randtable.obj",
+      "base_path": "build/base/hw/bzip2/randtable.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/randtable.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/compress",
+      "target_path": "build/target/hw/bzip2/compress.obj",
+      "base_path": "build/base/hw/bzip2/compress.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/compress.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/decompress",
+      "target_path": "build/target/hw/bzip2/decompress.obj",
+      "base_path": "build/base/hw/bzip2/decompress.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/decompress.c"
+      }
+    },
+    {
+      "name": "hw/bzip2/bzlib",
+      "target_path": "build/target/hw/bzip2/bzlib.obj",
+      "base_path": "build/base/hw/bzip2/bzlib.obj",
+      "metadata": {
+        "source_path": "refs/bzip2-1.0.2-dl/bzip2-1.0.2/bzlib.c"
+      }
+    },
+    {
+      "name": "hw/public/KeyValues",
+      "target_path": "build/target/hw/public/KeyValues.obj",
+      "base_path": "build/base/hw/public/KeyValues.obj",
+      "metadata": {
+        "source_path": "src/public/KeyValues.cpp"
+      }
+    },
+    {
+      "name": "hw/public/interface",
+      "target_path": "build/target/hw/public/interface.obj",
+      "base_path": "build/base/hw/public/interface.obj",
+      "metadata": {
+        "source_path": "src/public/interface.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Panel",
+      "target_path": "build/target/hw/vgui2/controls/Panel.obj",
+      "base_path": "build/base/hw/vgui2/controls/Panel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Panel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Label",
+      "target_path": "build/target/hw/vgui2/controls/Label.obj",
+      "base_path": "build/base/hw/vgui2/controls/Label.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Label.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Button",
+      "target_path": "build/target/hw/vgui2/controls/Button.obj",
+      "base_path": "build/base/hw/vgui2/controls/Button.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Button.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/EditablePanel",
+      "target_path": "build/target/hw/vgui2/controls/EditablePanel.obj",
+      "base_path": "build/base/hw/vgui2/controls/EditablePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/EditablePanel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/controls",
+      "target_path": "build/target/hw/vgui2/controls/controls.obj",
+      "base_path": "build/base/hw/vgui2/controls/controls.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/controls.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/mathlib",
+      "target_path": "build/target/hw/engine/mathlib.obj",
+      "base_path": "build/base/hw/engine/mathlib.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/mathlib.c"
+      }
+    },
+    {
+      "name": "hw/engine/mem",
+      "target_path": "build/target/hw/engine/mem.obj",
+      "base_path": "build/base/hw/engine/mem.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/mem.c"
+      }
+    },
+    {
+      "name": "hw/engine/GL_RSURF",
+      "target_path": "build/target/hw/engine/GL_RSURF.obj",
+      "base_path": "build/base/hw/engine/GL_RSURF.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_RSURF.C"
+      }
+    },
+    {
+      "name": "hw/engine/GL_MODEL",
+      "target_path": "build/target/hw/engine/GL_MODEL.obj",
+      "base_path": "build/base/hw/engine/GL_MODEL.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_MODEL.C"
+      }
+    },
+    {
+      "name": "hw/engine/decals",
+      "target_path": "build/target/hw/engine/decals.obj",
+      "base_path": "build/base/hw/engine/decals.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/decals.c"
+      }
+    },
+    {
+      "name": "hw/engine/gl_screen",
+      "target_path": "build/target/hw/engine/gl_screen.obj",
+      "base_path": "build/base/hw/engine/gl_screen.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/gl_screen.c"
+      }
+    },
+    {
+      "name": "hw/engine/VIEW",
+      "target_path": "build/target/hw/engine/VIEW.obj",
+      "base_path": "build/base/hw/engine/VIEW.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/VIEW.C"
+      }
+    },
+    {
+      "name": "hw/engine/pr_edict",
+      "target_path": "build/target/hw/engine/pr_edict.obj",
+      "base_path": "build/base/hw/engine/pr_edict.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pr_edict.c"
+      }
+    },
+    {
+      "name": "hw/engine/prefs_guess",
+      "target_path": "build/target/hw/engine/prefs_guess.obj",
+      "base_path": "build/base/hw/engine/prefs_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/prefs_guess.c"
+      }
+    },
+    {
+      "name": "hw/engine/cdll_int",
+      "target_path": "build/target/hw/engine/cdll_int.obj",
+      "base_path": "build/base/hw/engine/cdll_int.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cdll_int.c"
+      }
+    },
+    {
+      "name": "hw/engine/sys_dll",
+      "target_path": "build/target/hw/engine/sys_dll.obj",
+      "base_path": "build/base/hw/engine/sys_dll.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_dll.c"
+      }
+    },
+    {
+      "name": "hw/engine/sys_dll2",
+      "target_path": "build/target/hw/engine/sys_dll2.obj",
+      "base_path": "build/base/hw/engine/sys_dll2.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_dll2.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/sys_getmodes",
+      "target_path": "build/target/hw/engine/sys_getmodes.obj",
+      "base_path": "build/base/hw/engine/sys_getmodes.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_getmodes.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/GL_VIDNT",
+      "target_path": "build/target/hw/engine/GL_VIDNT.obj",
+      "base_path": "build/base/hw/engine/GL_VIDNT.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_VIDNT.C"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Frame",
+      "target_path": "build/target/hw/vgui2/controls/Frame.obj",
+      "base_path": "build/base/hw/vgui2/controls/Frame.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Frame.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/TextEntry",
+      "target_path": "build/target/hw/vgui2/controls/TextEntry.obj",
+      "base_path": "build/base/hw/vgui2/controls/TextEntry.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/TextEntry.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/RichText",
+      "target_path": "build/target/hw/vgui2/controls/RichText.obj",
+      "base_path": "build/base/hw/vgui2/controls/RichText.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/RichText.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Menu",
+      "target_path": "build/target/hw/vgui2/controls/Menu.obj",
+      "base_path": "build/base/hw/vgui2/controls/Menu.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Menu.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ProgressBar",
+      "target_path": "build/target/hw/vgui2/controls/ProgressBar.obj",
+      "base_path": "build/base/hw/vgui2/controls/ProgressBar.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ProgressBar.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/RadioButton",
+      "target_path": "build/target/hw/vgui2/controls/RadioButton.obj",
+      "base_path": "build/base/hw/vgui2/controls/RadioButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/RadioButton.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/TextImage",
+      "target_path": "build/target/hw/vgui2/controls/TextImage.obj",
+      "base_path": "build/base/hw/vgui2/controls/TextImage.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/TextImage.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/FocusNavGroup",
+      "target_path": "build/target/hw/vgui2/controls/FocusNavGroup.obj",
+      "base_path": "build/base/hw/vgui2/controls/FocusNavGroup.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/FocusNavGroup.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/MenuButton",
+      "target_path": "build/target/hw/vgui2/controls/MenuButton.obj",
+      "base_path": "build/base/hw/vgui2/controls/MenuButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MenuButton.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ScrollBar",
+      "target_path": "build/target/hw/vgui2/controls/ScrollBar.obj",
+      "base_path": "build/base/hw/vgui2/controls/ScrollBar.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ScrollBar.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ScrollBarSlider",
+      "target_path": "build/target/hw/vgui2/controls/ScrollBarSlider.obj",
+      "base_path": "build/base/hw/vgui2/controls/ScrollBarSlider.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ScrollBarSlider.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/MenuItem",
+      "target_path": "build/target/hw/vgui2/controls/MenuItem.obj",
+      "base_path": "build/base/hw/vgui2/controls/MenuItem.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MenuItem.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/BuildGroup",
+      "target_path": "build/target/hw/vgui2/controls/BuildGroup.obj",
+      "base_path": "build/base/hw/vgui2/controls/BuildGroup.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BuildGroup.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/PanelListPanel",
+      "target_path": "build/target/hw/vgui2/controls/PanelListPanel.obj",
+      "base_path": "build/base/hw/vgui2/controls/PanelListPanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PanelListPanel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/BuildModeDialog",
+      "target_path": "build/target/hw/vgui2/controls/BuildModeDialog.obj",
+      "base_path": "build/base/hw/vgui2/controls/BuildModeDialog.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BuildModeDialog.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ComboBox",
+      "target_path": "build/target/hw/vgui2/controls/ComboBox.obj",
+      "base_path": "build/base/hw/vgui2/controls/ComboBox.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ComboBox.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/AnimatingImagePanel",
+      "target_path": "build/target/hw/vgui2/controls/AnimatingImagePanel.obj",
+      "base_path": "build/base/hw/vgui2/controls/AnimatingImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/AnimatingImagePanel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/BitmapImagePanel",
+      "target_path": "build/target/hw/vgui2/controls/BitmapImagePanel.obj",
+      "base_path": "build/base/hw/vgui2/controls/BitmapImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BitmapImagePanel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/MessageBox",
+      "target_path": "build/target/hw/vgui2/controls/MessageBox.obj",
+      "base_path": "build/base/hw/vgui2/controls/MessageBox.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MessageBox.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ToggleButton",
+      "target_path": "build/target/hw/vgui2/controls/ToggleButton.obj",
+      "base_path": "build/base/hw/vgui2/controls/ToggleButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ToggleButton.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/CheckButton",
+      "target_path": "build/target/hw/vgui2/controls/CheckButton.obj",
+      "base_path": "build/base/hw/vgui2/controls/CheckButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/CheckButton.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Divider",
+      "target_path": "build/target/hw/vgui2/controls/Divider.obj",
+      "base_path": "build/base/hw/vgui2/controls/Divider.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Divider.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/URLLabel",
+      "target_path": "build/target/hw/vgui2/controls/URLLabel.obj",
+      "base_path": "build/base/hw/vgui2/controls/URLLabel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/URLLabel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/ImagePanel",
+      "target_path": "build/target/hw/vgui2/controls/ImagePanel.obj",
+      "base_path": "build/base/hw/vgui2/controls/ImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ImagePanel.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Tooltip",
+      "target_path": "build/target/hw/vgui2/controls/Tooltip.obj",
+      "base_path": "build/base/hw/vgui2/controls/Tooltip.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Tooltip.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/controls/Image",
+      "target_path": "build/target/hw/vgui2/controls/Image.obj",
+      "base_path": "build/base/hw/vgui2/controls/Image.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Image.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/net_api",
+      "target_path": "build/target/hw/engine/net_api.obj",
+      "base_path": "build/base/hw/engine/net_api.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/net_api.c"
+      }
+    },
+    {
+      "name": "hw/engine/voice",
+      "target_path": "build/target/hw/engine/voice.obj",
+      "base_path": "build/base/hw/engine/voice.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/r_trans",
+      "target_path": "build/target/hw/engine/r_trans.obj",
+      "base_path": "build/base/hw/engine/r_trans.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/r_trans.c"
+      }
+    },
+    {
+      "name": "hw/engine/VGUI_EngineSurfaceWrap",
+      "target_path": "build/target/hw/engine/VGUI_EngineSurfaceWrap.obj",
+      "base_path": "build/base/hw/engine/VGUI_EngineSurfaceWrap.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/VGUI_EngineSurfaceWrap.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_EngineSurfaceHW",
+      "target_path": "build/target/hw/engine/vgui_EngineSurfaceHW.obj",
+      "base_path": "build/base/hw/engine/vgui_EngineSurfaceHW.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_EngineSurfaceHW.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/tmessage",
+      "target_path": "build/target/hw/engine/tmessage.obj",
+      "base_path": "build/base/hw/engine/tmessage.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/tmessage.c"
+      }
+    },
+    {
+      "name": "hw/engine/gl_rlight",
+      "target_path": "build/target/hw/engine/gl_rlight.obj",
+      "base_path": "build/base/hw/engine/gl_rlight.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/gl_rlight.c"
+      }
+    },
+    {
+      "name": "hw/engine/cd",
+      "target_path": "build/target/hw/engine/cd.obj",
+      "base_path": "build/base/hw/engine/cd.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cd.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/cdll_exp",
+      "target_path": "build/target/hw/engine/cdll_exp.obj",
+      "base_path": "build/base/hw/engine/cdll_exp.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cdll_exp.c"
+      }
+    },
+    {
+      "name": "hw/engine/cl_draw",
+      "target_path": "build/target/hw/engine/cl_draw.obj",
+      "base_path": "build/base/hw/engine/cl_draw.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_draw.c"
+      }
+    },
+    {
+      "name": "hw/engine/cl_extrap",
+      "target_path": "build/target/hw/engine/cl_extrap.obj",
+      "base_path": "build/base/hw/engine/cl_extrap.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_extrap.c"
+      }
+    },
+    {
+      "name": "hw/engine/cl_pmove",
+      "target_path": "build/target/hw/engine/cl_pmove.obj",
+      "base_path": "build/base/hw/engine/cl_pmove.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_pmove.c"
+      }
+    },
+    {
+      "name": "hw/engine/cmodel",
+      "target_path": "build/target/hw/engine/cmodel.obj",
+      "base_path": "build/base/hw/engine/cmodel.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cmodel.c"
+      }
+    },
+    {
+      "name": "hw/engine/com_custom",
+      "target_path": "build/target/hw/engine/com_custom.obj",
+      "base_path": "build/base/hw/engine/com_custom.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/com_custom.c"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/text_draw",
+      "target_path": "build/target/hw/engine/vgui2/text_draw.obj",
+      "base_path": "build/base/hw/engine/vgui2/text_draw.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/text_draw.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_intwrap2",
+      "target_path": "build/target/hw/engine/vgui_intwrap2.obj",
+      "base_path": "build/base/hw/engine/vgui_intwrap2.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_intwrap2.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/chase",
+      "target_path": "build/target/hw/engine/chase.obj",
+      "base_path": "build/base/hw/engine/chase.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/chase.c"
+      }
+    },
+    {
+      "name": "hw/engine/buildnum",
+      "target_path": "build/target/hw/engine/buildnum.obj",
+      "base_path": "build/base/hw/engine/buildnum.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/buildnum.c"
+      }
+    },
+    {
+      "name": "hw/engine/GL_MESH",
+      "target_path": "build/target/hw/engine/GL_MESH.obj",
+      "base_path": "build/base/hw/engine/GL_MESH.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/GL_MESH.C"
+      }
+    },
+    {
+      "name": "hw/engine/textures",
+      "target_path": "build/target/hw/engine/textures.obj",
+      "base_path": "build/base/hw/engine/textures.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/textures.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_steam3",
+      "target_path": "build/target/hw/engine/sv_steam3.obj",
+      "base_path": "build/base/hw/engine/sv_steam3.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_steam3.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/BaseUI_Interface",
+      "target_path": "build/target/hw/engine/vgui2/BaseUI_Interface.obj",
+      "base_path": "build/base/hw/engine/vgui2/BaseUI_Interface.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/BaseUI_Interface.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/BaseUISurface",
+      "target_path": "build/target/hw/engine/vgui2/BaseUISurface.obj",
+      "base_path": "build/base/hw/engine/vgui2/BaseUISurface.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/BaseUISurface.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/cl_spectator",
+      "target_path": "build/target/hw/engine/cl_spectator.obj",
+      "base_path": "build/base/hw/engine/cl_spectator.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/cl_spectator.c"
+      }
+    },
+    {
+      "name": "hw/engine/DemoPlayerWrapper",
+      "target_path": "build/target/hw/engine/DemoPlayerWrapper.obj",
+      "base_path": "build/base/hw/engine/DemoPlayerWrapper.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/DemoPlayerWrapper.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/download",
+      "target_path": "build/target/hw/engine/download.obj",
+      "base_path": "build/base/hw/engine/download.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/download.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/eventapi",
+      "target_path": "build/target/hw/engine/eventapi.obj",
+      "base_path": "build/base/hw/engine/eventapi.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/eventapi.c"
+      }
+    },
+    {
+      "name": "hw/engine/filesystem_internal",
+      "target_path": "build/target/hw/engine/filesystem_internal.obj",
+      "base_path": "build/base/hw/engine/filesystem_internal.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/filesystem_internal.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/filesystem",
+      "target_path": "build/target/hw/engine/filesystem.obj",
+      "base_path": "build/base/hw/engine/filesystem.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/filesystem.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/glHud",
+      "target_path": "build/target/hw/engine/glHud.obj",
+      "base_path": "build/base/hw/engine/glHud.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/glHud.c"
+      }
+    },
+    {
+      "name": "hw/engine/gl_refrag",
+      "target_path": "build/target/hw/engine/gl_refrag.obj",
+      "base_path": "build/base/hw/engine/gl_refrag.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/gl_refrag.c"
+      }
+    },
+    {
+      "name": "hw/engine/HUD",
+      "target_path": "build/target/hw/engine/HUD.obj",
+      "base_path": "build/base/hw/engine/HUD.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/HUD.c"
+      }
+    },
+    {
+      "name": "hw/engine/module",
+      "target_path": "build/target/hw/engine/module.obj",
+      "base_path": "build/base/hw/engine/module.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/module.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/ipratelimit",
+      "target_path": "build/target/hw/engine/ipratelimit.obj",
+      "base_path": "build/base/hw/engine/ipratelimit.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/ipratelimit.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/ipratelimitWrapper",
+      "target_path": "build/target/hw/engine/ipratelimitWrapper.obj",
+      "base_path": "build/base/hw/engine/ipratelimitWrapper.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/ipratelimitWrapper.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/dinput_guess",
+      "target_path": "build/target/hw/engine/dinput_guess.obj",
+      "base_path": "build/base/hw/engine/dinput_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/dinput_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/pmove",
+      "target_path": "build/target/hw/engine/pmove.obj",
+      "base_path": "build/base/hw/engine/pmove.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pmove.c"
+      }
+    },
+    {
+      "name": "hw/engine/pmovedbg",
+      "target_path": "build/target/hw/engine/pmovedbg.obj",
+      "base_path": "build/base/hw/engine/pmovedbg.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pmovedbg.c"
+      }
+    },
+    {
+      "name": "hw/engine/r_triangle",
+      "target_path": "build/target/hw/engine/r_triangle.obj",
+      "base_path": "build/base/hw/engine/r_triangle.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/r_triangle.c"
+      }
+    },
+    {
+      "name": "hw/game_shared/shared_util",
+      "target_path": "build/target/hw/game_shared/shared_util.obj",
+      "base_path": "build/base/hw/game_shared/shared_util.obj",
+      "metadata": {
+        "source_path": "src/game_shared/shared_util.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/snd_win",
+      "target_path": "build/target/hw/engine/snd_win.obj",
+      "base_path": "build/base/hw/engine/snd_win.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/snd_win.c"
+      }
+    },
+    {
+      "name": "hw/common/steamid",
+      "target_path": "build/target/hw/common/steamid.obj",
+      "base_path": "build/base/hw/common/steamid.obj",
+      "metadata": {
+        "source_path": "src/common/steamid.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/sv_move",
+      "target_path": "build/target/hw/engine/sv_move.obj",
+      "base_path": "build/base/hw/engine/sv_move.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_move.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_pmove",
+      "target_path": "build/target/hw/engine/sv_pmove.obj",
+      "base_path": "build/base/hw/engine/sv_pmove.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_pmove.c"
+      }
+    },
+    {
+      "name": "hw/engine/sv_remoteaccess",
+      "target_path": "build/target/hw/engine/sv_remoteaccess.obj",
+      "base_path": "build/base/hw/engine/sv_remoteaccess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_remoteaccess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/sv_secure",
+      "target_path": "build/target/hw/engine/sv_secure.obj",
+      "base_path": "build/base/hw/engine/sv_secure.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sv_secure.c"
+      }
+    },
+    {
+      "name": "hw/engine/SystemWrapper",
+      "target_path": "build/target/hw/engine/SystemWrapper.obj",
+      "base_path": "build/base/hw/engine/SystemWrapper.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/SystemWrapper.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/Tokenize_guess",
+      "target_path": "build/target/hw/engine/Tokenize_guess.obj",
+      "base_path": "build/base/hw/engine/Tokenize_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/Tokenize_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/common/BaseSystemModule",
+      "target_path": "build/target/hw/common/BaseSystemModule.obj",
+      "base_path": "build/base/hw/common/BaseSystemModule.obj",
+      "metadata": {
+        "source_path": "src/common/BaseSystemModule.cpp"
+      }
+    },
+    {
+      "name": "hw/common/ObjectList",
+      "target_path": "build/target/hw/common/ObjectList.obj",
+      "base_path": "build/base/hw/common/ObjectList.obj",
+      "metadata": {
+        "source_path": "src/common/ObjectList.cpp"
+      }
+    },
+    {
+      "name": "hw/common/TokenLine",
+      "target_path": "build/target/hw/common/TokenLine.obj",
+      "base_path": "build/base/hw/common/TokenLine.obj",
+      "metadata": {
+        "source_path": "src/common/TokenLine.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/downloadthread",
+      "target_path": "build/target/hw/engine/downloadthread.obj",
+      "base_path": "build/base/hw/engine/downloadthread.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/downloadthread.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/LoadBlob",
+      "target_path": "build/target/hw/engine/LoadBlob.obj",
+      "base_path": "build/base/hw/engine/LoadBlob.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/LoadBlob.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/sys_engine",
+      "target_path": "build/target/hw/engine/sys_engine.obj",
+      "base_path": "build/base/hw/engine/sys_engine.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_engine.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/thread",
+      "target_path": "build/target/hw/engine/thread.obj",
+      "base_path": "build/base/hw/engine/thread.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/thread.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/traceinit",
+      "target_path": "build/target/hw/engine/traceinit.obj",
+      "base_path": "build/base/hw/engine/traceinit.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/traceinit.cpp"
+      }
+    },
+    {
+      "name": "hw/public/registry",
+      "target_path": "build/target/hw/public/registry.obj",
+      "base_path": "build/base/hw/public/registry.obj",
+      "metadata": {
+        "source_path": "src/public/registry.cpp"
+      }
+    },
+    {
+      "name": "hw/public/UtlBuffer",
+      "target_path": "build/target/hw/public/UtlBuffer.obj",
+      "base_path": "build/base/hw/public/UtlBuffer.obj",
+      "metadata": {
+        "source_path": "src/public/UtlBuffer.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/verify_guess",
+      "target_path": "build/target/hw/engine/verify_guess.obj",
+      "base_path": "build/base/hw/engine/verify_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/verify_guess.c"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_int",
+      "target_path": "build/target/hw/engine/vgui_int.obj",
+      "base_path": "build/base/hw/engine/vgui_int.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_int.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_intwrap",
+      "target_path": "build/target/hw/engine/vgui_intwrap.obj",
+      "base_path": "build/base/hw/engine/vgui_intwrap.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_intwrap.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/voice_sound_engine_interface",
+      "target_path": "build/target/hw/engine/voice_sound_engine_interface.obj",
+      "base_path": "build/base/hw/engine/voice_sound_engine_interface.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_sound_engine_interface.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/wad",
+      "target_path": "build/target/hw/engine/wad.obj",
+      "base_path": "build/base/hw/engine/wad.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/wad.c"
+      }
+    },
+    {
+      "name": "hw/public/utlsymbol",
+      "target_path": "build/target/hw/public/utlsymbol.obj",
+      "base_path": "build/base/hw/public/utlsymbol.obj",
+      "metadata": {
+        "source_path": "src/public/utlsymbol.cpp"
+      }
+    },
+    {
+      "name": "hw/public/MemPool",
+      "target_path": "build/target/hw/public/MemPool.obj",
+      "base_path": "build/base/hw/public/MemPool.obj",
+      "metadata": {
+        "source_path": "src/public/MemPool.cpp"
+      }
+    },
+    {
+      "name": "hw/a3d/A3DRenderer_guess",
+      "target_path": "build/target/hw/a3d/A3DRenderer_guess.obj",
+      "base_path": "build/base/hw/a3d/A3DRenderer_guess.obj",
+      "metadata": {
+        "source_path": "src/a3d/A3DRenderer_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/public/IceKey",
+      "target_path": "build/target/hw/public/IceKey.obj",
+      "base_path": "build/base/hw/public/IceKey.obj",
+      "metadata": {
+        "source_path": "src/public/IceKey.cpp"
+      }
+    },
+    {
+      "name": "hw/iga/IGA_Engine_guess",
+      "target_path": "build/target/hw/iga/IGA_Engine_guess.obj",
+      "base_path": "build/base/hw/iga/IGA_Engine_guess.obj",
+      "metadata": {
+        "source_path": "src/iga/IGA_Engine_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/iga/IGA_Metadata_guess",
+      "target_path": "build/target/hw/iga/IGA_Metadata_guess.obj",
+      "base_path": "build/base/hw/iga/IGA_Metadata_guess.obj",
+      "metadata": {
+        "source_path": "src/iga/IGA_Metadata_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/mathlib/imagequant",
+      "target_path": "build/target/hw/mathlib/imagequant.obj",
+      "base_path": "build/base/hw/mathlib/imagequant.obj",
+      "metadata": {
+        "source_path": "src/mathlib/imagequant.cpp"
+      }
+    },
+    {
+      "name": "hw/mathlib/quantize",
+      "target_path": "build/target/hw/mathlib/quantize.obj",
+      "base_path": "build/base/hw/mathlib/quantize.obj",
+      "metadata": {
+        "source_path": "src/mathlib/quantize.cpp"
+      }
+    },
+    {
+      "name": "hw/iga/IGA_Quantizer_guess",
+      "target_path": "build/target/hw/iga/IGA_Quantizer_guess.obj",
+      "base_path": "build/base/hw/iga/IGA_Quantizer_guess.obj",
+      "metadata": {
+        "source_path": "src/iga/IGA_Quantizer_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/hla3d_guess",
+      "target_path": "build/target/hw/engine/hla3d_guess.obj",
+      "base_path": "build/base/hw/engine/hla3d_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/hla3d_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/opengl2d3d_guess",
+      "target_path": "build/target/hw/engine/opengl2d3d_guess.obj",
+      "base_path": "build/base/hw/engine/opengl2d3d_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/opengl2d3d_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/pe_win32_guess",
+      "target_path": "build/target/hw/engine/pe_win32_guess.obj",
+      "base_path": "build/base/hw/engine/pe_win32_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/pe_win32_guess.c"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/BaseUISurface_Font",
+      "target_path": "build/target/hw/engine/vgui2/BaseUISurface_Font.obj",
+      "base_path": "build/base/hw/engine/vgui2/BaseUISurface_Font.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/BaseUISurface_Font.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/FontTextureCache",
+      "target_path": "build/target/hw/engine/vgui2/FontTextureCache.obj",
+      "base_path": "build/base/hw/engine/vgui2/FontTextureCache.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/FontTextureCache.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/HtmlWindow",
+      "target_path": "build/target/hw/engine/vgui2/HtmlWindow.obj",
+      "base_path": "build/base/hw/engine/vgui2/HtmlWindow.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/HtmlWindow.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/DetailTexture",
+      "target_path": "build/target/hw/engine/DetailTexture.obj",
+      "base_path": "build/base/hw/engine/DetailTexture.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/DetailTexture.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/CircularBuffer",
+      "target_path": "build/target/hw/engine/CircularBuffer.obj",
+      "base_path": "build/base/hw/engine/CircularBuffer.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/CircularBuffer.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/voice_gain",
+      "target_path": "build/target/hw/engine/voice_gain.obj",
+      "base_path": "build/base/hw/engine/voice_gain.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_gain.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/sys_sdlwind",
+      "target_path": "build/target/hw/engine/sys_sdlwind.obj",
+      "base_path": "build/base/hw/engine/sys_sdlwind.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/sys_sdlwind.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/bitmap_win",
+      "target_path": "build/target/hw/engine/bitmap_win.obj",
+      "base_path": "build/base/hw/engine/bitmap_win.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/bitmap_win.c"
+      }
+    },
+    {
+      "name": "hw/engine/voice_mixer_controls_openal",
+      "target_path": "build/target/hw/engine/voice_mixer_controls_openal.obj",
+      "base_path": "build/base/hw/engine/voice_mixer_controls_openal.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_mixer_controls_openal.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/l_studio",
+      "target_path": "build/target/hw/engine/l_studio.obj",
+      "base_path": "build/base/hw/engine/l_studio.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/l_studio.c"
+      }
+    },
+    {
+      "name": "hw/engine/voice_wavefile",
+      "target_path": "build/target/hw/engine/voice_wavefile.obj",
+      "base_path": "build/base/hw/engine/voice_wavefile.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_wavefile.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/czmodelcheck",
+      "target_path": "build/target/hw/engine/czmodelcheck.obj",
+      "base_path": "build/base/hw/engine/czmodelcheck.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/czmodelcheck.cpp"
+      }
+    },
+    {
+      "name": "hw/utils/procinfo/procinfo",
+      "target_path": "build/target/hw/utils/procinfo/procinfo.obj",
+      "base_path": "build/base/hw/utils/procinfo/procinfo.obj",
+      "metadata": {
+        "source_path": "src/utils/procinfo/procinfo.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/glide_guess",
+      "target_path": "build/target/hw/engine/glide_guess.obj",
+      "base_path": "build/base/hw/engine/glide_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/glide_guess.c"
+      }
+    },
+    {
+      "name": "hw/engine/voice_record_dsound",
+      "target_path": "build/target/hw/engine/voice_record_dsound.obj",
+      "base_path": "build/base/hw/engine/voice_record_dsound.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_record_dsound.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/voice_record_wavein",
+      "target_path": "build/target/hw/engine/voice_record_wavein.obj",
+      "base_path": "build/base/hw/engine/voice_record_wavein.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/voice_record_wavein.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/LauncherDirectDraw_guess",
+      "target_path": "build/target/hw/engine/LauncherDirectDraw_guess.obj",
+      "base_path": "build/base/hw/engine/LauncherDirectDraw_guess.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/LauncherDirectDraw_guess.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_EngineSurface",
+      "target_path": "build/target/hw/engine/vgui_EngineSurface.obj",
+      "base_path": "build/base/hw/engine/vgui_EngineSurface.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_EngineSurface.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui_EngineSurfaceWin32",
+      "target_path": "build/target/hw/engine/vgui_EngineSurfaceWin32.obj",
+      "base_path": "build/base/hw/engine/vgui_EngineSurfaceWin32.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui_EngineSurfaceWin32.cpp"
+      }
+    },
+    {
+      "name": "hw/engine/vgui2/MemoryBitmap",
+      "target_path": "build/target/hw/engine/vgui2/MemoryBitmap.obj",
+      "base_path": "build/base/hw/engine/vgui2/MemoryBitmap.obj",
+      "metadata": {
+        "source_path": "src/engine_hw/vgui2/MemoryBitmap.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/vgui_surfacelib/FontManager",
+      "target_path": "build/target/hw/vgui2/vgui_surfacelib/FontManager.obj",
+      "base_path": "build/base/hw/vgui2/vgui_surfacelib/FontManager.obj",
+      "metadata": {
+        "source_path": "src/vgui2/vgui_surfacelib/FontManager.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/vgui_surfacelib/Win32Font",
+      "target_path": "build/target/hw/vgui2/vgui_surfacelib/Win32Font.obj",
+      "base_path": "build/base/hw/vgui2/vgui_surfacelib/Win32Font.obj",
+      "metadata": {
+        "source_path": "src/vgui2/vgui_surfacelib/Win32Font.cpp"
+      }
+    },
+    {
+      "name": "hw/vgui2/vgui_surfacelib/FontAmalgam",
+      "target_path": "build/target/hw/vgui2/vgui_surfacelib/FontAmalgam.obj",
+      "base_path": "build/base/hw/vgui2/vgui_surfacelib/FontAmalgam.obj",
+      "metadata": {
+        "source_path": "src/vgui2/vgui_surfacelib/FontAmalgam.cpp"
+      }
+    },
+    {
+      "name": "launcher/commandline",
+      "target_path": "build/target/launcher/commandline.obj",
+      "base_path": "build/base/launcher/commandline.obj",
+      "metadata": {
+        "source_path": "src/launcher/commandline.cpp"
+      }
+    },
+    {
+      "name": "launcher/interface",
+      "target_path": "build/target/launcher/interface.obj",
+      "base_path": "build/base/launcher/interface.obj",
+      "metadata": {
+        "source_path": "src/launcher/interface.cpp"
+      }
+    },
+    {
+      "name": "launcher/launcher",
+      "target_path": "build/target/launcher/launcher.obj",
+      "base_path": "build/base/launcher/launcher.obj",
+      "metadata": {
+        "source_path": "src/launcher/launcher.cpp"
+      }
+    },
+    {
+      "name": "launcher/LoadBlob",
+      "target_path": "build/target/launcher/LoadBlob.obj",
+      "base_path": "build/base/launcher/LoadBlob.obj",
+      "metadata": {
+        "source_path": "src/launcher/LoadBlob.cpp"
+      }
+    },
+    {
+      "name": "launcher/registry",
+      "target_path": "build/target/launcher/registry.obj",
+      "base_path": "build/base/launcher/registry.obj",
+      "metadata": {
+        "source_path": "src/launcher/registry.cpp"
+      }
+    },
+    {
+      "name": "launcher/SteamAppStartup_guess",
+      "target_path": "build/target/launcher/SteamAppStartup_guess.obj",
+      "base_path": "build/base/launcher/SteamAppStartup_guess.obj",
+      "metadata": {
+        "source_path": "src/launcher/SteamAppStartup_guess.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/interface",
+      "target_path": "build/target/gameui/public/interface.obj",
+      "base_path": "build/base/gameui/public/interface.obj",
+      "metadata": {
+        "source_path": "src/public/interface.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/Sys_Utils",
+      "target_path": "build/target/gameui/GameUI/Sys_Utils.obj",
+      "base_path": "build/base/gameui/GameUI/Sys_Utils.obj",
+      "metadata": {
+        "source_path": "src/gameui/Sys_Utils.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/GameUI_Interface",
+      "target_path": "build/target/gameui/GameUI/GameUI_Interface.obj",
+      "base_path": "build/base/gameui/GameUI/GameUI_Interface.obj",
+      "metadata": {
+        "source_path": "src/gameui/GameUI_Interface.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/controls",
+      "target_path": "build/target/gameui/vgui2/controls/controls.obj",
+      "base_path": "build/base/gameui/vgui2/controls/controls.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/controls.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/KeyValues",
+      "target_path": "build/target/gameui/public/KeyValues.obj",
+      "base_path": "build/base/gameui/public/KeyValues.obj",
+      "metadata": {
+        "source_path": "src/public/KeyValues.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Panel",
+      "target_path": "build/target/gameui/vgui2/controls/Panel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Panel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Panel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Label",
+      "target_path": "build/target/gameui/vgui2/controls/Label.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Label.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Label.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Button",
+      "target_path": "build/target/gameui/vgui2/controls/Button.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Button.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Button.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/EditablePanel",
+      "target_path": "build/target/gameui/vgui2/controls/EditablePanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/EditablePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/EditablePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Frame",
+      "target_path": "build/target/gameui/vgui2/controls/Frame.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Frame.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Frame.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/TextEntry",
+      "target_path": "build/target/gameui/vgui2/controls/TextEntry.obj",
+      "base_path": "build/base/gameui/vgui2/controls/TextEntry.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/TextEntry.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/RichText",
+      "target_path": "build/target/gameui/vgui2/controls/RichText.obj",
+      "base_path": "build/base/gameui/vgui2/controls/RichText.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/RichText.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Menu",
+      "target_path": "build/target/gameui/vgui2/controls/Menu.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Menu.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Menu.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/BuildGroup",
+      "target_path": "build/target/gameui/vgui2/controls/BuildGroup.obj",
+      "base_path": "build/base/gameui/vgui2/controls/BuildGroup.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BuildGroup.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/PanelListPanel",
+      "target_path": "build/target/gameui/vgui2/controls/PanelListPanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/PanelListPanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PanelListPanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/BuildModeDialog",
+      "target_path": "build/target/gameui/vgui2/controls/BuildModeDialog.obj",
+      "base_path": "build/base/gameui/vgui2/controls/BuildModeDialog.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BuildModeDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ComboBox",
+      "target_path": "build/target/gameui/vgui2/controls/ComboBox.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ComboBox.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ComboBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/AnimatingImagePanel",
+      "target_path": "build/target/gameui/vgui2/controls/AnimatingImagePanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/AnimatingImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/AnimatingImagePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/BitmapImagePanel",
+      "target_path": "build/target/gameui/vgui2/controls/BitmapImagePanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/BitmapImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/BitmapImagePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/MessageBox",
+      "target_path": "build/target/gameui/vgui2/controls/MessageBox.obj",
+      "base_path": "build/base/gameui/vgui2/controls/MessageBox.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MessageBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ListPanel",
+      "target_path": "build/target/gameui/vgui2/controls/ListPanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ListPanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ListPanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/TestScriptController",
+      "target_path": "build/target/gameui/vgui2/controls/TestScriptController.obj",
+      "base_path": "build/base/gameui/vgui2/controls/TestScriptController.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/TestScriptController.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/PropertySheet",
+      "target_path": "build/target/gameui/vgui2/controls/PropertySheet.obj",
+      "base_path": "build/base/gameui/vgui2/controls/PropertySheet.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PropertySheet.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/SectionedListPanel",
+      "target_path": "build/target/gameui/vgui2/controls/SectionedListPanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/SectionedListPanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/SectionedListPanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/HTML",
+      "target_path": "build/target/gameui/vgui2/controls/HTML.obj",
+      "base_path": "build/base/gameui/vgui2/controls/HTML.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/HTML.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Slider",
+      "target_path": "build/target/gameui/vgui2/controls/Slider.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Slider.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Slider.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/PanelHorizListPanel",
+      "target_path": "build/target/gameui/vgui2/controls/PanelHorizListPanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/PanelHorizListPanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PanelHorizListPanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ProgressBar",
+      "target_path": "build/target/gameui/vgui2/controls/ProgressBar.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ProgressBar.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ProgressBar.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/RadioButton",
+      "target_path": "build/target/gameui/vgui2/controls/RadioButton.obj",
+      "base_path": "build/base/gameui/vgui2/controls/RadioButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/RadioButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/TextImage",
+      "target_path": "build/target/gameui/vgui2/controls/TextImage.obj",
+      "base_path": "build/base/gameui/vgui2/controls/TextImage.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/TextImage.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/FocusNavGroup",
+      "target_path": "build/target/gameui/vgui2/controls/FocusNavGroup.obj",
+      "base_path": "build/base/gameui/vgui2/controls/FocusNavGroup.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/FocusNavGroup.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/MenuButton",
+      "target_path": "build/target/gameui/vgui2/controls/MenuButton.obj",
+      "base_path": "build/base/gameui/vgui2/controls/MenuButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MenuButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ScrollBar",
+      "target_path": "build/target/gameui/vgui2/controls/ScrollBar.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ScrollBar.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ScrollBar.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ScrollBarSlider",
+      "target_path": "build/target/gameui/vgui2/controls/ScrollBarSlider.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ScrollBarSlider.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ScrollBarSlider.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/MenuItem",
+      "target_path": "build/target/gameui/vgui2/controls/MenuItem.obj",
+      "base_path": "build/base/gameui/vgui2/controls/MenuItem.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/MenuItem.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ToggleButton",
+      "target_path": "build/target/gameui/vgui2/controls/ToggleButton.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ToggleButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ToggleButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/CheckButton",
+      "target_path": "build/target/gameui/vgui2/controls/CheckButton.obj",
+      "base_path": "build/base/gameui/vgui2/controls/CheckButton.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/CheckButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Divider",
+      "target_path": "build/target/gameui/vgui2/controls/Divider.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Divider.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Divider.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/URLLabel",
+      "target_path": "build/target/gameui/vgui2/controls/URLLabel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/URLLabel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/URLLabel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ImagePanel",
+      "target_path": "build/target/gameui/vgui2/controls/ImagePanel.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ImagePanel.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ImagePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Tooltip",
+      "target_path": "build/target/gameui/vgui2/controls/Tooltip.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Tooltip.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Tooltip.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/Image",
+      "target_path": "build/target/gameui/vgui2/controls/Image.obj",
+      "base_path": "build/base/gameui/vgui2/controls/Image.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/Image.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/UtlBuffer",
+      "target_path": "build/target/gameui/public/UtlBuffer.obj",
+      "base_path": "build/base/gameui/public/UtlBuffer.obj",
+      "metadata": {
+        "source_path": "src/public/UtlBuffer.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/utlsymbol",
+      "target_path": "build/target/gameui/public/utlsymbol.obj",
+      "base_path": "build/base/gameui/public/utlsymbol.obj",
+      "metadata": {
+        "source_path": "src/public/utlsymbol.cpp"
+      }
+    },
+    {
+      "name": "gameui/common/parsemsg",
+      "target_path": "build/target/gameui/common/parsemsg.obj",
+      "base_path": "build/base/gameui/common/parsemsg.obj",
+      "metadata": {
+        "source_path": "src/common/parsemsg.cpp"
+      }
+    },
+    {
+      "name": "gameui/game_shared/shared_util",
+      "target_path": "build/target/gameui/game_shared/shared_util.obj",
+      "base_path": "build/base/gameui/game_shared/shared_util.obj",
+      "metadata": {
+        "source_path": "src/game_shared/shared_util.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/filesystem_helpers",
+      "target_path": "build/target/gameui/public/filesystem_helpers.obj",
+      "base_path": "build/base/gameui/public/filesystem_helpers.obj",
+      "metadata": {
+        "source_path": "src/public/filesystem_helpers.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/characterset",
+      "target_path": "build/target/gameui/public/characterset.obj",
+      "base_path": "build/base/gameui/public/characterset.obj",
+      "metadata": {
+        "source_path": "src/public/characterset.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CvarLatch",
+      "target_path": "build/target/gameui/GameUI/CvarLatch.obj",
+      "base_path": "build/base/gameui/GameUI/CvarLatch.obj",
+      "metadata": {
+        "source_path": "src/gameui/CvarLatch.cpp"
+      }
+    },
+    {
+      "name": "gameui/common/Random",
+      "target_path": "build/target/gameui/common/Random.obj",
+      "base_path": "build/base/gameui/common/Random.obj",
+      "metadata": {
+        "source_path": "src/common/Random.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerBox",
+      "target_path": "build/target/gameui/GameUI/CareerBox.obj",
+      "base_path": "build/base/gameui/GameUI/CareerBox.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerBaseFrame",
+      "target_path": "build/target/gameui/GameUI/CareerBaseFrame.obj",
+      "base_path": "build/base/gameui/GameUI/CareerBaseFrame.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerBaseFrame.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerBotFrame",
+      "target_path": "build/target/gameui/GameUI/CareerBotFrame.obj",
+      "base_path": "build/base/gameui/GameUI/CareerBotFrame.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerBotFrame.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerProfileFrame",
+      "target_path": "build/target/gameui/GameUI/CareerProfileFrame.obj",
+      "base_path": "build/base/gameui/GameUI/CareerProfileFrame.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerProfileFrame.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerMapFrame",
+      "target_path": "build/target/gameui/GameUI/CareerMapFrame.obj",
+      "base_path": "build/base/gameui/GameUI/CareerMapFrame.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerMapFrame.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerProfile",
+      "target_path": "build/target/gameui/GameUI/CareerProfile.obj",
+      "base_path": "build/base/gameui/GameUI/CareerProfile.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerProfile.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerDefinitions",
+      "target_path": "build/target/gameui/GameUI/CareerDefinitions.obj",
+      "base_path": "build/base/gameui/GameUI/CareerDefinitions.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerDefinitions.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerGameTasks",
+      "target_path": "build/target/gameui/GameUI/CareerGameTasks.obj",
+      "base_path": "build/base/gameui/GameUI/CareerGameTasks.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerGameTasks.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerGame",
+      "target_path": "build/target/gameui/GameUI/CareerGame.obj",
+      "base_path": "build/base/gameui/GameUI/CareerGame.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerGame.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/SaveGameDialog",
+      "target_path": "build/target/gameui/GameUI/SaveGameDialog.obj",
+      "base_path": "build/base/gameui/GameUI/SaveGameDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/SaveGameDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CDKeyEntryDialog",
+      "target_path": "build/target/gameui/GameUI/CDKeyEntryDialog.obj",
+      "base_path": "build/base/gameui/GameUI/CDKeyEntryDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/CDKeyEntryDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CreateMultiplayerGameBotPage",
+      "target_path": "build/target/gameui/GameUI/CreateMultiplayerGameBotPage.obj",
+      "base_path": "build/base/gameui/GameUI/CreateMultiplayerGameBotPage.obj",
+      "metadata": {
+        "source_path": "src/gameui/CreateMultiplayerGameBotPage.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CreateMultiplayerGameServerPage",
+      "target_path": "build/target/gameui/GameUI/CreateMultiplayerGameServerPage.obj",
+      "base_path": "build/base/gameui/GameUI/CreateMultiplayerGameServerPage.obj",
+      "metadata": {
+        "source_path": "src/gameui/CreateMultiplayerGameServerPage.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/GameConsoleDialog",
+      "target_path": "build/target/gameui/GameUI/GameConsoleDialog.obj",
+      "base_path": "build/base/gameui/GameUI/GameConsoleDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/GameConsoleDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/MultiplayerAdvancedDialog",
+      "target_path": "build/target/gameui/GameUI/MultiplayerAdvancedDialog.obj",
+      "base_path": "build/base/gameui/GameUI/MultiplayerAdvancedDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/MultiplayerAdvancedDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CreateMultiplayerGameGameplayPage",
+      "target_path": "build/target/gameui/GameUI/CreateMultiplayerGameGameplayPage.obj",
+      "base_path": "build/base/gameui/GameUI/CreateMultiplayerGameGameplayPage.obj",
+      "metadata": {
+        "source_path": "src/gameui/CreateMultiplayerGameGameplayPage.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CreateMultiplayerGameDialog",
+      "target_path": "build/target/gameui/GameUI/CreateMultiplayerGameDialog.obj",
+      "base_path": "build/base/gameui/GameUI/CreateMultiplayerGameDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/CreateMultiplayerGameDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/checksum_md5",
+      "target_path": "build/target/gameui/public/checksum_md5.obj",
+      "base_path": "build/base/gameui/public/checksum_md5.obj",
+      "metadata": {
+        "source_path": "src/public/checksum_md5.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/LogoFile",
+      "target_path": "build/target/gameui/GameUI/LogoFile.obj",
+      "base_path": "build/base/gameui/GameUI/LogoFile.obj",
+      "metadata": {
+        "source_path": "src/gameui/LogoFile.cpp"
+      }
+    },
+    {
+      "name": "gameui/HLTV/common/BitBuffer",
+      "target_path": "build/target/gameui/HLTV/common/BitBuffer.obj",
+      "base_path": "build/base/gameui/HLTV/common/BitBuffer.obj",
+      "metadata": {
+        "source_path": "src/HLTV/common/BitBuffer.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CvarSlider",
+      "target_path": "build/target/gameui/GameUI/CvarSlider.obj",
+      "base_path": "build/base/gameui/GameUI/CvarSlider.obj",
+      "metadata": {
+        "source_path": "src/gameui/CvarSlider.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/PropertyPage",
+      "target_path": "build/target/gameui/vgui2/controls/PropertyPage.obj",
+      "base_path": "build/base/gameui/vgui2/controls/PropertyPage.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PropertyPage.cpp"
+      }
+    },
+    {
+      "name": "gameui/HLTV/common/DirectorCmd",
+      "target_path": "build/target/gameui/HLTV/common/DirectorCmd.obj",
+      "base_path": "build/base/gameui/HLTV/common/DirectorCmd.obj",
+      "metadata": {
+        "source_path": "src/HLTV/common/DirectorCmd.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubVideo",
+      "target_path": "build/target/gameui/GameUI/OptionsSubVideo.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubVideo.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubVideo.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/PropertyDialog",
+      "target_path": "build/target/gameui/vgui2/controls/PropertyDialog.obj",
+      "base_path": "build/base/gameui/vgui2/controls/PropertyDialog.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/PropertyDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/ScriptObject",
+      "target_path": "build/target/gameui/GameUI/ScriptObject.obj",
+      "base_path": "build/base/gameui/GameUI/ScriptObject.obj",
+      "metadata": {
+        "source_path": "src/gameui/ScriptObject.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubVoice",
+      "target_path": "build/target/gameui/GameUI/OptionsSubVoice.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubVoice.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubVoice.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/QueryBox",
+      "target_path": "build/target/gameui/vgui2/controls/QueryBox.obj",
+      "base_path": "build/base/gameui/vgui2/controls/QueryBox.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/QueryBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CvarToggleCheckButton",
+      "target_path": "build/target/gameui/GameUI/CvarToggleCheckButton.obj",
+      "base_path": "build/base/gameui/GameUI/CvarToggleCheckButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/CvarToggleCheckButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/NewGameDialog",
+      "target_path": "build/target/gameui/GameUI/NewGameDialog.obj",
+      "base_path": "build/base/gameui/GameUI/NewGameDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/NewGameDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CvarTextEntry",
+      "target_path": "build/target/gameui/GameUI/CvarTextEntry.obj",
+      "base_path": "build/base/gameui/GameUI/CvarTextEntry.obj",
+      "metadata": {
+        "source_path": "src/gameui/CvarTextEntry.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/ChangeGameDialog",
+      "target_path": "build/target/gameui/GameUI/ChangeGameDialog.obj",
+      "base_path": "build/base/gameui/GameUI/ChangeGameDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/ChangeGameDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/LoadGameDialog",
+      "target_path": "build/target/gameui/GameUI/LoadGameDialog.obj",
+      "base_path": "build/base/gameui/GameUI/LoadGameDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/LoadGameDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/LabeledCommandComboBox",
+      "target_path": "build/target/gameui/GameUI/LabeledCommandComboBox.obj",
+      "base_path": "build/base/gameui/GameUI/LabeledCommandComboBox.obj",
+      "metadata": {
+        "source_path": "src/gameui/LabeledCommandComboBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/VGuiSystemModuleLoader",
+      "target_path": "build/target/gameui/GameUI/VGuiSystemModuleLoader.obj",
+      "base_path": "build/base/gameui/GameUI/VGuiSystemModuleLoader.obj",
+      "metadata": {
+        "source_path": "src/gameui/VGuiSystemModuleLoader.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/BitmapImagePanel",
+      "target_path": "build/target/gameui/GameUI/BitmapImagePanel.obj",
+      "base_path": "build/base/gameui/GameUI/BitmapImagePanel.obj",
+      "metadata": {
+        "source_path": "src/gameui/BitmapImagePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CareerProfileButton",
+      "target_path": "build/target/gameui/GameUI/CareerProfileButton.obj",
+      "base_path": "build/base/gameui/GameUI/CareerProfileButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/CareerProfileButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/RefreshSteamLogin",
+      "target_path": "build/target/gameui/GameUI/RefreshSteamLogin.obj",
+      "base_path": "build/base/gameui/GameUI/RefreshSteamLogin.obj",
+      "metadata": {
+        "source_path": "src/gameui/RefreshSteamLogin.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CommandCheckButton",
+      "target_path": "build/target/gameui/GameUI/CommandCheckButton.obj",
+      "base_path": "build/base/gameui/GameUI/CommandCheckButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/CommandCheckButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/PlayerListDialog",
+      "target_path": "build/target/gameui/GameUI/PlayerListDialog.obj",
+      "base_path": "build/base/gameui/GameUI/PlayerListDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/PlayerListDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubMultiplayer",
+      "target_path": "build/target/gameui/GameUI/OptionsSubMultiplayer.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubMultiplayer.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubMultiplayer.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/HelpDialog",
+      "target_path": "build/target/gameui/GameUI/HelpDialog.obj",
+      "base_path": "build/base/gameui/GameUI/HelpDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/HelpDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/BackgroundMenuButton",
+      "target_path": "build/target/gameui/GameUI/BackgroundMenuButton.obj",
+      "base_path": "build/base/gameui/GameUI/BackgroundMenuButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/BackgroundMenuButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/ContentControlDialog",
+      "target_path": "build/target/gameui/GameUI/ContentControlDialog.obj",
+      "base_path": "build/base/gameui/GameUI/ContentControlDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/ContentControlDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/DemoPlayerFileDialog",
+      "target_path": "build/target/gameui/GameUI/DemoPlayerFileDialog.obj",
+      "base_path": "build/base/gameui/GameUI/DemoPlayerFileDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/DemoPlayerFileDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/CvarNegateCheckButton",
+      "target_path": "build/target/gameui/GameUI/CvarNegateCheckButton.obj",
+      "base_path": "build/base/gameui/GameUI/CvarNegateCheckButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/CvarNegateCheckButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/TextEntryBox",
+      "target_path": "build/target/gameui/GameUI/TextEntryBox.obj",
+      "base_path": "build/base/gameui/GameUI/TextEntryBox.obj",
+      "metadata": {
+        "source_path": "src/gameui/TextEntryBox.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/TaskButton",
+      "target_path": "build/target/gameui/GameUI/TaskButton.obj",
+      "base_path": "build/base/gameui/GameUI/TaskButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/TaskButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/KeyToggleCheckButton",
+      "target_path": "build/target/gameui/GameUI/KeyToggleCheckButton.obj",
+      "base_path": "build/base/gameui/GameUI/KeyToggleCheckButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/KeyToggleCheckButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/BitmapButton",
+      "target_path": "build/target/gameui/GameUI/BitmapButton.obj",
+      "base_path": "build/base/gameui/GameUI/BitmapButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/BitmapButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubAudio",
+      "target_path": "build/target/gameui/GameUI/OptionsSubAudio.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubAudio.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubAudio.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/ImageButton",
+      "target_path": "build/target/gameui/GameUI/ImageButton.obj",
+      "base_path": "build/base/gameui/GameUI/ImageButton.obj",
+      "metadata": {
+        "source_path": "src/gameui/ImageButton.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubMouse",
+      "target_path": "build/target/gameui/GameUI/OptionsSubMouse.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubMouse.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubMouse.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/DottedLabel",
+      "target_path": "build/target/gameui/GameUI/DottedLabel.obj",
+      "base_path": "build/base/gameui/GameUI/DottedLabel.obj",
+      "metadata": {
+        "source_path": "src/gameui/DottedLabel.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/MusicManager",
+      "target_path": "build/target/gameui/GameUI/MusicManager.obj",
+      "base_path": "build/base/gameui/GameUI/MusicManager.obj",
+      "metadata": {
+        "source_path": "src/gameui/MusicManager.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubAdvanced",
+      "target_path": "build/target/gameui/GameUI/OptionsSubAdvanced.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubAdvanced.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubAdvanced.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/labelslidercombo",
+      "target_path": "build/target/gameui/GameUI/labelslidercombo.obj",
+      "base_path": "build/base/gameui/GameUI/labelslidercombo.obj",
+      "metadata": {
+        "source_path": "src/gameui/labelslidercombo.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/MsgBuffer_guess",
+      "target_path": "build/target/gameui/GameUI/MsgBuffer_guess.obj",
+      "base_path": "build/base/gameui/GameUI/MsgBuffer_guess.obj",
+      "metadata": {
+        "source_path": "src/gameui/MsgBuffer_guess.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/NetAPI_guess",
+      "target_path": "build/target/gameui/GameUI/NetAPI_guess.obj",
+      "base_path": "build/base/gameui/GameUI/NetAPI_guess.obj",
+      "metadata": {
+        "source_path": "src/gameui/NetAPI_guess.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/BasePanel",
+      "target_path": "build/target/gameui/GameUI/BasePanel.obj",
+      "base_path": "build/base/gameui/GameUI/BasePanel.obj",
+      "metadata": {
+        "source_path": "src/gameui/BasePanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/HLTV/common/byteorder",
+      "target_path": "build/target/gameui/HLTV/common/byteorder.obj",
+      "base_path": "build/base/gameui/HLTV/common/byteorder.obj",
+      "metadata": {
+        "source_path": "src/HLTV/common/byteorder.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/vcontrolslistpanel",
+      "target_path": "build/target/gameui/GameUI/vcontrolslistpanel.obj",
+      "base_path": "build/base/gameui/GameUI/vcontrolslistpanel.obj",
+      "metadata": {
+        "source_path": "src/gameui/vcontrolslistpanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/ModInfo",
+      "target_path": "build/target/gameui/GameUI/ModInfo.obj",
+      "base_path": "build/base/gameui/GameUI/ModInfo.obj",
+      "metadata": {
+        "source_path": "src/gameui/ModInfo.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/PanelListPanel",
+      "target_path": "build/target/gameui/GameUI/PanelListPanel.obj",
+      "base_path": "build/base/gameui/GameUI/PanelListPanel.obj",
+      "metadata": {
+        "source_path": "src/gameui/PanelListPanel.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsSubKeyboard",
+      "target_path": "build/target/gameui/GameUI/OptionsSubKeyboard.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsSubKeyboard.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsSubKeyboard.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/GameConsole",
+      "target_path": "build/target/gameui/GameUI/GameConsole.obj",
+      "base_path": "build/base/gameui/GameUI/GameConsole.obj",
+      "metadata": {
+        "source_path": "src/gameui/GameConsole.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/RunGameEngine",
+      "target_path": "build/target/gameui/GameUI/RunGameEngine.obj",
+      "base_path": "build/base/gameui/GameUI/RunGameEngine.obj",
+      "metadata": {
+        "source_path": "src/gameui/RunGameEngine.cpp"
+      }
+    },
+    {
+      "name": "gameui/public/MemPool",
+      "target_path": "build/target/gameui/public/MemPool.obj",
+      "base_path": "build/base/gameui/public/MemPool.obj",
+      "metadata": {
+        "source_path": "src/public/MemPool.cpp"
+      }
+    },
+    {
+      "name": "gameui/HLTV/common/common",
+      "target_path": "build/target/gameui/HLTV/common/common.obj",
+      "base_path": "build/base/gameui/HLTV/common/common.obj",
+      "metadata": {
+        "source_path": "src/HLTV/common/common.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/OptionsDialog",
+      "target_path": "build/target/gameui/GameUI/OptionsDialog.obj",
+      "base_path": "build/base/gameui/GameUI/OptionsDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/OptionsDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/vgui2/controls/ImageList",
+      "target_path": "build/target/gameui/vgui2/controls/ImageList.obj",
+      "base_path": "build/base/gameui/vgui2/controls/ImageList.obj",
+      "metadata": {
+        "source_path": "src/vgui2/controls/ImageList.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/DemoPlayerDialog",
+      "target_path": "build/target/gameui/GameUI/DemoPlayerDialog.obj",
+      "base_path": "build/base/gameui/GameUI/DemoPlayerDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/DemoPlayerDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/DemoEventsDialog",
+      "target_path": "build/target/gameui/GameUI/DemoEventsDialog.obj",
+      "base_path": "build/base/gameui/GameUI/DemoEventsDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/DemoEventsDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/common/BaseSystemModule",
+      "target_path": "build/target/gameui/common/BaseSystemModule.obj",
+      "base_path": "build/base/gameui/common/BaseSystemModule.obj",
+      "metadata": {
+        "source_path": "src/common/BaseSystemModule.cpp"
+      }
+    },
+    {
+      "name": "gameui/common/ObjectList",
+      "target_path": "build/target/gameui/common/ObjectList.obj",
+      "base_path": "build/base/gameui/common/ObjectList.obj",
+      "metadata": {
+        "source_path": "src/common/ObjectList.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/DemoEditDialog",
+      "target_path": "build/target/gameui/GameUI/DemoEditDialog.obj",
+      "base_path": "build/base/gameui/GameUI/DemoEditDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/DemoEditDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/Socket_guess",
+      "target_path": "build/target/gameui/GameUI/Socket_guess.obj",
+      "base_path": "build/base/gameui/GameUI/Socket_guess.obj",
+      "metadata": {
+        "source_path": "src/gameui/Socket_guess.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/LoadingDialog",
+      "target_path": "build/target/gameui/GameUI/LoadingDialog.obj",
+      "base_path": "build/base/gameui/GameUI/LoadingDialog.obj",
+      "metadata": {
+        "source_path": "src/gameui/LoadingDialog.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/MasterVersionChk_guess",
+      "target_path": "build/target/gameui/GameUI/MasterVersionChk_guess.obj",
+      "base_path": "build/base/gameui/GameUI/MasterVersionChk_guess.obj",
+      "metadata": {
+        "source_path": "src/gameui/MasterVersionChk_guess.cpp"
+      }
+    },
+    {
+      "name": "gameui/game_shared/bot/bot_profile",
+      "target_path": "build/target/gameui/game_shared/bot/bot_profile.obj",
+      "base_path": "build/base/gameui/game_shared/bot/bot_profile.obj",
+      "metadata": {
+        "source_path": "src/game_shared/bot/bot_profile.cpp"
+      }
+    },
+    {
+      "name": "gameui/GameUI/Taskbar",
+      "target_path": "build/target/gameui/GameUI/Taskbar.obj",
+      "base_path": "build/base/gameui/GameUI/Taskbar.obj",
+      "metadata": {
+        "source_path": "src/gameui/Taskbar.cpp"
+      }
+    }
+  ]
+}

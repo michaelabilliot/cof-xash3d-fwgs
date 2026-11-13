@@ -1,0 +1,15 @@
+?VGuiWrap_SetRootPanelSize@@YAXXZ
+_$E24
+_$E23
+_VGuiWrap_Startup
+_VGuiWrap_Shutdown
+_VGuiWrap_CallEngineSurfaceAppHandler
+_VGuiWrap_GetPanel
+_VGuiWrap_ReleaseMouse
+_VGuiWrap_GetMouse
+_VGuiWrap_SetVisible
+_VGuiWrap_Paint
+??0CDummyApp@@QAE@XZ
+?main@CDummyApp@@UAEXHQAPAD@Z
+?platTick@CDummyApp@@MAEXXZ
+??_GEngineSurfaceWrap@@QAEPAXI@Z

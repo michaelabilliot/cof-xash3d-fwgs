@@ -1,0 +1,8 @@
+??$GetClassPtr@VCNumeralPlateLeft@@@@YAPAVCNumeralPlateLeft@@PAV0@@Z
+??$GetClassPtr@VCNumeralPlateRight@@@@YAPAVCNumeralPlateRight@@PAV0@@Z
+?Precache@CNumeralPlateLeft@@EAEXXZ
+?Spawn@CNumeralPlateLeft@@EAEXXZ
+?Spawn@CNumeralPlateRight@@EAEXXZ
+?Think@CNumeralPlateLeft@@EAEXXZ
+_cof_numeralplate_left
+_cof_numeralplate_right

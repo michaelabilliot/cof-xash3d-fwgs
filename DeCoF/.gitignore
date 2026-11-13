@@ -1,0 +1,79 @@
+# Retail game files and reference repositories (never committed)
+/versions/
+/versions.zip
+/refs/
+/cof-archive.zip
+
+# Build output, assembled game, Ghidra project
+/build/
+/dist/
+/re/
+
+# Local notes and agent instructions (not part of the project)
+/AGENTS.md
+/AGENTS.MD
+/CLAUDE.md
+/STATUS.md
+
+# Binaries and debug data
+*.dll
+*.exe
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.obj
+*.o
+*.idb
+*.pch
+*.res
+*.map
+*.so
+*.dylib
+*.asi
+
+# Archives
+*.zip
+*.7z
+*.rar
+
+# Game assets, in case any are copied outside versions/ by mistake
+*.wad
+*.bsp
+*.mdl
+*.spr
+*.wav
+*.mp3
+*.tga
+*.bmp
+
+# RE tool databases
+*.gpr
+*.rep/
+*.i64
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editors and OS
+*.ncb
+*.opt
+*.plg
+*.aps
+*.suo
+*.user
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Local downloads dropped into the tree by hand
+/tools/_download/

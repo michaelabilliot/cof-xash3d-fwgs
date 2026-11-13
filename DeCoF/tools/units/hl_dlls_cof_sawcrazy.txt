@@ -1,0 +1,16 @@
+??$GetClassPtr@VCSawCrazy@@@@YAPAVCSawCrazy@@PAV0@@Z
+?CheckMeleeAttack1@CSawCrazy@@UAEHMM@Z
+?CheckMeleeAttack2@CSawCrazy@@UAEHMM@Z
+?CheckRangeAttack1@CSawCrazy@@UAEHMM@Z
+?CheckRangeAttack2@CSawCrazy@@UAEHMM@Z
+?Classify@CSawCrazy@@UAEHXZ
+?DeathSound@CSawCrazy@@UAEXXZ
+?IgnoreConditions@CSawCrazy@@UAEHXZ
+?Killed@CSawCrazy@@UAEXPAUentvars_s@@H@Z
+?MonsterThink@CSawCrazy@@UAEXXZ
+?Precache@CSawCrazy@@UAEXXZ
+?SawTouch@CSawCrazy@@QAEXPAVCBaseEntity@@@Z
+?SetYawSpeed@CSawCrazy@@UAEXXZ
+?Spawn@CSawCrazy@@UAEXXZ
+?TakeDamage@CSawCrazy@@UAEHPAUentvars_s@@0MH@Z
+_monster_sawcrazy

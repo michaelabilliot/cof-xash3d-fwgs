@@ -1,0 +1,6 @@
+??0CChangeGameDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CChangeGameDialog@@UAE@XZ
+?LoadModList_guess@CChangeGameDialog@@AAEXXZ
+?OnCommand@CChangeGameDialog@@MAEXPBD@Z
+?OnClose@CChangeGameDialog@@MAEXXZ
+??_GCChangeGameDialog@@UAEPAXI@Z

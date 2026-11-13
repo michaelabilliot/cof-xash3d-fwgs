@@ -1,0 +1,17 @@
+??$GetClassPtr@VCCofTelescopeCancel@@@@YAPAVCCofTelescopeCancel@@PAV0@@Z
+??$GetClassPtr@VCFixedCamera@@@@YAPAVCFixedCamera@@PAV0@@Z
+??$GetClassPtr@VCTelescope@@@@YAPAVCTelescope@@PAV0@@Z
+?Classify@CFixedCamera@@UAEHXZ
+?ObjectCaps@CTelescope@@UAEHXZ
+?Precache@CFixedCamera@@UAEXXZ
+?Precache@CTelescope@@UAEXXZ
+?Restore@CTelescope@@UAEHAAVCRestore@@@Z
+?Save@CTelescope@@UAEHAAVCSave@@@Z
+?Spawn@CCofTelescopeCancel@@UAEXXZ
+?Spawn@CFixedCamera@@UAEXXZ
+?Spawn@CTelescope@@UAEXXZ
+?Use@CCofTelescopeCancel@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?Use@CTelescope@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_cof_telescope
+_cof_telescope_camera
+_cof_telescope_cancel

@@ -1,0 +1,14 @@
+_VoiceSE_GetSoundDataCallback
+?VoiceSE_RegisterCvars@@YAXXZ
+?VoiceSE_Init@@YA_NXZ
+?VoiceSE_Term@@YAXXZ
+?VoiceSE_Idle@@YAXM@Z
+?VoiceSE_StartChannel@@YAXH@Z
+?VoiceSE_EndChannel@@YAXH@Z
+_VoiceSE_GetSFXCache
+?VoiceSE_StartOverdrive@@YAXXZ
+?VoiceSE_EndOverdrive@@YAXXZ
+?VoiceSE_InitMouth@@YAXH@Z
+?VoiceSE_CloseMouth@@YAXH@Z
+?VoiceSE_MoveMouth@@YAXHPAFH@Z
+_VoiceSE_NotifyFreeChannel

@@ -1,0 +1,16 @@
+??$GetClassPtr@VCSyringe@@@@YAPAVCSyringe@@PAV0@@Z
+?BladeRetract@CSyringe@@QAEXXZ
+?Deploy@CSyringe@@UAEHXZ
+?DestroyItem@CSyringe@@QAEXXZ
+?GetItemInfo@CSyringe@@UAEHPAUItemInfo@@@Z
+?Holster@CSyringe@@UAEXXZ
+?Inject@CSyringe@@QAEXXZ
+?ItemPostFrame@CSyringe@@UAEXXZ
+?Precache@CSyringe@@UAEXXZ
+?PrimaryAttack@CSyringe@@UAEXXZ
+?Redeploy@CSyringe@@QAEXXZ
+?SecondaryAttack@CSyringe@@UAEXXZ
+?ShouldWeaponIdle@CSyringe@@UAEHXZ
+?Spawn@CSyringe@@UAEXXZ
+?WeaponIdle@CSyringe@@UAEXXZ
+_weapon_syringe

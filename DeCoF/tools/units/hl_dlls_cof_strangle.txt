@@ -1,0 +1,8 @@
+??$GetClassPtr@VCCoFStrangle@@@@YAPAVCCoFStrangle@@PAV0@@Z
+?Precache@CCoFStrangle@@EAEXXZ
+?Restore@CCoFStrangle@@EAEHAAVCRestore@@@Z
+?Save@CCoFStrangle@@EAEHAAVCSave@@@Z
+?Spawn@CCoFStrangle@@EAEXXZ
+?StrangleThink@CCoFStrangle@@AAEXXZ
+?Use@CCoFStrangle@@EAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_cof_strangle

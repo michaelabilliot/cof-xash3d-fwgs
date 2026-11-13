@@ -1,0 +1,11 @@
+_GL_Dump_f
+_R_InitTextures
+_R_UploadEmptyTex
+_R_InitParticleTexture
+_R_Envmap_f
+_R_Init
+_R_TranslatePlayerSkin
+_R_NewMap
+_R_TimeRefresh_f
+_D_FlushCaches
+_R_CheckVariables

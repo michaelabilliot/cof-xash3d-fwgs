@@ -1,0 +1,4 @@
+?Draw@CHudTrain@@UAEHM@Z
+?Init@CHudTrain@@UAEHXZ
+?MsgFunc_Train@CHudTrain@@QAEHPBDHPAX@Z
+?VidInit@CHudTrain@@UAEHXZ

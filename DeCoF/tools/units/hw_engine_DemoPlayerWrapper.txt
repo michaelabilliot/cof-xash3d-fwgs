@@ -1,0 +1,10 @@
+_DemoPlayer_Init
+_DemoPlayer_SetActive
+_DemoPlayer_IsActive
+_DemoPlayer_LoadGame
+_DemoPlayer_SetEditMode
+_DemoPlayer_ReadDemoMessage
+_DemoPlayer_GetDemoViewInfo
+_DemoPlayer_Stop
+_DemoPlayer_ShowGUI
+_DemoPlayer_ReadNetchanState

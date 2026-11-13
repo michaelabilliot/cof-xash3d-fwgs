@@ -1,0 +1,11 @@
+??$GetClassPtr@VCKeyitemModel@@@@YAPAVCKeyitemModel@@PAV0@@Z
+?GetDescriptionFromItem@CKeyitemModel@@AAEPADPAD0@Z
+?KeyValue@CKeyitemModel@@EAEXPAUKeyValueData_s@@@Z
+?KeyitemUse@CKeyitemModel@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?ObjectCaps@CKeyitemModel@@EAEHXZ
+?Precache@CKeyitemModel@@EAEXXZ
+?Restore@CKeyitemModel@@EAEHAAVCRestore@@@Z
+?Save@CKeyitemModel@@EAEHAAVCSave@@@Z
+?SendInitMessage@CKeyitemModel@@EAEXPAVCBasePlayer@@@Z
+?Spawn@CKeyitemModel@@EAEXXZ
+_item_key

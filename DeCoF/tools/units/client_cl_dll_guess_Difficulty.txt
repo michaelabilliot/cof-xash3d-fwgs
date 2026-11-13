@@ -1,0 +1,8 @@
+??0CDifficulty@@QAE@XZ
+??1CDifficulty@@QAE@XZ
+?Initialize@CDifficulty@@QAEXXZ
+?KeyInput@CDifficulty@@QAEHHHPBD@Z
+?StateChanged@CDifficulty@@UAEXPAVCCheckButton2@vgui@@@Z
+?actionPerformed@CDifficultyHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?setVisible@CDifficulty@@UAEX_N@Z
+?ActionSignal@CDifficulty@@QAEXH@Z

@@ -1,0 +1,13 @@
+??$GetClassPtr@VCLantern@@@@YAPAVCLantern@@PAV0@@Z
+?Deploy@CLantern@@UAEHXZ
+?Fidget@CLantern@@UAEXXZ
+?GetItemInfo@CLantern@@UAEHPAUItemInfo@@@Z
+?Holster@CLantern@@UAEXXZ
+?ItemPostFrame@CLantern@@UAEXXZ
+?Precache@CLantern@@UAEXXZ
+?SecondaryAttack@CLantern@@UAEXXZ
+?ShouldWeaponIdle@CLantern@@UAEHXZ
+?Spawn@CLantern@@UAEXXZ
+?WeaponIdle@CLantern@@UAEXXZ
+?iItemSlot@CLantern@@UAEHXZ
+_weapon_lantern

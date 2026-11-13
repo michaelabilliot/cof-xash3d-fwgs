@@ -1,0 +1,14 @@
+_V_SetRefParams
+_V_GetRefParams
+_V_RenderView
+_V_CalcShake
+_V_ApplyShake
+_V_ScreenShake
+_V_ScreenFade
+_V_FadeAlpha
+_V_Init
+_BuildGammaTable
+_V_CheckGamma
+_V_UpdatePalette
+_V_CalcBlend
+_V_InitLevel

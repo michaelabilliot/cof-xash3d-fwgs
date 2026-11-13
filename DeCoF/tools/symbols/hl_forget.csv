@@ -1,0 +1,23 @@
+va,name,evidence
+100164A0,$LN36,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+1008E95C,$LN54,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+10093E2C,$LN29,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100974E4,$LN43,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100A1304,$LN61,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100A89A8,$LN54,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100ACB30,$LN84,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100B875C,$LN81,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100B8E40,$LN54,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100B9DE8,$LN48,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100C294C,$LN36,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100CB72C,$LN215,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100CD980,$LN82,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100D4394,$LN133,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+100D9A88,$LN116,"jump table label from an earlier harvest; tables are part of their function since the delinker change, and the label split the function"
+101A1F78,__real@c3480000,"stale label: the float at 101A1F78 is -90.0 (bytes 0000b4c2), not -200"
+100360F0,FUN_100360f0,"default Ghidra label of CDualWeapon::TMPShoot, created when the ret 4 stub was recreated"
+10037D40,?CameraShoot@CDualWeapon@@QAEX_N@Z,"bytematch pairing on an identical empty function; 10037D40 is the imbue slot of the basic_streambuf vtable, CameraShoot is 10031010"
+1000E5E0,??BVector@@QAEPAMXZ,the function here is Vector::Vector (link position)
+10041890,??0Vector@@QAE@XZ,the function here is CSquadMonster::MySquadMonsterPointer (link position)
+100C52B0,??1CMultiplayGameMgrHelper@@UAE@XZ,the function here is ~IVoiceGameMgrHelper (vtable)
+10116A40,?UTIL_PlayWeaponSound_guess@@YAXPBDH_NVVector@@PAVCBaseEntity@@1@Z,renamed PlayWeaponSound_guess so it sorts into its retail slot between PRECACHE_SOUND and ReadEntVars

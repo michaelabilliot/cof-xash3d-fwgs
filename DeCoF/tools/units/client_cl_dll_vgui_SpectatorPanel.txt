@@ -1,0 +1,10 @@
+??0SpectatorPanel@@QAE@HHHH@Z
+??1SpectatorPanel@@UAE@XZ
+?Initialize@SpectatorPanel@@QAEXXZ
+?ShowMenu@SpectatorPanel@@QAEX_N@Z
+?Update@SpectatorPanel@@QAEXXZ
+??_GSpectatorPanel@@UAEPAXI@Z
+?ActionSignal@SpectatorPanel@@QAEXH@Z
+?EnableInsetView@SpectatorPanel@@QAEX_N@Z
+?GetSpectatorLabel@@YAPBDH@Z
+?actionPerformed@CSpectatorHandler_Command@@UAEXPAVPanel@vgui@@@Z

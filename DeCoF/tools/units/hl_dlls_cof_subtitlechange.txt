@@ -1,0 +1,8 @@
+??$GetClassPtr@VCSubtitleChange@@@@YAPAVCSubtitleChange@@PAV0@@Z
+?KeyValue@CSubtitleChange@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CSubtitleChange@@UAEHXZ
+?Restore@CSubtitleChange@@UAEHAAVCRestore@@@Z
+?Save@CSubtitleChange@@UAEHAAVCSave@@@Z
+?Spawn@CSubtitleChange@@UAEXXZ
+?Use@CSubtitleChange@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_subtitle_linechange

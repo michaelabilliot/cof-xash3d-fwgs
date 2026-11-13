@@ -1,0 +1,12 @@
+?FindProgram_guess@CCgContext_guess@@QAEPAUcgprogram_s_guess@@PBD@Z
+?GetFragmentProfile_guess@CCgContext_guess@@QAE?AW4CGprofile@@XZ
+?Startup_guess@CCgContext_guess@@QAE_NXZ
+?IsProgramValid_guess@CCgContext_guess@@QAE_NPBDH@Z
+?RemoveProgram_guess@CCgContext_guess@@QAEPAUcgprogram_s_guess@@PAU2@@Z
+?Shutdown_guess@CCgContext_guess@@QAEXXZ
+??0CCgContext_guess@@QAE@XZ
+??1CCgContext_guess@@QAE@XZ
+?AddProgram_guess@CCgContext_guess@@QAEPAUcgprogram_s_guess@@PBDH@Z
+?IsInitialized_guess@CCgContext_guess@@QAE_NXZ
+??__Eg_CgContext_guess@@YAXXZ
+??__Fg_CgContext_guess@@YAXXZ

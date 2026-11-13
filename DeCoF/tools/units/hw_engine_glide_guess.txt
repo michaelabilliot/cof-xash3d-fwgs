@@ -1,0 +1,3 @@
+_InitGlide3Dfx_guess
+_PerfStats3Dfx_guess
+_ReadPixels3Dfx_guess

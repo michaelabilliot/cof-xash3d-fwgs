@@ -1,0 +1,13 @@
+?keyvalues@@YAPAVIKeyValues@@XZ
+?input@vgui2@@YAPAVIInput@1@XZ
+?scheme@vgui2@@YAPAVISchemeManager@1@XZ
+?surface@vgui2@@YAPAVISurface@1@XZ
+?system@vgui2@@YAPAVISystem@1@XZ
+?ivgui@vgui2@@YAPAVIVGui@1@XZ
+?ipanel@vgui2@@YAPAVIPanel@1@XZ
+?filesystem@vgui2@@YAPAVIFileSystem@@XZ
+?localize@vgui2@@YAPAVILocalize@1@XZ
+?VGuiControls_Init@vgui2@@YA_NPBDPAP6APAVIBaseInterface@@0PAH@ZH@Z
+?InitializeInterface_guess@vgui2@@YAPAXPBDPAP6APAVIBaseInterface@@0PAH@ZH@Z
+?VGuiControls_Shutdown@vgui2@@YAXXZ
+?GetControlsModuleName@vgui2@@YAPBDXZ

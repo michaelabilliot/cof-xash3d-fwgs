@@ -1,0 +1,10 @@
+??$GetClassPtr@VCTapeRecorder@@@@YAPAVCTapeRecorder@@PAV0@@Z
+?BlinkThink@CTapeRecorder@@AAEXXZ
+?KeyValue@CTapeRecorder@@EAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CTapeRecorder@@EAEHXZ
+?Precache@CTapeRecorder@@EAEXXZ
+?Restore@CTapeRecorder@@EAEHAAVCRestore@@@Z
+?Save@CTapeRecorder@@EAEHAAVCSave@@@Z
+?Spawn@CTapeRecorder@@EAEXXZ
+?TapeUse@CTapeRecorder@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_tape_recorder

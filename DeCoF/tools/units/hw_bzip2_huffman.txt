@@ -1,0 +1,3 @@
+_BZ2_hbMakeCodeLengths
+_BZ2_hbAssignCodes
+_BZ2_hbCreateDecodeTables

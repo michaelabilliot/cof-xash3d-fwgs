@@ -1,0 +1,9 @@
+??$GetClassPtr@VCSubtitleMultiple@@@@YAPAVCSubtitleMultiple@@PAV0@@Z
+?ChangeSubtitle@CSubtitleMultiple@@QAEXXZ
+?KeyValue@CSubtitleMultiple@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CSubtitleMultiple@@UAEHXZ
+?Restore@CSubtitleMultiple@@UAEHAAVCRestore@@@Z
+?Save@CSubtitleMultiple@@UAEHAAVCSave@@@Z
+?Spawn@CSubtitleMultiple@@UAEXXZ
+?Use@CSubtitleMultiple@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_subtitle_multiple

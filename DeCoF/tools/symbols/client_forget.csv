@@ -1,0 +1,85 @@
+va,name,evidence
+1007C9F0,?abs@@YAMM@Z,"stale position label: 1007C9F0 is __MsgFunc_Telescope (CAM_Init hooks it with the string Telescope)"
+10064C10,?CaptureBlurTexture_guess@@YAXHH@Z,"renamed: CHud::DrawBlurTest passes four arguments, the definition takes four"
+1054370C,?cam_old_guess@@3VVector@@A,"renamed: this address is the HLSDK cam_ofs; cam_old_guess is 10543700"
+10542BC0,?iKeyEvents_guess@@3HA,"renamed: the AttachCam entity pointer pAttachCamEnt_guess"
+104D26C7,?g_bMPModel_guess@@3_NA,"duplicate name of g_bHandsLoaded_guess"
+104D26E8,?iBlurTexture_guess@@3HA,"duplicate name of g_iBlurTexture_guess"
+100ADEC0,?CalcViewModelLag_guess@@YAXMPAMAAVVector@@0PAUcl_entity_s@@_N@Z,"old signature of the view.cpp function, renamed when its parameters were settled"
+100B31E0,?VectorIsValid_guess@@YA_NVVector@@@Z,"old signature of the view.cpp function, renamed when its parameters were settled"
+10064A40,?LoadPoliceSleeveTexture_guess@@YAXXZ,"old signature or name, renamed by the studio renderer work (unused int parameter, rain.cpp owns VectorDistance_guess)"
+100642B0,?LoadGloveTexture_guess@@YAXXZ,"old signature or name, renamed by the studio renderer work (unused int parameter, rain.cpp owns VectorDistance_guess)"
+10065210,?VectorDistance_guess@@YAMVVector@@0@Z,"old signature or name, renamed by the studio renderer work (unused int parameter, rain.cpp owns VectorDistance_guess)"
+10545081,?bUnknown10545081_guess@@3_NA,"member, not a global: the CCgWater_guess constructor clears [this+9], so CHud::Init and CHud::VidInit clear g_CgWater_guess.m_bEnabled_guess"
+1004DFD0,??1CGameStudioModelRenderer@@UAE@XZ,false byte match of a single jmp: 1004DFD0 is EV_HookEvents; retail has no standalone CGameStudioModelRenderer destructor (its ??_G and the g_StudioRenderer atexit thunk call ~CStudioModelRenderer directly)
+10090C20,?Shutdown_guess@CPBuffer_guess@@QAEXXZ,stale copy of the PBuffer_guess name (10087D20): 10090C20 is vectoangles_guess in the StudioModelRenderer object
+10044020,?PlaySoundA@@YAXPADM@Z,renamed ?InventorySound_guess@@YAXPADM@Z: not the cl_util.h inline (decorated-name slot between CRECBInventory::Initialize and KeyInput)
+1006CA10,??1CBlackBar@@UAE@XZ,renamed ??1IVoiceStatusHelper@@UAE@XZ: the function stores the IVoiceStatusHelper vftable
+
+1001E930,?AmmoInvInit_guess@@YAXXZ,renamed VGUI_AmmoInvInit_guess so it sorts into its retail slot in AmmoInventory_guess.obj (between MsgAmmoInv_guess and actionPerformed)
+1001CBE0,?Draw_guess@CBlurTexture_guess@@QAEXHH@Z,renamed DrawBlended_guess so it sorts into its retail slot in Blur_guess.obj (between BindTexture_guess and DrawBlur_guess)
+1001CF80,?InitScreen_guess@CBlur_guess@@QAEXXZ,renamed Initialize_guess so it sorts into its retail slot in Blur_guess.obj (after Init_guess)
+1003E7D0,?BossBarInit_guess@@YAXXZ,renamed VGUI_BossBarInit_guess so it sorts into its retail slot in BossBar_guess.obj (between MsgBossBar_guess and solve)
+10086670,?Init_guess@CCgContext_guess@@QAE_NXZ,renamed Startup_guess so it sorts into its retail slot in CgContext_guess.obj (after Shutdown_guess)
+100875D0,?RenderQuad_guess@CCgWater_guess@@QAEXXZ,renamed ScreenQuad_guess so it sorts into its retail slot in CgWater_guess.obj (between Render_guess and SetBlackShader_guess)
+10020230,?SetCustomHoodie_guess@@YAXXZ,renamed UseCustomHoodie_guess so it sorts into its retail slot in ClothesMenu_guess.obj (between UpdateButtons_guess and VGUI_ClothesInit_guess)
+10020350,?ClothesInit_guess@@YAXXZ,renamed VGUI_ClothesInit_guess so it sorts into its retail slot in ClothesMenu_guess.obj (between UseCustomHoodie_guess and actionPerformed)
+1003F370,?ComputerInit_guess@@YAXXZ,renamed VGUI_ComputerInit_guess so it sorts into its retail slot in Computer_guess.obj (between MsgComputer_guess and actionPerformed)
+10023E40,?CoopStatsInit_guess@@YAXXZ,renamed VGUI_CoopStatsInit_guess so it sorts into its retail slot in CoopStats_guess.obj (between MsgCoopStats_guess and _Decref)
+10029420,?va_guess@@YAPADPBDZZ,renamed UTIL_VarArgs_guess so it sorts into its retail slot in Credits_guess.obj (between ShowUnlock_guess and VGUI_CreditsInit_guess)
+10029450,?CreditsInit_guess@@YAXXZ,renamed VGUI_CreditsInit_guess so it sorts into its retail slot in Credits_guess.obj (between UTIL_VarArgs_guess and _Destroy)
+1002E6C0,?LoadCampaigns_guess@CGameMenu@@QAEXXZ,renamed ReadCampaigns_guess so it sorts into its retail slot in GameMenu_guess.obj (between ParseCampaign_guess and ResetButtonPositions_guess)
+1002EBA0,?GameMenuInit_guess@@YAXXZ,renamed VGUI_GameMenuInit_guess so it sorts into its retail slot in GameMenu_guess.obj (between ResetButtonPositions_guess and actionPerformed)
+10040E30,?CustomDocInit_guess@@YAXXZ,renamed VGUI_CustomDocInit_guess so it sorts into its retail slot in GameOver_guess.obj (between MsgCustomDoc_guess and actionPerformed)
+10038A10,?UpdateHUDVisibility_guess@CHUDControl@@QAEXXZ,renamed HandleHUDVisibility_guess so it sorts into its retail slot in HUDControl_guess.obj (between HUDControlInit_guess and Initialize)
+10039210,?UpdateLogo_guess@CHUDControl@@QAEXXZ,renamed LogoUpdate_guess so it sorts into its retail slot in HUDControl_guess.obj (between Initialize and MsgCameraZoom_guess)
+1003A3E0,?MsgTimer_guess@@YAHPBDHPAX@Z,renamed MsgTimerMode_guess so it sorts into its retail slot in HUDControl_guess.obj (between MsgStamina_guess and MsgTimerPlus_guess)
+1003B0C0,?DrawMessages_guess@CHUDControl@@QAEXXZ,renamed RenderMessages_guess so it sorts into its retail slot in HUDControl_guess.obj (between ParseHintTokens and ShowSMSIcon_guess)
+10046350,?PressKey_guess@CKeypad@@QAEXH@Z,renamed EnterKey_guess so it sorts into its retail slot in Keypad_guess.obj (between Activate_guess and Initialize)
+10046A90,?KeypadInit_guess@@YAXXZ,renamed VGUI_KeypadInit_guess so it sorts into its retail slot in Keypad_guess.obj (between UpdateLayout_guess and actionPerformed)
+10048C50,?ReadLine_guess@CNoteDocument@@QAEXXZ,renamed SetText_guess so it sorts into its retail slot in NoteDocument_guess.obj (between SetPage_guess and actionPerformed)
+10049A20,?PressDigit_guess@CPhone@@QAEXH@Z,renamed AddDigit_guess so it sorts into its retail slot in Phone_guess.obj (between ActionSignal and Clear_guess)
+10049D00,?Dial_guess@CPhone@@QAEXXZ,renamed PhoneDial_guess so it sorts into its retail slot in Phone_guess.obj (between MsgPhone_guess and PhoneInit_guess)
+10043990,?Reset_guess@CRECBInventory@@QAEXXZ,renamed ClearItems_guess so it sorts into its retail slot in RECBInventory_guess.obj (between ActionSignal and DoAction_guess)
+10044100,?IsCursorOver_guess@CRECBInventory@@QAE_NHHHH@Z,renamed MouseOver_guess so it sorts into its retail slot in RECBInventory_guess.obj (between KeyInput and MsgInventChck_guess)
+10044EA0,?QSlotInit_guess@@YAXXZ,renamed VGUI_QSlotInit_guess so it sorts into its retail slot in RECBInventory_guess.obj (between Update_guess and actionPerformed)
+10031DD0,?DirectoryExists_guess@@YA_NPBD@Z,renamed PathExists_guess so it sorts into its retail slot in SaveLoad_guess.obj (between MsgSaveLoad_guess and ReadAllSlots_guess)
+10031DF0,?UpdateSlots_guess@CSaveLoad@@QAEXXZ,renamed ReadAllSlots_guess so it sorts into its retail slot in SaveLoad_guess.obj (between PathExists_guess and ReadSlot_guess)
+10033700,?PressDigit_guess@CTelephone@@QAEXH@Z,renamed AddDigit_guess so it sorts into its retail slot in Telephone_guess.obj (between ActionSignal and Dial_guess)
+10088400,?FindTexture_guess@CTextureManager_guess@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@PAH@Z,renamed GetTexturePath_guess so it sorts into its retail slot in TextureManager_guess.obj (between GetPath_guess and GetTexture_guess)
+10088CF0,?FindNumberedTextures_guess@CTextureManager_guess@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@PAH@Z,renamed ImportFrames_guess so it sorts into its retail slot in TextureManager_guess.obj (between GetTexture_guess and ImportImageFile_guess)
+100895F0,?FindImageFile_guess@CTextureManager_guess@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z,renamed ImportImageFile_guess so it sorts into its retail slot in TextureManager_guess.obj (between ImportFrames_guess and IsHardware_guess)
+10089840,?Reset_guess@CTextureManager_guess@@QAEXXZ,renamed LevelInit_guess so it sorts into its retail slot in TextureManager_guess.obj (between IsHardware_guess and LoadFile_guess)
+10089880,?UploadImage_guess@CTextureManager_guess@@QAEXPAUtexture_s_guess@@@Z,renamed LoadFile_guess so it sorts into its retail slot in TextureManager_guess.obj (between LevelInit_guess and LoadFromName_guess)
+10089950,?GetTexture_guess@CTextureManager_guess@@QAEPAUtexture_s_guess@@PBD@Z,renamed LoadFromName_guess so it sorts into its retail slot in TextureManager_guess.obj (between LoadFile_guess and LoadImage_guess)
+10089EF0,?Load_guess@CTextureManager_guess@@QAEPAUtexture_s_guess@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z,renamed LoadTex_guess so it sorts into its retail slot in TextureManager_guess.obj (between LoadSprite_guess and LoadTexture_guess)
+1008A210,?LoadPlayerShadow_guess@CTextureManager_guess@@QAEXXZ,renamed PrecachePlayerShadow_guess so it sorts into its retail slot in TextureManager_guess.obj (between LoadTexture_guess and _Xran)
+1008A280,?IsExtensionSupported_guess@@YAEPBD0@Z,renamed isExtensionSupported_guess so it sorts into its retail slot in TextureManager_guess.obj (between _Xran and push_back)
+1003E1E0,?BoardInit_guess@@YAXXZ,renamed VGUI_BoardInit_guess so it sorts into its retail slot in VGUIBillboard_guess.obj (between MsgBoard_guess and actionPerformed)
+10052AA0,_EV_ServerMuzzleFlash_guess,renamed EV_ThirdPersonMuzzleFlash_guess so it sorts into its retail slot in ev_hldm.obj (between _EV_SpinGauss and _EV_TrainPitchAdjust)
+100AE9A0,?V_ViewPunch_guess@@YAXMMM@Z,renamed PunchViewAngles_guess and moved from ev_hldm.cpp to view.cpp: the retail function lies in view.obj (between PunchAngleDecay_guess and SetupFlashlight)
+1005EB40,?TextureTest_guess@@YAXXZ,renamed ClearTextureChains_guess so it sorts into its retail slot in gl_renderer.obj (between ?1GL_MtexStateSaver and CreateDefaultNormalMap)
+10065210,?VecDistance_guess@@YAMVVector@@0@Z,renamed DistanceTo_guess so it sorts into its retail slot in gl_studiomodel.obj (between Chrome and DrawPlayerFlashlights_guess)
+10065260,?UpdatePlayerFlashlights_guess@@YAXXZ,renamed DrawPlayerFlashlights_guess so it sorts into its retail slot in gl_studiomodel.obj (between DistanceTo_guess and EXT_LightPoint)
+1006CDD0,?GetInventoryItem_guess@CHud@@QAEPADH@Z,renamed GetSlotItem_guess so it sorts into its retail slot in hud.obj (between GetSensitivity and GetSpriteIndex)
+1006D930,?SubUnknown5590_guess@CHud@@QAEHH@Z,renamed MinusUnknown5590_guess so it sorts into its retail slot in hud.obj (between Init and MsgFunc_HUDColor)
+1006D9D0,?AddUnknown5590_guess@CHud@@QAEHH@Z,renamed PlusUnknown5590_guess so it sorts into its retail slot in hud.obj (between MsgFunc_SetFOV and VidInit)
+10072470,?RedrawFrame_guess@@YAXXZ,renamed DrawMP3Frame_guess so it sorts into its retail slot in hud_redraw.obj (between DrawHudStringReverse and DrawNewFade_guess)
+10079800,?IN_XboxFix_guess@@YAXXZ,renamed IN_PadFix_guess so it sorts into its retail slot in input.obj (between IN_ObjectivesUp and IN_ReloadDown)
+1007F9E0,?IrrKlangInit_guess@@YAXXZ,renamed IrrKlangCreate_guess so it sorts into its retail slot in mp3.obj (between Initialize and IrrKlangDestroy_guess)
+1007FA40,?MP3_Shutdown_guess@@YAXXZ,renamed IrrKlangDestroy_guess so it sorts into its retail slot in mp3.obj (between IrrKlangCreate_guess and IrrKlangFrame_guess)
+1007FAF0,?IrrKlangPlay_guess@@YAXPBD@Z,renamed IrrKlangPlayMP3_guess so it sorts into its retail slot in mp3.obj (between IrrKlangIsPaused_guess and IrrKlangPlaySFX_guess)
+1007FB50,?IrrKlangSetParams_guess@@YAXMMMM@Z,renamed IrrKlangSetFade_guess so it sorts into its retail slot in mp3.obj (between IrrKlangPlaySFX_guess and IrrKlangSetLoop_guess)
+1007FC30,?PrintAverage_guess@@YGXPBEI@Z,renamed OutputAverage_guess so it sorts into its retail slot in mp3.obj (between IrrKlangStop_guess and PlayMP3)
+10080B90,?KillViewModelSystems_guess@ParticleSystemManager@@QAEX_N@Z,renamed DeleteViewModelSystems_guess so it sorts into its retail slot in particlemgr.obj (between DeleteSystemWithEntity and FindSystem)
+100855B0,?VectorDistance_guess@@YAMVVector@@0@Z,renamed DistanceBetween_guess so it sorts into its retail slot in rain.obj (between ?0chunk_s and FallingDripEffect_guess)
+10085740,?SplashLandingEffect_guess@@YAXPAUcl_drip@@@Z,renamed GroundSplashEffect_guess so it sorts into its retail slot in rain.obj (between FallingDripEffect_guess and InitRain)
+10093080,?SplashEffect_guess@@YAXPAUcl_drip@@@Z,renamed DripSplashEffect_guess so it sorts into its retail slot in tri.obj (between DrawSpriteAsPoly and DripWaterRingEffect_guess)
+10093170,?RingEffect_guess@@YAXPAUcl_drip@@@Z,renamed DripWaterRingEffect_guess so it sorts into its retail slot in tri.obj (between DripSplashEffect_guess and OrthoCrosshair_guess)
+100ADE50,?NormalizeAngles360_guess@@YAXMM@Z,renamed AngleNormalize360_guess so it sorts into its retail slot in view.obj (between AddViewmodelBob_guess and CalcViewModelLag_guess)
+100AE540,?SetupMagliteLight_guess@@YAXVVector@@0MM@Z,renamed CreateMagliteLight_guess so it sorts into its retail slot in view.obj (between CalcViewmodelBob_guess and GetDualEntity_guess)
+100AE850,?V_DecayPunchAngle_guess@@YAXVVector@@PAUref_params_s@@@Z,renamed PunchAngleDecay_guess so it sorts into its retail slot in view.obj (between MaxAngleBetweenAngles and PunchViewAngles_guess)
+100AF150,?GetBobMode_guess@@YAHPAUref_params_s@@@Z,renamed TestBobMode_guess so it sorts into its retail slot in view.obj (between SetupViewModelLight_guess and V_AddIdle)
+100B3240,?MsgCoopCamAnim_guess@@YAHPBDHPAX@Z,renamed __MsgFunc_CoopCamAnim_guess so it sorts into its retail slot in view.obj (between VectorIsValid_guess and __MsgFunc_ModelAttach_guess)
+100B32A0,?MsgModelAttach_guess@@YAHPBDHPAX@Z,renamed __MsgFunc_ModelAttach_guess so it sorts into its retail slot in view.obj (between __MsgFunc_CoopCamAnim_guess and __MsgFunc_ThirdPerson_guess)
+100B32D0,?MsgThirdPerson_guess@@YAHPBDHPAX@Z,renamed __MsgFunc_ThirdPerson_guess so it sorts into its retail slot in view.obj (between __MsgFunc_ModelAttach_guess and _V_CalcEmpty_guess)

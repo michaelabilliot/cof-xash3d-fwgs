@@ -1,0 +1,17 @@
+??$GetClassPtr@VCBaby@@@@YAPAVCBaby@@PAV0@@Z
+?AlertSound@CBaby@@UAEXXZ
+?CheckRangeAttack1@CBaby@@UAEHMM@Z
+?CheckRangeAttack2@CBaby@@UAEHMM@Z
+?Classify@CBaby@@UAEHXZ
+?DeathSound@CBaby@@UAEXXZ
+?FakeDeath@CBaby@@QAEXXZ
+?HandleAnimEvent@CBaby@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CBaby@@UAEHXZ
+?Killed@CBaby@@UAEXPAUentvars_s@@H@Z
+?PainSound@CBaby@@UAEXXZ
+?Precache@CBaby@@UAEXXZ
+?SetYawSpeed@CBaby@@UAEXXZ
+?Spawn@CBaby@@UAEXXZ
+?TakeDamage@CBaby@@UAEHPAUentvars_s@@0MH@Z
+_monster_baby
+?AttackSound@CBaby@@QAEXXZ

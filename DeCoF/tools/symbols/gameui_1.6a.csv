@@ -1,0 +1,14 @@
+va,name,kind,evidence
+1000F539,__GLOBAL__sub_I_TheCareerGame,func,linux_symbols:string:0.75
+1000F561,___MsgFunc_CZCareer,func,linux_symbols:string:0.69
+10014EE0,_ShowCareerMapDescription,func,linux_symbols:string:0.754
+10024D00,_MD5Init,func,linux_symbols:consts:1.0
+10024F4F,_MD5Transform,func,linux_symbols:consts:0.92
+100260B5,_COM_TimeString,func,linux_symbols:string:0.375
+1002659D,_COM_FormatTime,func,linux_symbols:string:0.531
+100309F9,__GLOBAL__sub_I_g_GameConsole,func,linux_symbols:string:0.75
+10030B68,__GLOBAL__sub_I_g_szEXEName,func,linux_symbols:string:0.75
+10036EA9,__GLOBAL__sub_I_TheMusicManager,func,linux_symbols:string:0.75
+10036ECC,_CreateMusicManager,func,linux_symbols:caller:0.667
+10043329,__GLOBAL__sub_I_g_VModuleLoader,func,linux_symbols:string:0.75
+1004EFD9,_SaveReadNameAndComment,func,linux_symbols:string:0.76

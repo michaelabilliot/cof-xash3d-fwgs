@@ -1,0 +1,8 @@
+??0CMasterVersionChkMsgHandler@@QAE@W4HANDLERTYPE@CMsgHandler@@PAX@Z
+?Process_guess@CMasterVersionChkMsgHandler@@UAE_NPAUnetadr_s@@PAVCMsgBuffer@@@Z
+??_GCMasterVersionChkMsgHandler@@UAEPAXI@Z
+??1CMasterVersionChkMsgHandler@@UAE@XZ
+??0QuitMessageBox@@QAE@PBD0PAVPanel@vgui2@@@Z
+?OnClose@QuitMessageBox@@UAEXXZ
+??_GQuitMessageBox@@UAEPAXI@Z
+??1QuitMessageBox@@UAE@XZ

@@ -1,0 +1,3 @@
+?HUD_GetLastOrg@@YAXPAM@Z
+?HUD_SetLastOrg@@YAXXZ
+_HUD_PostRunCmd

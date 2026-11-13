@@ -1,0 +1,16 @@
+_EV_PlaySound
+_EV_StopSound
+_EV_FindModelIndex
+_EV_LocalPlayerDucking
+_EV_LocalPlayerViewheight
+_EV_LocalPlayerBounds
+_EV_IndexFromTrace
+_EV_GetPhysent
+_EV_SetUpPlayerPrediction
+_EV_SetTraceHull
+_EV_PlayerTrace
+_EV_IsLocal
+_EV_WeaponAnimation
+_EV_PrecacheEvent
+_EV_PlaybackEvent
+_EV_KillEvents

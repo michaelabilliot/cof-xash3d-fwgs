@@ -1,0 +1,6 @@
+?UTIL_GetBaseDir@@YAPADXZ
+?SetEngineDLL@@YAXPAPBD@Z
+?OnVideoModeFailed@@YA_NXZ
+?Sys_GetExecutableName@@YAHPADH@Z
+?LoadFilesystemModule@@YAPAVCSysModule@@PBD_N@Z
+_WinMain@16

@@ -1,0 +1,1 @@
+?UpdateClientData@CHud@@QAEHPAUclient_data_s@@M@Z

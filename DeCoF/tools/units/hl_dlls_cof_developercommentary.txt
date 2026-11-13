@@ -1,0 +1,8 @@
+??$GetClassPtr@VCCoFDevCommentary@@@@YAPAVCCoFDevCommentary@@PAV0@@Z
+?DevThink@CCoFDevCommentary@@AAEXXZ
+?DevUse@CCoFDevCommentary@@AAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?ObjectCaps@CCoFDevCommentary@@EAEHXZ
+?Precache@CCoFDevCommentary@@EAEXXZ
+?SendInitMessage@CCoFDevCommentary@@EAEXPAVCBasePlayer@@@Z
+?Spawn@CCoFDevCommentary@@EAEXXZ
+_cof_developer_commentary

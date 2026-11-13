@@ -1,0 +1,12 @@
+?BigShort@@YAFF@Z
+?LittleShort@@YAFF@Z
+?BigLong@@YA_H_H@Z
+?LittleLong@@YA_H_H@Z
+?BigFloat@@YAMM@Z
+?LittleFloat@@YAMM@Z
+?ShortSwap@@YAFF@Z
+?ShortNoSwap@@YAFF@Z
+?LongSwap@@YA_H_H@Z
+?LongNoSwap@@YA_H_H@Z
+?FloatSwap@@YAMM@Z
+?FloatNoSwap@@YAMM@Z

@@ -1,0 +1,3 @@
+?GetScheduleOfType@CBaseMonster@@UAEPAUSchedule_t@@H@Z
+?ScheduleFromName@CBaseMonster@@UAEPAUSchedule_t@@PBD@Z
+?ScheduleInList@CBaseMonster@@QAEPAUSchedule_t@@PBDPAPAU2@H@Z

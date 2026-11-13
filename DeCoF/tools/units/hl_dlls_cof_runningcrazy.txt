@@ -1,0 +1,13 @@
+??$GetClassPtr@VCRCrazy@@@@YAPAVCRCrazy@@PAV0@@Z
+?AlertSound@CRCrazy@@UAEXXZ
+?CheckRangeAttack1@CRCrazy@@UAEHMM@Z
+?CheckRangeAttack2@CRCrazy@@UAEHMM@Z
+?Classify@CRCrazy@@UAEHXZ
+?HandleAnimEvent@CRCrazy@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CRCrazy@@UAEHXZ
+?Killed@CRCrazy@@UAEXPAUentvars_s@@H@Z
+?Precache@CRCrazy@@UAEXXZ
+?SetYawSpeed@CRCrazy@@UAEXXZ
+?Spawn@CRCrazy@@UAEXXZ
+?TakeDamage@CRCrazy@@UAEHPAUentvars_s@@0MH@Z
+_monster_rcrazy

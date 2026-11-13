@@ -1,0 +1,4 @@
+?Draw@CHudGeiger@@UAEHM@Z
+?Init@CHudGeiger@@UAEHXZ
+?MsgFunc_Geiger@CHudGeiger@@QAEHPBDHPAX@Z
+?VidInit@CHudGeiger@@UAEHXZ

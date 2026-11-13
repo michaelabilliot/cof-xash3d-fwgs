@@ -1,0 +1,7 @@
+??0CVGUIExtraMenu@@QAE@XZ
+??1CVGUIExtraMenu@@QAE@XZ
+?Initialize@CVGUIExtraMenu@@QAEXXZ
+?actionPerformed@CVGUIExtraMenuHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?setVisible@CVGUIExtraMenu@@UAEX_N@Z
+?solve@CVGUIExtraMenu@@MAEXXZ
+?ActionSignal@CVGUIExtraMenu@@QAEXH@Z

@@ -1,0 +1,11 @@
+??0CSaveGameDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CSaveGameDialog@@UAE@XZ
+?OnCommand@CSaveGameDialog@@MAEXPBD@Z
+?OnClose@CSaveGameDialog@@MAEXXZ
+?CreateSavedGamesList@CSaveGameDialog@@IAEXXZ
+?SaveReadNameAndComment@@YAHPAXPAD1@Z
+?TimeStampSortFunc@@YAHPAVListPanel@vgui2@@ABVListPanelItem@2@1@Z
+?ParseSaveData@CSaveGameDialog@@IAE_NPBD0PAVKeyValues@@@Z
+?ScanSavedGames@CSaveGameDialog@@IAEXXZ
+?FindSaveSlot@CSaveGameDialog@@IAEPBDXZ
+??_GCSaveGameDialog@@UAEPAXI@Z

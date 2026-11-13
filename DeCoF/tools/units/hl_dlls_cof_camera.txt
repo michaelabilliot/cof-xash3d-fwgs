@@ -1,0 +1,16 @@
+??$GetClassPtr@VCCamera@@@@YAPAVCCamera@@PAV0@@Z
+?Deploy@CCamera@@UAEHXZ
+?Fidget@CCamera@@UAEXXZ
+?GetItemInfo@CCamera@@UAEHPAUItemInfo@@@Z
+?Holster@CCamera@@UAEXXZ
+?ItemPostFrame@CCamera@@UAEXXZ
+?Precache@CCamera@@UAEXXZ
+?PrimaryAttack@CCamera@@UAEXXZ
+?SecondaryAttack@CCamera@@UAEXXZ
+?SendInitMessage@CCamera@@UAEXPAVCBasePlayer@@@Z
+?ShouldWeaponIdle@CCamera@@UAEHXZ
+?Spawn@CCamera@@UAEXXZ
+?WeaponIdle@CCamera@@UAEXXZ
+_weapon_camera
+_camera_spot
+?Spawn@CCameraSpot@@EAEXXZ

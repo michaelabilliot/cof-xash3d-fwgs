@@ -1,0 +1,16 @@
+??$GetClassPtr@VCTwitcher2@@@@YAPAVCTwitcher2@@PAV0@@Z
+?AlertSound@CTwitcher2@@UAEXXZ
+?CheckRangeAttack1@CTwitcher2@@UAEHMM@Z
+?CheckRangeAttack2@CTwitcher2@@UAEHMM@Z
+?Classify@CTwitcher2@@UAEHXZ
+?HandleAnimEvent@CTwitcher2@@UAEXPAUMonsterEvent_t@@@Z
+?IdleSound@CTwitcher2@@UAEXXZ
+?IgnoreConditions@CTwitcher2@@UAEHXZ
+?Killed@CTwitcher2@@UAEXPAUentvars_s@@H@Z
+?PainSound@CTwitcher2@@UAEXXZ
+?Precache@CTwitcher2@@UAEXXZ
+?SetYawSpeed@CTwitcher2@@UAEXXZ
+?Spawn@CTwitcher2@@UAEXXZ
+?TakeDamage@CTwitcher2@@UAEHPAUentvars_s@@0MH@Z
+_monster_twitcher2
+?AttackSound@CTwitcher2@@QAEXXZ

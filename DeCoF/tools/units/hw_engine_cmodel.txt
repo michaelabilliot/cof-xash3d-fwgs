@@ -1,0 +1,9 @@
+_Mod_Init
+_Mod_DecompressVis
+_Mod_LeafPVS
+_CM_DecompressPVS
+_CM_LeafPVS
+_CM_LeafPAS
+_CM_FreePAS
+_CM_CalcPAS
+_CM_HeadnodeVisible

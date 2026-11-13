@@ -1,0 +1,13 @@
+??$GetClassPtr@VCAxe@@@@YAPAVCAxe@@PAV0@@Z
+?Deploy@CAxe@@UAEHXZ
+?Fidget@CAxe@@UAEXXZ
+?GetItemInfo@CAxe@@UAEHPAUItemInfo@@@Z
+?Holster@CAxe@@UAEXXZ
+?ItemPostFrame@CAxe@@UAEXXZ
+?Precache@CAxe@@UAEXXZ
+?PrimaryAttack@CAxe@@UAEXXZ
+?SendInitMessage@CAxe@@UAEXPAVCBasePlayer@@@Z
+?ShouldWeaponIdle@CAxe@@UAEHXZ
+?Spawn@CAxe@@UAEXXZ
+?WeaponIdle@CAxe@@UAEXXZ
+_weapon_axe

@@ -1,0 +1,15 @@
+?Deploy@CFlare@@UAEHXZ
+?Fidget@CFlare@@UAEXXZ
+?FlareThink@CFlare@@QAEXXZ
+?GetItemInfo@CFlare@@UAEHPAUItemInfo@@@Z
+?Holster@CFlare@@UAEXXZ
+?Ignite@CFlare@@QAEXXZ
+?ItemPostFrame@CFlare@@UAEXXZ
+?Precache@CFlare@@UAEXXZ
+?PrimaryAttack@CFlare@@UAEXXZ
+?Redeploy@CFlare@@QAEXXZ
+?SecondaryAttack@CFlare@@UAEXXZ
+?Spawn@CFlare@@UAEXXZ
+?ThrowRemove@CFlare@@QAEXXZ
+?WeaponIdle@CFlare@@UAEXXZ
+_weapon_flare

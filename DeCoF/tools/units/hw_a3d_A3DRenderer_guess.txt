@@ -1,0 +1,7 @@
+_hwSetListenerPosition_guess
+_hwSetListenerOrientation_guess
+_hwSetVolume_guess
+_hwSetVoiceRelative_guess
+_hwLockBuffer_guess
+_hwUnlockBuffer_guess
+_hwIsActive_guess

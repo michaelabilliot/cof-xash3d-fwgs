@@ -1,0 +1,16 @@
+?BlackFog@@YAXXZ
+?DrawRain@@YAXXZ
+?DrawSpriteAsPoly@@YAXHPAUrect_s@@0HMMMM@Z
+?OrthoDraw@@YAXHHMMMM@Z
+?OrthoGasMask@@YAXXZ
+?OrthoQuad@@YAXHHHH@Z
+?OrthoScope@@YAXXZ
+?UseTexture@@YAHAAHPAD@Z
+?RenderFog@@YAXXZ
+?OrthoDraw@@YAXHHMMMMHHHH@Z
+?DripSplashEffect_guess@@YAXPAUcl_drip@@@Z
+?DripWaterRingEffect_guess@@YAXPAUcl_drip@@@Z
+?OrthoCrosshair_guess@@YAXHH@Z
+?DrawFXObjects@@YAXXZ
+_HUD_DrawNormalTriangles
+_HUD_DrawTransparentTriangles

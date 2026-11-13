@@ -1,0 +1,17 @@
+??0VoiceRecord_DSound@@QAE@XZ
+??1VoiceRecord_DSound@@MAE@XZ
+?Release@VoiceRecord_DSound@@UAEXXZ
+?RecordStart@VoiceRecord_DSound@@UAE_NXZ
+?RecordStop@VoiceRecord_DSound@@UAEXXZ
+?Init@VoiceRecord_DSound@@UAE_NH@Z
+?Term_guess@VoiceRecord_DSound@@AAEXXZ
+?Clear_guess@VoiceRecord_DSound@@AAEXXZ
+?Idle@VoiceRecord_DSound@@UAEXXZ
+?GetRecordedData@VoiceRecord_DSound@@UAEHPAFH@Z
+?UpdateWrapping_guess@VoiceRecord_DSound@@AAEXXZ
+?CreateVoiceRecord_DSound_guess@@YAPAVIVoiceRecord@@H@Z
+??_GVoiceRecord_DSound@@MAEPAXI@Z
+??0IVoiceRecord@@QAE@XZ
+??_GIVoiceRecord@@MAEPAXI@Z
+??1IVoiceRecord@@MAE@XZ
+?NumCaptureBufferBytes_guess@VoiceRecord_DSound@@AAEKXZ

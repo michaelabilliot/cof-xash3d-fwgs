@@ -1,0 +1,8 @@
+?TabPanelInit@@YAXXZ
+??0CTabPanel@@QAE@XZ
+??1CTabPanel@@QAE@XZ
+?Initialize@CTabPanel@@QAEXXZ
+?LoadMessage@CTabPanel@@QAEXPBDHPAX@Z
+?MsgShowTabPanel@@YAHPBDHPAX@Z
+?Toggle@CTabPanel@@QAEHXZ
+?paintBackground@CTabPanel@@MAEXXZ

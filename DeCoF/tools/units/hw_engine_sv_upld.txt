@@ -1,0 +1,15 @@
+_SV_CheckFile
+_SV_ClearResourceLists
+_SV_CreateCustomizationList
+_SV_Customization
+_SV_RegisterResources
+_SV_MoveToOnHandList
+_SV_AddToResourceList
+_SV_ClearResourceList
+_SV_RemoveFromResourceList
+_SV_EstimateNeededResources
+_SV_RequestMissingResourcesFromClients
+_SV_UploadComplete
+_SV_BatchUploadRequest
+_SV_RequestMissingResources
+_SV_ParseResourceList

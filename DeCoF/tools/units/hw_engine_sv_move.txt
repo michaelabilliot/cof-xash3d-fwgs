@@ -1,0 +1,12 @@
+_SV_CheckBottom
+_SV_movetest
+_SV_movestep
+_SV_StepDirection
+_SV_FlyDirection
+_SV_FixCheckBottom
+_SV_NewChaseDir
+_SV_CloseEnough
+_SV_ReachedGoal
+_SV_NewChaseDir2
+_SV_MoveToOrigin_I
+_SV_SetMonsterSize_guess

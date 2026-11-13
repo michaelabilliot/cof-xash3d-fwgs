@@ -1,0 +1,9 @@
+_R_AnimateLight
+_AddLightBlend
+_R_RenderDlight
+_R_RenderDlights
+_R_MarkLights
+_R_PushDlights
+_RecursiveLightPoint
+_R_LightVec
+_R_LightPoint

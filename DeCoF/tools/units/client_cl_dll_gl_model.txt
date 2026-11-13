@@ -1,0 +1,3 @@
+?GL_SetSpriteRenderMode@@YAXH@Z
+?R_GetSpriteFrame@@YAPAUmspriteframe_s@@PAUmodel_s@@H@Z
+?R_DrawSprite@@YAXPAUcl_entity_s@@@Z

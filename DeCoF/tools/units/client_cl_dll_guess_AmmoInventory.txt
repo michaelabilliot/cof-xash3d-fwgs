@@ -1,0 +1,13 @@
+??0CAmmoInventory@@QAE@XZ
+?Initialize@CAmmoInventory@@QAEXXZ
+?KeyInput@CAmmoInventory@@QAEHHHPBD@Z
+?VGUI_AmmoInvInit_guess@@YAXXZ
+?actionPerformed@CAmmoInventoryHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?solve@CAmmoInventory@@MAEXXZ
+?ActionSignal@CAmmoInventory@@QAEXH@Z
+?MsgAmmoInv_guess@@YAHPBDHPAX@Z
+?setVisible@CAmmoInventory@@UAEX_N@Z
+?paint@ColorButton@@UAEXXZ
+?paintBackground@ColorButton@@UAEXXZ
+?IsNotValid@CommandButton@@UAEHXZ
+??1CAmmoInventory@@QAE@XZ

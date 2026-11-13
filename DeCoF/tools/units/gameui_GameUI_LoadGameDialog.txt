@@ -1,0 +1,8 @@
+??0CLoadGameDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CLoadGameDialog@@UAE@XZ
+?OnCommand@CLoadGameDialog@@MAEXPBD@Z
+?OnClose@CLoadGameDialog@@MAEXXZ
+?CreateSavedGamesList@CLoadGameDialog@@IAEXXZ
+?ParseSaveData@CLoadGameDialog@@IAE_NPBD0PAVKeyValues@@@Z
+?ScanSavedGames@CLoadGameDialog@@IAEXXZ
+??_GCLoadGameDialog@@UAEPAXI@Z

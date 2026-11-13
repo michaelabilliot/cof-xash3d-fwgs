@@ -1,0 +1,7 @@
+?Length@@YAMPBM@Z
+?LoadSprite@@YAHPBD@Z
+?VectorAngles@@YAXPBMPAM@Z
+?VectorInverse@@YAXPAM@Z
+?VectorMA@@YAXPBMM0PAM@Z
+?VectorNormalize@@YAMPAM@Z
+?VectorScale@@YAXPBMMPAM@Z

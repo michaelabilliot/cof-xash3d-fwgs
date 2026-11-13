@@ -1,0 +1,7 @@
+??0CBitmapImagePanel@@QAE@PAVPanel@vgui2@@PBD1@Z
+?PaintBackground@CBitmapImagePanel@@UAEXXZ
+?setTexture@CBitmapImagePanel@@UAEXPBD@Z
+?forceUpload@CBitmapImagePanel@@AAEXXZ
+?forceReload@CBitmapImagePanel@@UAEXXZ
+??_GCBitmapImagePanel@@UAEPAXI@Z
+??1CBitmapImagePanel@@UAE@XZ

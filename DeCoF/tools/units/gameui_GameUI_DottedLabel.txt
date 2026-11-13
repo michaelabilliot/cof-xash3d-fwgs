@@ -1,0 +1,4 @@
+??0CDottedBgLabel@@QAE@PAVPanel@vgui2@@PBD1HHH@Z
+?PaintBackground@CDottedBgLabel@@UAEXXZ
+??_GCDottedBgLabel@@UAEPAXI@Z
+??1CDottedBgLabel@@UAE@XZ

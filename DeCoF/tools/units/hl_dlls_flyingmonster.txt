@@ -1,0 +1,13 @@
+?CeilingZ@CFlyingMonster@@QAEMABVVector@@@Z
+?ChangeYaw@CFlyingMonster@@UAEMH@Z
+?FTriangulate@CFlyingMonster@@UAEHABVVector@@0MPAVCBaseEntity@@PAV2@@Z
+?FloorZ@CFlyingMonster@@QAEMABVVector@@@Z
+?Move@CFlyingMonster@@UAEXM@Z
+?MoveExecute@CFlyingMonster@@UAEXPAVCBaseEntity@@ABVVector@@M@Z
+?CheckLocalMove@CFlyingMonster@@UAEHABVVector@@0PAVCBaseEntity@@PAM@Z
+?HandleAnimEvent@CFlyingMonster@@UAEXPAUMonsterEvent_t@@@Z
+?Killed@CFlyingMonster@@UAEXPAUentvars_s@@H@Z
+?ProbeZ@CFlyingMonster@@QAEHABVVector@@0PAM@Z
+?ShouldAdvanceRoute@CFlyingMonster@@UAEHM@Z
+?Stop@CFlyingMonster@@UAEXXZ
+?GetStoppedActivity@CFlyingMonster@@UAE?AW4Activity@@XZ

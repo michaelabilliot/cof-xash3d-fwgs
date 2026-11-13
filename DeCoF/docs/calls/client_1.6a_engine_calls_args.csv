@@ -1,0 +1,678 @@
+member,arg0,arg1,arg2,call_site
+pfnClientCmd,voice_modenable 1,,,1000C327
+pfnClientCmd,voice_modenable 1,,,1000E300
+pfnClientCmd,voice_modenable 0,,,1000E312
+pfnClientCmd,escape,,,1001B8E9
+pfnClientCmd,map c_game_menu1,,,10029DE1
+pfnClientCmd,quit,,,1002DDE4
+pfnClientCmd,map c_game_menu1,,,10031685
+pfnClientCmd,disconnect,,,100316A7
+pfnClientCmd,map c_doc_city,,,10035A2E
+pfnClientCmd,disconnect,,,10035AB6
+pfnClientCmd,dev_commentary 1,,,1004055D
+pfnClientCmd,dev_commentary 0,,,1004056F
+pfnClientCmd,map c_game_menu1,,,10040B79
+pfnClientCmd,<eax>,,,10040C34
+pfnClientCmd,map c_doc_city,,,10040C54
+pfnClientCmd,exit,,,100557F1
+pfnClientCmd,disconnect;maxplayers 1;deathmatch 0;map c_difficulty_settings,,,1006E1F5
+pfnClientCmd,disconnect;maxplayers 1;deathmatch 0,,,1006E345
+pfnClientCmd,disconnect;maxplayers 1;deathmatch 0,,,1006E380
+pfnClientCmd,map c_game_menu1,,,1006E38F
+pfnClientCmd,disconnect;maxplayers 1;deathmatch 0,,,1006E3C0
+pfnClientCmd,map c_unlockables,,,1006E3CF
+pfnClientCmd,disconnect;maxplayers 1;deathmatch 0;map c_unlockables,,,1006E436
+pfnClientCmd,snapshot\n,,,1007313D
+pfnClientCmd,<eax>,,,10075384
+pfnClientCmd,map c_game_menu1,,,1007A4C7
+pfnClientCmd,<eax>,,,1007D99C
+pfnClientCmd,<eax>,,,10095C47
+pfnClientCmd,<eax>,,,1009612B
+pfnClientCmd,<eax>,,,1009757B
+pfnClientCmd,kill,,,100975D1
+pfnClientCmd,<edi>,,,1009ED58
+pfnClientCmd,<eax>,,,100A00BE
+pfnClientCmd,togglebrowser\n,,,100A00C9
+pfnClientCmd,togglebrowser\n,,,100A00E5
+pfnClientCmd,<eax>,,,100A0141
+pfnClientCmd,togglebrowser\n,,,100A014C
+pfnClientCmd,_special,,,100A9580
+pfnClientCmd,ForceCloseCommandMenu\n,,,100AB18E
+pfnServerCmd,<eax>,,,1000C055
+pfnServerCmd,<edx>,,,1001B853
+pfnServerCmd,dropammo 1,,,1001E452
+pfnServerCmd,setclothes 1,,,1001FA4D
+pfnServerCmd,setclothes 2,,,1001FA94
+pfnServerCmd,setclothes 3,,,1001FADB
+pfnServerCmd,setclothes 4,,,1001FB22
+pfnServerCmd,setclothes 5,,,1001FB69
+pfnServerCmd,setclothes 6,,,1001FBB0
+pfnServerCmd,setclothes 7,,,1001FBF7
+pfnServerCmd,setclothes 8,,,1001FC3E
+pfnServerCmd,setclothes 9,,,1001FC88
+pfnServerCmd,setclothes 10,,,1001FCD2
+pfnServerCmd,setclothes 11,,,1001FD1C
+pfnServerCmd,setclothes 0,,,1001FD83
+pfnServerCmd,closeclothes,,,1001FDC0
+pfnServerCmd,<eax>,,,1002029C
+pfnServerCmd,closegame,,,10029DFF
+pfnServerCmd,<eax>,,,1002B060
+pfnServerCmd,freeze 1024,,,1002DB23
+pfnServerCmd,optionshack 0,,,1002DCB2
+pfnServerCmd,optionshack 2,,,1002DCC7
+pfnServerCmd,optionshack 1,,,1002DDC6
+pfnServerCmd,freeze 1024,,,1002E320
+pfnServerCmd,subtitleset 1,,,1002FDEF
+pfnServerCmd,subtitleset 2,,,1002FE57
+pfnServerCmd,subtitleset 3,,,1002FEBF
+pfnServerCmd,subtitleset 4,,,1002FF27
+pfnServerCmd,subtitleset 5,,,1002FF8F
+pfnServerCmd,subtitleset 6,,,1002FFF7
+pfnServerCmd,subtitleset 7,,,1003005F
+pfnServerCmd,padlockrotate 1,,,100308CB
+pfnServerCmd,padlockrotate 2,,,100308DE
+pfnServerCmd,padlockrotate 3,,,100308F1
+pfnServerCmd,padlockrotate 4,,,10030904
+pfnServerCmd,padlockcancel,,,10030917
+pfnServerCmd,unfreeze 666,,,10031616
+pfnServerCmd,unfreeze 1024,,,10031710
+pfnServerCmd,cofload 1,,,1003174D
+pfnServerCmd,unfreezesave 1024 1,,,1003176F
+pfnServerCmd,unfreeze 1024,,,10031819
+pfnServerCmd,cofload 2,,,10031856
+pfnServerCmd,unfreezesave 1024 2,,,10031878
+pfnServerCmd,unfreeze 1024,,,10031922
+pfnServerCmd,cofload 3,,,1003195F
+pfnServerCmd,unfreezesave 1024 3,,,10031981
+pfnServerCmd,unfreeze 1024,,,10031A2B
+pfnServerCmd,cofload 4,,,10031A68
+pfnServerCmd,unfreezesave 1024 4,,,10031A8A
+pfnServerCmd,unfreeze 1024,,,10031B34
+pfnServerCmd,cofload 5,,,10031B71
+pfnServerCmd,unfreezesave 1024 5,,,10031B93
+pfnServerCmd,freeze 1024,,,10031D84
+pfnServerCmd,telephonewrong,,,1003381A
+pfnServerCmd,unfreeze 1024,,,10033BD8
+pfnServerCmd,<eax>,,,1003D8BF
+pfnServerCmd,<eax>,,,1003EFCA
+pfnServerCmd,stopcomputer,,,1003F496
+pfnServerCmd,<eax>,,,1003F5E6
+pfnServerCmd,<eax>,,,100402E0
+pfnServerCmd,skillset 1,,,100402EE
+pfnServerCmd,<eax>,,,10040373
+pfnServerCmd,<eax>,,,100403BC
+pfnServerCmd,<eax>,,,10040412
+pfnServerCmd,closegame,,,1004045F
+pfnServerCmd,closegame,,,10040BA2
+pfnServerCmd,freeze 1024,,,10040DA2
+pfnServerCmd,<eax>,,,1004334D
+pfnServerCmd,<eax>,,,10043442
+pfnServerCmd,<eax>,,,100435FD
+pfnServerCmd,<eax>,,,10043726
+pfnServerCmd,<eax>,,,1004384A
+pfnServerCmd,<eax>,,,10043A28
+pfnServerCmd,<eax>,,,10043AE7
+pfnServerCmd,<eax>,,,10043D4D
+pfnServerCmd,<eax>,,,10043E3C
+pfnServerCmd,<eax>,,,10044649
+pfnServerCmd,<eax>,,,100446E7
+pfnServerCmd,<eax>,,,100447E4
+pfnServerCmd,<eax>,,,100468D3
+pfnServerCmd,closedocument,,,100470D5
+pfnServerCmd,<eax>,,,10049D36
+pfnServerCmd,boilercheck 1,,,1004A1C8
+pfnServerCmd,boilercheck 2,,,1004A1DA
+pfnServerCmd,boilercheck 3,,,1004A1EC
+pfnServerCmd,boilercheck 4,,,1004A1FE
+pfnServerCmd,boilercheck 5,,,1004A222
+pfnServerCmd,unfreeze 666,,,1004A5FE
+pfnServerCmd,cofsave 19573,,,1004A625
+pfnServerCmd,unfreeze 1024,,,1004A65E
+pfnServerCmd,closedocument,,,1004AAB5
+pfnServerCmd,<eax>,,,1004B283
+pfnServerCmd,stresscontinue,,,1004B2F2
+pfnServerCmd,unfreeze 1024,,,1004B311
+pfnServerCmd,<eax>,,,1004B395
+pfnServerCmd,swimboost,,,1004C7F8
+pfnServerCmd,<eax>,,,1004CFEF
+pfnServerCmd,<eax>,,,1004D025
+pfnServerCmd,<eax>,,,100727AA
+pfnServerCmd,boatup,,,10073717
+pfnServerCmd,boatdown,,,1007372E
+pfnServerCmd,boatleft,,,10073745
+pfnServerCmd,boatright,,,1007375C
+pfnServerCmd,wheelchairup,,,1007377C
+pfnServerCmd,wheelchairdown,,,10073793
+pfnServerCmd,wheelchairleft,,,100737AA
+pfnServerCmd,wheelchairright,,,100737C1
+pfnServerCmd,<eax>,,,10074F59
+pfnServerCmd,<eax>,,,10076894
+pfnServerCmd,<eax>,,,10077B1D
+pfnServerCmd,ironsightzoomout,,,100789B4
+pfnServerCmd,attack2pressed,,,100789CC
+pfnServerCmd,telescopecancel,,,100789F1
+pfnServerCmd,attack2released,,,10078A2B
+pfnServerCmd,ironsightzoomin,,,10078B01
+pfnServerCmd,readylobby,,,10078B3D
+pfnServerCmd,attack1pressed,,,10078BD1
+pfnServerCmd,<eax>,,,10078C94
+pfnServerCmd,<eax>,,,10078CB5
+pfnServerCmd,telescopecancel,,,10078CCF
+pfnServerCmd,attack1released,,,10078D25
+pfnServerCmd,dodgebackward,,,10078DCF
+pfnServerCmd,dodgebackward,,,10078DEF
+pfnServerCmd,backpressed,,,10078E06
+pfnServerCmd,backreleased,,,10078E57
+pfnServerCmd,dodgeforward,,,10078FEF
+pfnServerCmd,dodgeforward,,,1007900F
+pfnServerCmd,forwardpressed,,,10079026
+pfnServerCmd,forwardreleased,,,10079077
+pfnServerCmd,tapgetup,,,10079221
+pfnServerCmd,dodgeleft,,,100793E2
+pfnServerCmd,dodgeleft,,,10079402
+pfnServerCmd,dodgeright,,,100794F2
+pfnServerCmd,dodgeright,,,10079512
+pfnServerCmd,wheelchairreload,,,1007985E
+pfnServerCmd,boatdisembark,,,10079A09
+pfnServerCmd,telescopecancel,,,10079A20
+pfnServerCmd,dodgeleft,,,1007AA0F
+pfnServerCmd,telescopefinish,,,100AFD80
+pfnServerCmdUnreliable,<eax>,,,1000C1CE
+pfnPlaySoundByName,weapons/radio/radio_start.wav,<ecx>,,1000C34B
+pfnPlaySoundByName,weapons/radio/radio_end.wav,<ecx>,,1000C37A
+pfnPlaySoundByName,weapons/radio/radio_start.wav,<ecx>,,1000C426
+pfnPlaySoundByName,weapons/radio/radio_end.wav,<ecx>,,1000C574
+pfnPlaySoundByName,common/wpn_select.wav,<ecx>,,1001B89A
+pfnPlaySoundByName,common/wpn_hudoff.wav,<ecx>,,1001B8DA
+pfnPlaySoundByName,common/wpn_moveselect.wav,<ecx>,,1001B9C0
+pfnPlaySoundByName,common/wpn_moveselect.wav,<ecx>,,1001BA8F
+pfnPlaySoundByName,inventory/inventory_click.wav,,,1001E464
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,1001E47E
+pfnPlaySoundByName,inventory/inventory_toggle.wav,<ecx>,,1001E538
+pfnPlaySoundByName,inventory/inventory_close.wav,<ecx>,,1001E68E
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1001F0F2
+pfnPlaySoundByName,common/page_turn.wav,<ecx>,,1001F1DF
+pfnPlaySoundByName,common/page_turn.wav,<ecx>,,1001F27E
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,1002B087
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002BDDD
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002BEB1
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002BF3D
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002BFC9
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002C055
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002C0E1
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002C16D
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002C1F9
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002D922
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002D99D
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002D9F3
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002DC66
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002DCF8
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002DD6C
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002DF37
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,1002EE65
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002EF5D
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F031
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F105
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F1D9
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F2AD
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F381
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F455
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F529
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F5FD
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,1002F6D1
+pfnPlaySoundByName,phone/telephone_receiver_down.wav,<ecx>,,100336BA
+pfnPlaySoundByName,phone/telephone_button_press.wav,<ecx>,,10033773
+pfnPlaySoundByName,phone/telephone_button_press.wav,<ecx>,,100337D4
+pfnPlaySoundByName,phone/telephone_receiver_up.wav,<ecx>,,10033917
+pfnPlaySoundByName,phone/telephone_receiver_down.wav,<ecx>,,10033A23
+pfnPlaySoundByName,ui/3d_click.wav,<ecx>,,100359F6
+pfnPlaySoundByName,<eax>,<ecx>,,10039544
+pfnPlaySoundByName,common/survival_timeplus.wav,<ecx>,,1003A7B3
+pfnPlaySoundByName,statue_puzzle/statue_switch.wav,,,1003D8D4
+pfnPlaySoundByName,ui/3d_click.wav,,,10040DB4
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,10041051
+pfnPlaySoundByName,ui/3d_rollover.wav,<ecx>,,100410ED
+pfnPlaySoundByName,inventory/inventory_click.wav,,,100435D9
+pfnPlaySoundByName,inventory/inventory_click.wav,,,10043702
+pfnPlaySoundByName,inventory/inventory_click.wav,,,10043826
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,100438A7
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,10043A63
+pfnPlaySoundByName,inventory/inventory_click.wav,,,10043BC3
+pfnPlaySoundByName,inventory/inventory_click.wav,,,10043C75
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,10043CC9
+pfnPlaySoundByName,inventory/inventory_click.wav,,,10043E23
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,10043E54
+pfnPlaySoundByName,<dword ptr [ebp + 8]>,<ecx>,,10044031
+pfnPlaySoundByName,inventory/inventory_close.wav,<ecx>,,100440E5
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,1004474B
+pfnPlaySoundByName,inventory/inventory_no.wav,<ecx>,,1004481D
+pfnPlaySoundByName,inventory/inventory_toggle.wav,<ecx>,,1004486C
+pfnPlaySoundByName,inventory/inventory_toggle.wav,<ecx>,,10044A03
+pfnPlaySoundByName,keypad/keypad_activate.wav,,,10046320
+pfnPlaySoundByName,keypad/keypad_press.wav,<ecx>,,1004637C
+pfnPlaySoundByName,keypad/keypad_press.wav,<ecx>,,100464A3
+pfnPlaySoundByName,<eax>,<ecx>,,10048C0E
+pfnPlaySoundByName,phone/tone_nine.wav,<ecx>,,10049AE3
+pfnPlaySoundByName,phone/tone_send.wav,,,10049D62
+pfnPlaySoundByName,save/save_yes.wav,,,1004A637
+pfnPlaySoundByName,save/save_yes.wav,,,1004B298
+pfnPlaySoundByName,save/save_no.wav,,,1004B323
+pfnPlaySoundByName,save/save_no.wav,,,1004B3AA
+pfnPlaySoundByName,player/ladder_1.wav,<ecx>,,1004D175
+pfnPlaySoundByName,<eax>,,,10053A2E
+pfnPlaySoundByName,inventory/inventory_close.wav,<ecx>,,1007918C
+pfnPlaySoundByName,inventory/inventory_open.wav,<ecx>,,100791B9
+pfnPlaySoundByName,player/police/police_pager.wav,<ecx>,,1008A9A3
+pfnPlaySoundByName,weapons/dead_arm.wav,<ecx>,,10090A33
+pfnPlaySoundByName,common/gpanel_popup.wav,<ecx>,,100A3B42
+pfnPlaySoundByName,common/gpanel_close.wav,<ecx>,,100A3BEE
+pfnPlaySoundByName,common/gpanel_open.wav,,,100A3C09
+pfnPlaySoundByName,inventory/inventory_close.wav,<ecx>,,100AA28E
+pfnPlaySoundByNameAtLocation,player/player_swim.wav,<ecx>,<ebx>,1004C7ED
+pfnPlaySoundByNameAtLocation,<eax>,<ecx>,<edx>,1004CCB6
+pfnPlaySoundByNameAtLocation,<ebx>,<ecx>,<edx>,1004CCDA
+pfnPlaySoundByNameAtLocation,common/bodydrop1.wav,<ecx>,<eax>,1004D070
+pfnPlaySoundByNameAtLocation,common/bodydrop2.wav,<ecx>,<eax>,1004D09E
+pfnPlaySoundByNameAtLocation,common/bodydrop3.wav,<ecx>,<eax>,1004D0CC
+pfnPlaySoundByNameAtLocation,common/bodydrop4.wav,<ecx>,<eax>,1004D0FA
+pfnPlaySoundByNameAtLocation,player/get_up.wav,<ecx>,<eax>,1004D128
+pfnPlaySoundByNameAtLocation,ambience/drip.wav,<ecx>,<edi>,100925DB
+pfnSPR_Load,sprites/radioicon.spr,,,1000C88F
+pfnSPR_Load,<eax>,,,1001AC1A
+pfnSPR_Load,<eax>,,,1001AC84
+pfnSPR_Load,<eax>,,,1001ACEE
+pfnSPR_Load,<eax>,,,1001AD61
+pfnSPR_Load,<eax>,,,1001ADD4
+pfnSPR_Load,<eax>,,,1001AE57
+pfnSPR_Load,<eax>,,,1001AEC1
+pfnSPR_Load,<eax>,,,1001AF2B
+pfnSPR_Load,<eax>,,,1001AFAA
+pfnSPR_Load,<dword ptr [ebp + 0x10]>,,,1005660F
+pfnSPR_Load,<edi>,,,1006B3B4
+pfnSPR_Load,sprites/muzzleflash.spr,,,1006DD54
+pfnSPR_Load,<eax>,,,1006DEBA
+pfnSPR_Load,<eax>,,,1006DF69
+pfnSPR_Load,sprites/iplayer.spr,,,10077FD8
+pfnSPR_Load,sprites/iplayerblue.spr,,,10077FE9
+pfnSPR_Load,sprites/iplayerred.spr,,,10077FFA
+pfnSPR_Load,sprites/iplayerdead.spr,,,1007800B
+pfnSPR_Load,sprites/tile.spr,,,1007801C
+pfnSPR_Load,sprites/laserbeam.spr,,,1007802D
+pfnSPR_Load,sprites/camera.spr,,,1007803E
+pfnSPR_Load,sprites/crosshairs.spr,,,1007804F
+pfnSPR_Load,<eax>,,,1008258C
+pfnSPR_Load,<eax>,,,10089E22
+pfnSPR_Load,sprites/crosshair_new.spr,,,10093269
+pfnSPR_Load,sprites/gasmask1.spr,,,10093706
+pfnSPR_Load,sprites/gasmask2.spr,,,1009372B
+pfnSPR_Load,sprites/gasmask3.spr,,,10093750
+pfnSPR_Load,sprites/sniper1.spr,,,10093A06
+pfnSPR_Load,sprites/sniper2.spr,,,10093A2B
+pfnSPR_Load,sprites/sniper3.spr,,,10093A50
+pfnSPR_Load,<eax>,,,10093CB3
+pfnSPR_Load,sprites/stmbal1.spr,,,1009415A
+pfnSPR_Load,<eax>,,,100945BD
+pfnSPR_Load,<edi>,,,100993CE
+pfnSPR_Load,<eax>,,,10099B23
+pfnSPR_Load,<eax>,,,10099C61
+pfnConsolePrint,<eax>,,,1000B34B
+pfnConsolePrint,CVoiceStatus::HandleReqStateMsg\n,,,1000B58F
+pfnConsolePrint,CVoiceStatus::HandleVoiceMaskMsg\n,,,1000B616
+pfnConsolePrint,<eax>,,,1000B63C
+pfnConsolePrint,<eax>,,,1000B662
+pfnConsolePrint,CVoiceStatus::SetPlayerBlockedState part 1\n,,,1000BC93
+pfnConsolePrint,CVoiceStatus::SetPlayerBlockedState part 2\n,,,1000BCE1
+pfnConsolePrint,<eax>,,,1000BD45
+pfnConsolePrint,------- BANNED PLAYERS -------\n,,,1000BD98
+pfnConsolePrint,------------------------------\n,,,1000BDBC
+pfnConsolePrint,CVoiceStatus::UpdateServerState: pLevelName[0]==0\n,,,1000BFD9
+pfnConsolePrint,<eax>,,,1000C0A2
+pfnConsolePrint,<eax>,,,1000C1BE
+pfnConsolePrint,CVoiceStatus::UpdateServerState: no change\n,,,1000C25C
+pfnConsolePrint,<eax>,,,1000C305
+pfnConsolePrint,<eax>,,,1004B9D2
+pfnConsolePrint,<dword ptr [ebp + 8]>,,,1008A88C
+pfnConsolePrint,data:10545128,,,1008A9E5
+pfnConsolePrint,<eax>,,,10091BE8
+Con_Printf,"Error: couldn't load menu_settings.txt, using default\n",,,1001A6A1
+Con_Printf,Error: unknown token %s in file menu_settings.txt\n,,,1001AAC8
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1001D6E6
+Con_Printf,Cannot load gfx/vgui/ammo/ammo_inventory.tga!\n,,,1001D7CA
+Con_Printf,Cannot load gfx/vgui/640_notecancel.tga!\n,,,1001ED37
+Con_Printf,Cannot load gfx/vgui/left_right.tga!\n,,,1001ED82
+Con_Printf,Cannot load gfx/vgui/loading_dots.tga!\n,,,1002A557
+Con_Printf,Cannot load gfx/vgui/640_documents.tga!\n,,,1002A9D6
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1002AA21
+Con_Printf,Cannot load gfx/vgui/notes/hiddennote1.tga!\n,,,1002ABB3
+Con_Printf,Cannot load gfx/vgui/menu_logo.tga!\n,,,1002C417
+Con_Printf,PARSING CUSTOM CAMPAIGN: %s\n,,,1002E388
+Con_Printf,PARSING CUSTOM CAMPAIGN: Couldn't parse data from campaign file %s\n,,,1002E697
+Con_Printf,Cannot load gfx/vgui/language_settings.tga!\n,,,1002F945
+Con_Printf,Cannot load gfx/vgui/puzzle/padlock_buttons.tga!\n,,,10030547
+Con_Printf,Cannot load gfx/vgui/save_load.tga!\n,,,10030A67
+Con_Printf,Creating save directory %s\n,,,1003246C
+Con_Printf,Made save directory\n,,,1003248D
+Con_Printf,Cannot load gfx/vgui/telescope_scope.tga!\n,,,10032867
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,10032DE6
+Con_Printf,Cannot load gfx/vgui/puzzle/telephone_vgui.tga!\n,,,10032ECA
+Con_Printf,Cannot load gfx/vgui/unlockables/unlockables_menu.tga!\n,,,10033D47
+Con_Printf,Cannot load gfx/vgui/unlockables/unlockables_locked.tga!\n,,,10033FC6
+Con_Printf,Cannot load gfx/vgui/640_hudelem_smsicon.tga!\n,,,10036578
+Con_Printf,Cannot load gfx/vgui/hints/hint_inventory.tga!\n,,,100365C3
+Con_Printf,Cannot load gfx/vgui/crosshair.tga!\n,,,1003660E
+Con_Printf,Cannot load gfx/vgui/640_logo_logo.tga!\n,,,10036659
+Con_Printf,Cannot load gfx/vgui/640_healthbar.tga!\n,,,100366A4
+Con_Printf,Cannot load gfx/vgui/640_healthbar_bar.tga!\n,,,10036767
+Con_Printf,Cannot load gfx/vgui/640_healthbar_barempty.tga!\n,,,100367B2
+Con_Printf,Cannot load gfx/vgui/640_staminabar.tga!\n,,,100367FD
+Con_Printf,Cannot load gfx/vgui/640_staminabar_bar.tga!\n,,,10036848
+Con_Printf,Cannot load gfx/vgui/640_staminabar_barempty.tga!\n,,,10036893
+Con_Printf,Cannot load gfx/vgui/640_hint_bar.tga!\n,,,100368DE
+Con_Printf,Cannot load gfx/vgui/introductions/english/english_sp.tga!\n,,,10036929
+Con_Printf,Cannot load gfx/vgui/coop_follow_icon.tga %i!\n,,,10036983
+Con_Printf,Cannot load gfx/vgui/coop_syringe_icon.tga %i!\n,,,100369CE
+Con_Printf,ParseHintTokens Couldn't open file %s\n,,,1003A9C5
+Con_Printf,ParseHintTokens Error parsing file %s. (expected { )\n,,,1003AC74
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1003D3E8
+Con_Printf,Cannot load gfx/vgui/640_eagle_button.tga!\n,,,1003D4CC
+Con_Printf,Cannot load %s!\n,,,1003DB57
+Con_Printf,No message sent\n,,,1003DB78
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1003DCD6
+Con_Printf,Cannot load gfx/vgui/640_gustavdahlwelcome.tga!\n,,,1003DD8E
+Con_Printf,Cannot load %s!\n,,,1003E172
+Con_Printf,No message sent\n,,,1003E182
+Con_Printf,Cannot load gfx/vgui/boss/doctor_health_full.tga!\n,,,1003E3E5
+Con_Printf,Cannot load gfx/vgui/boss/doctor_health_empty.tga!\n,,,1003E430
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1003E976
+Con_Printf,Cannot load gfx/vgui/puzzle/computer/computer_logon.tga!\n,,,1003EA5A
+Con_Printf,Cannot load gfx/vgui/640_difficulty.tga!\n,,,1003F945
+Con_Printf,Cannot load gfx/vgui/game_over.tga!\n,,,100406BD
+Con_Printf,Cannot load gfx/vgui/game_over_load.tga!\n,,,10040708
+Con_Printf,Cannot load gfx/vgui/game_over_exit.tga!\n,,,10040753
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,10041261
+Con_Printf,Cannot load gfx/vgui/640_inventory.tga!\n,,,1004136F
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,100457F8
+Con_Printf,Cannot load gfx/vgui/640_panelback.tga!\n,,,100458DC
+Con_Printf,Cannot load gfx/vgui/640_panel2back.tga!\n,,,10045927
+Con_Printf,Cannot load gfx/vgui/640_paneloff.tga!\n,,,10045972
+Con_Printf,Cannot load gfx/vgui/640_panelon.tga!\n,,,100459BD
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,10046BCE
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,10049146
+Con_Printf,Cannot load gfx/vgui/640_phone.tga!\n,,,1004926A
+Con_Printf,Cannot load gfx/vgui/640_boilerpuzzle.tga!\n,,,10049E67
+Con_Printf,Cannot load gfx/vgui/640_panelback.tga!\n,,,1004A3F5
+Con_Printf,Cannot load gfx/vgui/backgroundtoall.tga!\n,,,1004A7E0
+Con_Printf,Cannot load gfx/vgui/640_pass1.tga!\n,,,1004A907
+Con_Printf,Cannot load gfx/vgui/640_savegame.tga!\n,,,1004B015
+Con_Printf,Cannot load %s!\n,,,1004B56D
+Con_Printf,No message sent\n,,,1004B58E
+Con_Printf,"Cant get local player (wow, how it is happened?)\n",,,1004C3CA
+Con_Printf,Cant load model for light testing entity\n,,,1004C477
+Con_Printf,VidInit: skipping loading of opengl32.dll - disabled by user\n,,,1005573B
+Con_Printf,VidInit: Software renderer\n,,,10055813
+Con_Printf,VidInit ERROR: Cannot load opengl32.dll!\n,,,1005584D
+Con_Printf,VidInit: opengl32.dll loaded successfully\n,,,10055887
+Con_Printf,VidInit: OpenGL renderer (%s)\n,,,100558C2
+Con_Printf,VidInit: Direct3D renderer\n,,,10055A6B
+Con_Printf,NO SPRITE white.spr!\n,,,100564D9
+Con_Printf,WTF???\n,,,100568BE
+Con_Printf,ERROR: couldnt open file %s for writing!\n,,,1005691B
+Con_Printf,leaf info dump created\n,,,10056A7B
+Con_Printf,WTF???\n,,,10056AD4
+Con_Printf,ERROR: couldnt open file %s for writing!\n,,,10056B31
+Con_Printf,ACHTUNG!\n,,,10056C36
+Con_Printf,warning: bad texture id for %s!\n,,,10056CBA
+Con_Printf,"leveldump created (%d textures, %d polys)\n",,,10056D83
+Con_Printf,written %s (%d x %d)\n,,,10056EE0
+Con_Printf,error writting %s\n,,,10056EF1
+Con_Printf,Warning: too many static decals on level!\n,,,1005834B
+Con_Printf,usage: pastedecal <decal name>\n,,,10059516
+Con_Printf,R_GetSpriteFrame: no such frame %d\n,,,1005D6C0
+Con_Printf,ERROR: UpdateEntityList - cant get local player!\n,,,10060A63
+Con_Printf,R_TextureAnimation: infinite cycle,,,100626BC
+Con_Printf,R_TextureAnimation: broken cycle,,,100626CF
+Con_Printf,usage: skyangles <pitch> <yaw> <roll>\n,,,10064110
+Con_Printf,( default skyangles is 0 -90 90 )\n,,,1006411B
+Con_Printf,too many skybox entites!!!\n,,,10064186
+Con_Printf,SetupModel: no such bodypart %d\n,,,1006878B
+Con_Printf,Mod_Extradata: failed for %s\n,,,10068D53
+Con_Printf,Couldn't get key for bind %s!\n,,,1006CCAD
+Con_Printf, *\n,,,1006F031
+Con_Printf, * CheckItem parsing error: expecting { after key name\n,,,1006F03C
+Con_Printf, *\n,,,1006F047
+Con_Printf,got list\n,,,10073F1A
+Con_Printf,ping == %s\n,,,1007433C
+Con_Printf,players %s\n,,,1007439E
+Con_Printf,rules %s\n,,,10074730
+Con_Printf,ERROR! Couldn't register all spectator variables.\n,,,10076D56
+Con_Printf,Couldn't open file %s. Using default values for overiew mode.\n,,,10077011
+Con_Printf,Error parsing overview file %s. (%s unkown)\n,,,1007746D
+Con_Printf,Error parsing overview file %s. (expected { )\n,,,10077495
+Con_Printf,Invalid spectator mode.\n,,,100777B9
+Con_Printf,%c,,,1007795E
+Con_Printf,usage:  spec_menu <0|1>\n,,,10077990
+Con_Printf,usage:  spec_mode <Main Mode> [<Inset Mode>]\n,,,100779B0
+Con_Printf,joystick found\n\n,,,1007BD76
+Con_Printf,\n%s configured\n\n,,,1007BF43
+Con_Printf,%s,,,1007D474
+Con_Printf,MP3 INFO%2i. %-35s : ,,,1007F0A7
+Con_Printf,"MP3 INFO ""%s""\n",,,1007F0C8
+Con_Printf,"MP3 INFO No Text found, but:\n",,,1007F0EA
+Con_Printf,MP3 INFO %-43s- %s\n,,,1007F12B
+Con_Printf,MP3 INFO %-42sERROR: SKIPPING FILE (i=%i; k=%i)\n,,,1007F154
+Con_Printf,\n,,,1007F173
+Con_Printf,MP3 INFO ERROR: SKIPPING FILE (i=%i)\n,,,1007F193
+Con_Printf,MP3 INFO %2i. Skipping\n,,,1007F1B3
+Con_Printf,\n,,,1007F1CD
+Con_Printf,Couldn't open particle file %s. Using default particle settings.\n,,,10081172
+Con_Printf,Warning: Particle type %s is defined more than once!\n,,,100823D9
+Con_Printf,Particle is trying to move at\n,,,1008372C
+Con_Printf,BoxOnPlaneSide error\n,,,10083FE3
+Con_Printf,Rain error: FX limit overflow!\n,,,10085638
+Con_Printf,Rain error: failed to allocate FX object!\n,,,1008572B
+Con_Printf,Rain error: FX limit overflow!\n,,,10085778
+Con_Printf,Rain error: failed to allocate FX object!\n,,,10085842
+Con_Printf,Rain error: failed to allocate memory block for fx objects!\n,,,10085956
+Con_Printf,Rain error: can't get water entity\n,,,10085EC9
+Con_Printf,Rain error: water is not func_water entity\n,,,10085EDC
+Con_Printf,Rain error: can't create drip in water\n,,,10085EFF
+Con_Printf,Rain info: Drips exist: %i\n,,,1008603D
+Con_Printf,Rain info: FXs exist: %i\n,,,1008604E
+Con_Printf,"Rain info: Attempted/Dropped: %i, %i\n",,,1008605B
+Con_Printf,Rain info: Average drip life time: %f\n,,,1008608B
+Con_Printf,Rain info: Average drip life time: --\n,,,100860A7
+Con_Printf,Rain error: failed to allocate memory block!\n,,,100860C6
+Con_Printf,Rain error: FX limit overflow!\n,,,100861BF
+Con_Printf,Rain error: failed to allocate FX object!\n,,,1008629C
+Con_Printf,<ebp>,,,100862E2
+Con_Printf,,,,100863A7
+Con_Printf,%s\n,,,100865D2
+Con_Printf,Error on vertex\n,,,10086B71
+Con_Printf,Error Loading Black Shader\n,,,10086BF3
+Con_Printf,Error on fragment\n,,,10086C1D
+Con_Printf,Error on Vertex\n,,,10087257
+Con_Printf,Error on fragment\n,,,1008728A
+Con_Printf,Couldnt bind pbuffer to render texture\n,,,10087947
+Con_Printf,Problem Finding Pixel Format\n,,,100879E1
+Con_Printf,Problem Creating PBuffer\n,,,10087A76
+Con_Printf,Pbuffer Size doesnt match\n,,,10087ABC
+Con_Printf,Couldnt make Pbuffer Current\n,,,10087ADD
+Con_Printf,Pbuffer was Lost\n,,,10087B2B
+Con_Printf,Couldnt make Pbuffer Current\n,,,10087B4A
+Con_Printf,#funcname() not Initialized!\n,,,10087BD8
+Con_Printf,#funcname() not Initialized!\n,,,10087BF6
+Con_Printf,#funcname() not Initialized!\n,,,10087C14
+Con_Printf,#funcname() not Initialized!\n,,,10087C32
+Con_Printf,#funcname() not Initialized!\n,,,10087C50
+Con_Printf,#funcname() not Initialized!\n,,,10087C6E
+Con_Printf,#funcname() not Initialized!\n,,,10087C8C
+Con_Printf,#funcname() not Initialized!\n,,,10087CAA
+Con_Printf,#funcname() not Initialized!\n,,,10087CC8
+Con_Printf,#funcname() not Initialized!\n,,,10087CE6
+Con_Printf,Couldnt release pbuffer to render texture\n,,,10087D17
+Con_Printf,Couldnt Restore Renderer\n,,,10087D45
+Con_Printf,MipMap extension not found\n,,,10088119
+Con_Printf,Drawing custom entity %s\n,,,1008C7BD
+Con_Printf,TGA LOAD: Could not allocate memory for image\n,,,10091D27
+Con_Printf,TGA LOAD: Too many pixels read\n,,,10091EC8
+Con_Printf,TGA LOAD: Could not read image data\n,,,10091F0C
+Con_Printf,TGA LOAD: Could not read RLE header\n,,,10091F37
+Con_Printf,TGA LOAD: Invalid texture information\n,,,10091F54
+Con_Printf,TGA LOAD: Could not open texture file\n,,,10091FA4
+Con_Printf,TGA LOAD: TGA file must be type 2 or type 10\n,,,1009202C
+Con_Printf,TGA LOAD: Could not allocate memory for image\n,,,10092111
+Con_Printf,TGA LOAD: Could not read image data\n,,,10092144
+Con_Printf,TGA LOAD: Invalid texture information\n,,,100921AF
+Con_Printf,ERROR: hi_rain.spr or snowflake.spr could not be loaded!\n,,,100928B0
+Con_Printf,<ebp>,,,10093097
+Con_Printf,,,,1009315C
+Con_Printf,<ebp>,,,10093187
+Con_Printf,,,,1009324C
+Con_Printf,ERROR: Can't load sprites/crosshair_new.spr\n,,,1009327D
+Con_Printf,ERROR: illegal number of frames in ortho sprite (%i)\n,,,100933D9
+Con_Printf,ERROR: Can't load sprites/gasmask1.spr\n,,,1009371A
+Con_Printf,ERROR: Can't load sprites/gasmask2.spr\n,,,1009373F
+Con_Printf,ERROR: Can't load sprites/gasmask3.spr\n,,,10093762
+Con_Printf,ERROR: Can't load sprites/sniper1.spr\n,,,10093A1A
+Con_Printf,ERROR: Can't load sprites/sniper2.spr\n,,,10093A3F
+Con_Printf,ERROR: Can't load sprites/sniper3.spr\n,,,10093A62
+Con_Printf,error: cant load sprite sprites/stmbal1.spr\n,,,1009416E
+Con_Printf,ERROR: Cant load image for scrollpanel: [%s]\n,,,100993E7
+Con_Printf,File %s - unknown HEAD parameter: [%s]\n,,,100999E3
+Con_Printf,ERROR: Cant load image for background: [%s]\n,,,10099B42
+Con_Printf,ERROR: Expecting 4 frames in sprite: [%s]\n,,,10099B71
+Con_Printf,ERROR: Cant load image for button: [%s]\n,,,10099C80
+Con_Printf,ERROR: Expecting 2 frames in sprite: [%s]\n,,,10099CAF
+Con_Printf,File %s - unknown TITLE parameter: [%s]\n,,,1009A24D
+Con_Printf,File %s - unknown TEXT parameter: [%s]\n,,,1009AAC2
+Con_Printf,File %s - ignoring [src] parameter - already has an image\n,,,1009AD1C
+Con_Printf,File %s - image not loaded: [%s]\n,,,1009ADB1
+Con_Printf,File %s - unknown IMG parameter: [%s]\n,,,1009AFCC
+Con_Printf,File %s - IMG with no parameters\n,,,1009B0F7
+Con_Printf,File %s - unknown tag: [%s]\n,,,1009B137
+Con_Printf,ERROR: too many renderable objects!\n,,,1009B237
+Con_Printf,Cannot load gfx/vgui/speaker4.tga!\n,,,1009C6AC
+Con_Printf,ERROR: too many schemes!\n,,,1009CE43
+Con_Printf,"Loading bitmap font ""%s"" using width info file\n",,,1009CFC1
+Con_Printf,"Loading bitmap font ""%s""\n",,,1009D06A
+Con_Printf,"Failed to load bitmap font for scheme ""%s""\n",,,1009D0FC
+Con_Printf,WARNING: post-message %s not found in titles.txt!\n,,,100A2724
+Con_Printf,,,,100A2AFF
+Con_Printf,ERROR: subtitles - has childs but no lists!\n,,,100A2F00
+Con_Printf,Could not load image [%s]\n,,,100A3818
+Con_Printf,ACHTUNG! pickup msgpanel is not created!\n,,,100A526D
+Con_Printf,Error in %s file after '%s'.\n,,,100A56E0
+Con_Printf,Too many menus in %s past '%s'\n,,,100A5D60
+Con_Printf,,,,100AAE3F
+Con_Printf,Could not load icon gfx/vgui/icon%d_...\n,,,100AD36B
+Con_Printf,,,,100AD538
+Con_Printf,Screenmessage error: ViewPort is not constructed!\n,,,100AD6A2
+Con_Printf,Scrollingmessage error: ViewPort is not constructed!\n,,,100AD819
+Con_DPrintf,Unknown clothesmenu ActionSignal %i.\n,,,1001FD98
+Con_DPrintf,Unknown Language ActionSignal %i.\n,,,100300C8
+Con_DPrintf,Unknown AnimalStatue ActionSignal %i.\n,,,1003D90B
+Con_DPrintf,Unknown Billboard ActionSignal %i.\n,,,1003E008
+Con_DPrintf,Unknown Computer ActionSignal %i.\n,,,1003EF24
+Con_DPrintf,Unknown Inventory ActionSignal %i.\n,,,100438D3
+Con_DPrintf,Unknown Keypad ActionSignal %i.\n,,,100462D7
+Con_DPrintf,Unknown Save ActionSignal %i.\n,,,1004A678
+Con_DPrintf,Unknown userdoc ActionSignal %i.\n,,,1004AA98
+Con_DPrintf,Unknown Yesno ActionSignal %i.\n,,,1004B407
+Con_DPrintf,"Unknown demo buffer type, skipping.\n",,,1004BAF7
+Con_DPrintf,SendRequest:  Unable to read master server addresses\n,,,10074646
+Con_DPrintf,CHudSpectator::DirectorMessage: unknown command %i.\n,,,10075399
+Con_DPrintf,No observer targets.\n,,,1007693E
+Con_DPrintf,UTIL_FindEntityInMap: EOF without closing brace\n,,,10077EF6
+Con_DPrintf,Three keys down for a button '%c' '%c' '%c'!\n,,,1007A7E0
+Con_DPrintf,joystick not found -- driver not present\n\n,,,1007BC37
+Con_DPrintf,joystick not found -- no valid joysticks (%x)\n\n,,,1007BCDB
+Con_DPrintf,joystick not found -- invalid joystick capabilities (%x)\n\n,,,1007BD28
+Con_DPrintf,Disabling CG Effects\n,,,10086923
+Con_DPrintf,Too many attachments on %s\n,,,1008BDB1
+Con_DPrintf,loading %s\n,,,1008E750
+Con_DPrintf,Too many attachments on %s\n,,,100905D9
+Con_DPrintf,Unknown SpectatorPanel ActionSignal %i.\n,,,100A0900
+Con_DPrintf,Unable to open %s\n,,,100A54ED
+pfnCenterPrint,<eax>,,,1007FD36
+pfnCenterPrint,<eax>,,,10091B33
+COM_LoadFile,<dword ptr [ebp + 8]>,5,<eax>,1000868B
+COM_LoadFile,<dword ptr [ebp + 8]>,5,<eax>,1000875B
+COM_LoadFile,scripts/voicemodel.txt,5,0,1000C83D
+COM_LoadFile,,,,1001A68D
+COM_LoadFile,models/costumes/custom_hoodie.tga,5,0,1002024C
+COM_LoadFile,<eax>,5,0,1002E3E1
+COM_LoadFile,SAVE/saveinfo1.cof,5,0,100316E4
+COM_LoadFile,SAVE/saveinfo2.cof,5,0,100317ED
+COM_LoadFile,SAVE/saveinfo3.cof,5,0,100318F6
+COM_LoadFile,SAVE/saveinfo4.cof,5,0,100319FF
+COM_LoadFile,SAVE/saveinfo5.cof,5,0,10031B08
+COM_LoadFile,<ebx>,5,0,1003A9B2
+COM_LoadFile,gfx/decals/decalinfo.txt,5,0,10059195
+COM_LoadFile,<dword ptr [ebp + 8]>,5,<eax>,100692F9
+COM_LoadFile,<edi>,5,<eax>,10069692
+COM_LoadFile,<esi>,5,<eax>,10069B52
+COM_LoadFile,<eax>,5,0,1006A4EC
+COM_LoadFile,<eax>,5,<ecx>,1006EEB0
+COM_LoadFile,<eax>,5,0,1007400B
+COM_LoadFile,<eax>,5,0,10076FF8
+COM_LoadFile,donatormsg.txt,5,0,1007A2BE
+COM_LoadFile,<ebx>,5,0,1008115F
+COM_LoadFile,<eax>,5,0,100953B1
+COM_LoadFile,<edi>,5,<eax>,100994DB
+COM_LoadFile,<eax>,5,<eax>,1009CECB
+COM_LoadFile,<eax>,5,<eax>,1009CF3F
+COM_LoadFile,<dword ptr [ebp - 0x640]>,5,0,100A54D3
+COM_LoadFile,<eax>,5,0,100A8BF5
+COM_LoadFile,<eax>,5,0,100A8D1A
+COM_LoadFile,<eax>,5,0,100ACFD4
+pfnGetLevelName,,,,1000BF9C
+pfnGetLevelName,,,,1001EAA2
+pfnGetLevelName,,,,100314C9
+pfnGetLevelName,,,,1003151C
+pfnGetLevelName,,,,10031561
+pfnGetLevelName,,,,1003157D
+pfnGetLevelName,,,,10031599
+pfnGetLevelName,,,,1003171E
+pfnGetLevelName,,,,10031827
+pfnGetLevelName,,,,10031930
+pfnGetLevelName,,,,10031A39
+pfnGetLevelName,,,,10031B42
+pfnGetLevelName,,,,10035A8F
+pfnGetLevelName,,,,10035A9E
+pfnGetLevelName,,,,10038A19
+pfnGetLevelName,,,,1003C65E
+pfnGetLevelName,,,,1003C671
+pfnGetLevelName,,,,10040305
+pfnGetLevelName,,,,10043148
+pfnGetLevelName,,,,100439F7
+pfnGetLevelName,,,,10044A34
+pfnGetLevelName,,,,10045126
+pfnGetLevelName,,,,1004B2BA
+pfnGetLevelName,,,,1004B345
+pfnGetLevelName,,,,1004B3CC
+pfnGetLevelName,,,,1005A091
+pfnGetLevelName,,,,1005A16E
+pfnGetLevelName,,,,10065FA9
+pfnGetLevelName,,,,1006A43D
+pfnGetLevelName,,,,1006E3F0
+pfnGetLevelName,,,,1006E3FF
+pfnGetLevelName,,,,10071657
+pfnGetLevelName,,,,100718BA
+pfnGetLevelName,,,,100718EF
+pfnGetLevelName,,,,10072ADB
+pfnGetLevelName,,,,10072B0F
+pfnGetLevelName,,,,10072BC1
+pfnGetLevelName,,,,10076F61
+pfnGetLevelName,,,,100774D3
+pfnGetLevelName,,,,10078770
+pfnGetLevelName,,,,1007877F
+pfnGetLevelName,,,,100790E0
+pfnGetLevelName,,,,10079126
+pfnGetLevelName,,,,100795A3
+pfnGetLevelName,,,,100795E2
+pfnGetLevelName,,,,100798D6
+pfnGetLevelName,,,,1007BBB5
+pfnGetLevelName,,,,100884DD
+pfnGetLevelName,,,,100A8B2E
+pfnGetLevelName,,,,100A9713
+pfnGetLevelName,,,,100ACED9

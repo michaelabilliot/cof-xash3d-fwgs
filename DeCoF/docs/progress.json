@@ -1,0 +1,386 @@
+{
+  "commit": "74fe8ba",
+  "counting": "LIB rows excluded; bytes weighted by function size",
+  "date": "2026-10-25",
+  "dlls": {
+    "CoFLaunchApp.exe": {
+      "bytes": {
+        "EQUIVALENT": 0,
+        "MATCHED": 7679,
+        "TODO": 0,
+        "total": 7679
+      },
+      "categories": {
+        "COF": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 7679,
+            "TODO": 0,
+            "total": 7679
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 51,
+            "TODO": 0,
+            "total": 51
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 0,
+        "MATCHED": 51,
+        "TODO": 0,
+        "total": 51
+      }
+    },
+    "GameUI.dll": {
+      "bytes": {
+        "EQUIVALENT": 0,
+        "MATCHED": 655563,
+        "TODO": 0,
+        "total": 655563
+      },
+      "categories": {
+        "ENGINE": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 187902,
+            "TODO": 0,
+            "total": 187902
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 397,
+            "TODO": 0,
+            "total": 397
+          }
+        },
+        "UNKNOWN": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 467661,
+            "TODO": 0,
+            "total": 467661
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 4805,
+            "TODO": 0,
+            "total": 4805
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 0,
+        "MATCHED": 5202,
+        "TODO": 0,
+        "total": 5202
+      }
+    },
+    "client.dll": {
+      "bytes": {
+        "EQUIVALENT": 74184,
+        "MATCHED": 576004,
+        "TODO": 0,
+        "total": 650188
+      },
+      "categories": {
+        "COF": {
+          "bytes": {
+            "EQUIVALENT": 27845,
+            "MATCHED": 157635,
+            "TODO": 0,
+            "total": 185480
+          },
+          "functions": {
+            "EQUIVALENT": 14,
+            "MATCHED": 366,
+            "TODO": 0,
+            "total": 380
+          }
+        },
+        "HLSDK": {
+          "bytes": {
+            "EQUIVALENT": 7914,
+            "MATCHED": 161498,
+            "TODO": 0,
+            "total": 169412
+          },
+          "functions": {
+            "EQUIVALENT": 3,
+            "MATCHED": 643,
+            "TODO": 0,
+            "total": 646
+          }
+        },
+        "PARANOIA": {
+          "bytes": {
+            "EQUIVALENT": 6481,
+            "MATCHED": 88237,
+            "TODO": 0,
+            "total": 94718
+          },
+          "functions": {
+            "EQUIVALENT": 1,
+            "MATCHED": 264,
+            "TODO": 0,
+            "total": 265
+          }
+        },
+        "SPIRIT": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 7734,
+            "TODO": 0,
+            "total": 7734
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 19,
+            "TODO": 0,
+            "total": 19
+          }
+        },
+        "UNKNOWN": {
+          "bytes": {
+            "EQUIVALENT": 31944,
+            "MATCHED": 160900,
+            "TODO": 0,
+            "total": 192844
+          },
+          "functions": {
+            "EQUIVALENT": 16,
+            "MATCHED": 945,
+            "TODO": 0,
+            "total": 961
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 34,
+        "MATCHED": 2237,
+        "TODO": 0,
+        "total": 2271
+      }
+    },
+    "cof.exe": {
+      "bytes": {
+        "EQUIVALENT": 125,
+        "MATCHED": 5147,
+        "TODO": 0,
+        "total": 5272
+      },
+      "categories": {
+        "ENGINE": {
+          "bytes": {
+            "EQUIVALENT": 125,
+            "MATCHED": 5147,
+            "TODO": 0,
+            "total": 5272
+          },
+          "functions": {
+            "EQUIVALENT": 1,
+            "MATCHED": 51,
+            "TODO": 0,
+            "total": 52
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 1,
+        "MATCHED": 51,
+        "TODO": 0,
+        "total": 52
+      }
+    },
+    "hl.dll": {
+      "bytes": {
+        "EQUIVALENT": 43898,
+        "MATCHED": 1061568,
+        "TODO": 0,
+        "total": 1105466
+      },
+      "categories": {
+        "COF": {
+          "bytes": {
+            "EQUIVALENT": 8654,
+            "MATCHED": 474260,
+            "TODO": 0,
+            "total": 482914
+          },
+          "functions": {
+            "EQUIVALENT": 2,
+            "MATCHED": 1788,
+            "TODO": 0,
+            "total": 1790
+          }
+        },
+        "HLSDK": {
+          "bytes": {
+            "EQUIVALENT": 35244,
+            "MATCHED": 403506,
+            "TODO": 0,
+            "total": 438750
+          },
+          "functions": {
+            "EQUIVALENT": 3,
+            "MATCHED": 2472,
+            "TODO": 0,
+            "total": 2475
+          }
+        },
+        "PARANOIA": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 14996,
+            "TODO": 0,
+            "total": 14996
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 82,
+            "TODO": 0,
+            "total": 82
+          }
+        },
+        "SPIRIT": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 72641,
+            "TODO": 0,
+            "total": 72641
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 409,
+            "TODO": 0,
+            "total": 409
+          }
+        },
+        "UNKNOWN": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 96165,
+            "TODO": 0,
+            "total": 96165
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 578,
+            "TODO": 0,
+            "total": 578
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 5,
+        "MATCHED": 5329,
+        "TODO": 0,
+        "total": 5334
+      }
+    },
+    "hw.dll": {
+      "bytes": {
+        "EQUIVALENT": 2907,
+        "MATCHED": 1354996,
+        "TODO": 0,
+        "total": 1357903
+      },
+      "categories": {
+        "ENGINE": {
+          "bytes": {
+            "EQUIVALENT": 2907,
+            "MATCHED": 1012679,
+            "TODO": 0,
+            "total": 1015586
+          },
+          "functions": {
+            "EQUIVALENT": 5,
+            "MATCHED": 5455,
+            "TODO": 0,
+            "total": 5460
+          }
+        },
+        "UNKNOWN": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 342317,
+            "TODO": 0,
+            "total": 342317
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 2772,
+            "TODO": 0,
+            "total": 2772
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 5,
+        "MATCHED": 8227,
+        "TODO": 0,
+        "total": 8232
+      }
+    },
+    "opengl32.dll": {
+      "bytes": {
+        "EQUIVALENT": 0,
+        "MATCHED": 22929,
+        "TODO": 0,
+        "total": 22929
+      },
+      "categories": {
+        "PARANOIA": {
+          "bytes": {
+            "EQUIVALENT": 0,
+            "MATCHED": 22929,
+            "TODO": 0,
+            "total": 22929
+          },
+          "functions": {
+            "EQUIVALENT": 0,
+            "MATCHED": 367,
+            "TODO": 0,
+            "total": 367
+          }
+        }
+      },
+      "functions": {
+        "EQUIVALENT": 0,
+        "MATCHED": 367,
+        "TODO": 0,
+        "total": 367
+      }
+    }
+  },
+  "shown_total": {
+    "bytes": {
+      "EQUIVALENT": 121114,
+      "MATCHED": 3683886,
+      "TODO": 0,
+      "total": 3805000
+    },
+    "functions": {
+      "EQUIVALENT": 45,
+      "MATCHED": 21464,
+      "TODO": 0,
+      "total": 21509
+    }
+  },
+  "target_version": "1.6a",
+  "total": {
+    "bytes": {
+      "EQUIVALENT": 121114,
+      "MATCHED": 3683886,
+      "TODO": 0,
+      "total": 3805000
+    },
+    "functions": {
+      "EQUIVALENT": 45,
+      "MATCHED": 21464,
+      "TODO": 0,
+      "total": 21509
+    }
+  }
+}

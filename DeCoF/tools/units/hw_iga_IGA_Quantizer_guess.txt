@@ -1,0 +1,15 @@
+??0CQuantizer@@QAE@HH@Z
+??1CQuantizer@@UAE@XZ
+?ProcessImage@CQuantizer@@QAEXPAEHH@Z
+?GetLeftShiftCount@CQuantizer@@IAEHH@Z
+?GetRightShiftCount@CQuantizer@@IAEHH@Z
+?AddColor@CQuantizer@@IAEXPAPAU_NODE@@EEEHHPAH0@Z
+?CreateNode@CQuantizer@@IAEPAU_NODE@@HHPAHPAPAU2@@Z
+?ReduceTree@CQuantizer@@IAEXHPAHPAPAU_NODE@@@Z
+?DeleteTree@CQuantizer@@IAEXPAPAU_NODE@@@Z
+?GetPaletteColors@CQuantizer@@IAEXPAU_NODE@@PAEPAH@Z
+?GetColorCount@CQuantizer@@QAEHXZ
+?GetColorTable@CQuantizer@@QAEXPAE@Z
+?FindNearestColor_guess@@YAEPAEHHHH@Z
+?QuantizeImage_guess@@YAXPAEHH00H@Z
+??_GCQuantizer@@UAEPAXI@Z

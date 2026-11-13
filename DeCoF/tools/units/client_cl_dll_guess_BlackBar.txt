@@ -1,0 +1,5 @@
+?Draw@CBlackBar@@UAEHM@Z
+?Init@CBlackBar@@UAEHXZ
+?VidInit@CBlackBar@@UAEHXZ
+?MsgFunc_BlackBars@CBlackBar@@QAEHPBDHPAX@Z
+?__MsgFunc_BlackBars@@YAHPBDHPAX@Z

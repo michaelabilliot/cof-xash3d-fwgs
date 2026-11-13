@@ -1,0 +1,14 @@
+??1CVoiceGameMgr@@UAE@XZ
+??4CBitVecAccessor@@QAEXH@Z
+?ClientCommand@CVoiceGameMgr@@QAE_NPAVCBasePlayer@@PBD@Z
+?ClientConnected@CVoiceGameMgr@@QAEXPAUedict_s@@@Z
+?Init@CVoiceGameMgr@@QAE_NPAVIVoiceGameMgrHelper@@H@Z
+?Update@CVoiceGameMgr@@QAEXN@Z
+?UpdateMasks@CVoiceGameMgr@@AAEXXZ
+?VoiceServerDebug@@YAXPBDZZ
+?PlayerHasBlockedPlayer@CVoiceGameMgr@@QAE_NPAVCBasePlayer@@0@Z
+?SetHelper@CVoiceGameMgr@@QAEXPAVIVoiceGameMgrHelper@@@Z
+?CallMonsterThink@CBaseMonster@@QAEXXZ
+?SUB_CallUseToggle@CBaseEntity@@QAEXXZ
+??0CVoiceGameMgr@@QAE@XZ
+??0?$CBitVec@$0CA@@@QAE@XZ

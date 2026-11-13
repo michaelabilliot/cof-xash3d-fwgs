@@ -1,0 +1,15 @@
+??$GetClassPtr@VCChild@@@@YAPAVCChild@@PAV0@@Z
+?AlertSound@CChild@@UAEXXZ
+?CheckRangeAttack1@CChild@@UAEHMM@Z
+?CheckRangeAttack2@CChild@@UAEHMM@Z
+?Classify@CChild@@UAEHXZ
+?HandleAnimEvent@CChild@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CChild@@UAEHXZ
+?Killed@CChild@@UAEXPAUentvars_s@@H@Z
+?PainSound@CChild@@UAEXXZ
+?Precache@CChild@@UAEXXZ
+?SetYawSpeed@CChild@@UAEXXZ
+?Spawn@CChild@@UAEXXZ
+?TakeDamage@CChild@@UAEHPAUentvars_s@@0MH@Z
+_monster_child
+?AttackSound@CChild@@QAEXXZ

@@ -1,0 +1,16 @@
+??0ImagePanel@vgui2@@QAE@PAVPanel@1@PBD@Z
+??1ImagePanel@vgui2@@UAE@XZ
+?OnSizeChanged@ImagePanel@vgui2@@MAEXHH@Z
+?SetImage@ImagePanel@vgui2@@UAEXPAVIImage@2@@Z
+?GetImage@ImagePanel@vgui2@@UAEPAVIImage@2@XZ
+?PaintBackground@ImagePanel@vgui2@@MAEXXZ
+?GetSettings@ImagePanel@vgui2@@MAEXPAVKeyValues@@@Z
+?ApplySettings@ImagePanel@vgui2@@MAEXPAVKeyValues@@@Z
+?ApplySchemeSettings@ImagePanel@vgui2@@MAEXPAVIScheme@2@@Z
+?GetDescription@ImagePanel@vgui2@@MAEPBDXZ
+??_GImagePanel@vgui2@@UAEPAXI@Z
+??0ImagePanel_RegisterMap@ImagePanel@vgui2@@QAE@XZ
+?ChainToMap@ImagePanel@vgui2@@SAXXZ
+?GetMessageMap@ImagePanel@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@ImagePanel@vgui2@@SAPBDXZ
+?GetPanelBaseClassName@ImagePanel@vgui2@@SAPBDXZ

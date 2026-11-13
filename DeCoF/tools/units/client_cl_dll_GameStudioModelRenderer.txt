@@ -1,0 +1,11 @@
+?R_StudioDrawPlayer@@YAHHPAUentity_state_s@@@Z
+??0CGameStudioModelRenderer@@QAE@XZ
+CGameStudioModelRenderer::`scalar_deleting_destructor'
+?DrawCustomEntModel@@YAXPAUcl_entity_s@@HH@Z
+?R_StudioInit@@YAXXZ
+?R_StudioDrawModel@@YAHH@Z
+??_GCGameStudioModelRenderer@@UAEPAXI@Z
+_HUD_GetStudioModelInterface
+??__Eg_StudioRenderer@@YAXXZ
+??__Fg_StudioRenderer@@YAXXZ
+?ExtDrawShield@@YAXXZ

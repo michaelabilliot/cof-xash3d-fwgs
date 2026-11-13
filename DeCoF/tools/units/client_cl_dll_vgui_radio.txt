@@ -1,0 +1,8 @@
+?RadioIconInit@@YAXXZ
+??0CRadioIcon@@QAE@XZ
+?Initialize@CRadioIcon@@QAEXXZ
+?MsgShowRadioIcon@@YAHPBDHPAX@Z
+?Reposition@CRadioIcon@@IAEXXZ
+?Show@CRadioIcon@@QAEXPBDMHHHH@Z
+?paintBackground@CRadioIcon@@MAEXXZ
+??1CRadioIcon@@QAE@XZ

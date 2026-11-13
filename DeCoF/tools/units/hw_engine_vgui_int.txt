@@ -1,0 +1,11 @@
+_VGui_Startup
+_VGui_Shutdown
+_VGui_CallEngineSurfaceAppHandler
+_VGui_GetPanel
+_VGui_ReleaseMouse
+_VGui_GetMouse
+_VGui_SetVisible
+_VGui_Paint
+_VGui_GameUIKeyPressed
+_VGui_Key_Event
+_VGui_LoadBMP

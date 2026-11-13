@@ -1,0 +1,14 @@
+?Clamp@@YAXVVector@@PAUcolor24@@@Z
+?SetLightmapBaseIndex@@YAXXZ
+?StyleIndex@@YAHPAUmsurface_s@@H@Z
+?UpdateLightmaps@@YAXXZ
+?UploadBlocklights@@YAXPAUmsurface_s@@@Z
+?UploadLightmaps@@YAXH@Z
+?BuildLightMap_Combine@@YAXPAUmsurface_s@@@Z
+?BuildLightMap_FromBaselight@@YAXPAUmsurface_s@@@Z
+?BuildLightMap_FromBumpStyle@@YAXPAUmsurface_s@@HH@Z
+?BuildLightMap_FromOriginal@@YAXPAUmsurface_s@@@Z
+?BumpMarkFaces@@YAXXZ
+?LightmapSize@@YAHPAUmsurface_s@@@Z
+?LightmapsNeedsUpdate@@YAHXZ
+?ApplyGamma@@YAMM@Z

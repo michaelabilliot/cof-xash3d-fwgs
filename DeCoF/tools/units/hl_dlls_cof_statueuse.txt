@@ -1,0 +1,9 @@
+??$GetClassPtr@VCStatueUse@@@@YAPAVCStatueUse@@PAV0@@Z
+?KeyValue@CStatueUse@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CStatueUse@@UAEHXZ
+?Precache@CStatueUse@@UAEXXZ
+?Restore@CStatueUse@@UAEHAAVCRestore@@@Z
+?Save@CStatueUse@@UAEHAAVCSave@@@Z
+?Spawn@CStatueUse@@UAEXXZ
+?Use@CStatueUse@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_trigger_statueuse

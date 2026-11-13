@@ -1,0 +1,11 @@
+??$GetClassPtr@VCAction@@@@YAPAVCAction@@PAV0@@Z
+?Deploy@CAction@@UAEHXZ
+?GetItemInfo@CAction@@UAEHPAUItemInfo@@@Z
+?Holster@CAction@@UAEXXZ
+?ItemPostFrame@CAction@@UAEXXZ
+?Precache@CAction@@UAEXXZ
+?ShouldWeaponIdle@CAction@@UAEHXZ
+?Spawn@CAction@@UAEXXZ
+?WeaponIdle@CAction@@UAEXXZ
+?iItemSlot@CAction@@UAEHXZ
+_weapon_action

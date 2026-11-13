@@ -1,0 +1,67 @@
+DeCoF license
+=============
+
+DeCoF holds three kinds of material, each under its own terms.
+
+
+1. Tools and documentation written for DeCoF
+--------------------------------------------
+
+The scripts in tools/ (except the data in tools/symbols/), the documentation
+in docs/ (except the tables of retail names and addresses named in part 3),
+README.md, objdiff.json and tools/units.json are under the MIT License:
+
+    MIT License
+
+    Copyright (c) 2026 caixax
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+2. Code derived from the Half-Life SDK and from Paranoia
+--------------------------------------------------------
+
+Much of src/ (the game DLLs, the shared code and the SDK headers) descends
+from the Half-Life 1 SDK, Copyright (c) Valve Corp. That code is subject to
+the Half-Life 1 SDK License, whose full text is in
+LICENSES/Half-Life-1-SDK.txt: it may be copied, modified and distributed in
+source and object code form, but only for free.
+
+Code that descends from Paranoia (the client.dll renderer, and the Paranoia
+and Spirit of Half-Life code in both game DLLs) keeps Paranoia's terms:
+GPL-2.0 for Paranoia's own code and the Half-Life 1 SDK License for Valve's
+files (see docs/refs.md).
+
+
+3. Code and data reconstructed from the Cry of Fear binaries
+------------------------------------------------------------
+
+The rest of src/, and the names and addresses of retail functions and data
+in tools/symbols/ and docs/*.csv, reproduce code and facts of the retail
+Cry of Fear binaries. Their copyright belongs to their original authors:
+Team Psykskallar (Cry of Fear), Valve Corporation (the GoldSrc engine, VGUI2
+and the engine launcher) and the authors of the third-party code compiled
+into the game. This license grants no rights over that code. It is
+published for research, preservation and interoperability with a legally
+owned copy of the game.
+
+
+DeCoF is not affiliated with or endorsed by Team Psykskallar or Valve. No
+game assets or retail binaries are part of this repository.

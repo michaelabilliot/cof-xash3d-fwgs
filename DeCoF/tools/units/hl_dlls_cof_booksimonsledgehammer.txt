@@ -1,0 +1,15 @@
+??$GetClassPtr@VCBookSimonSledgehammer@@@@YAPAVCBookSimonSledgehammer@@PAV0@@Z
+?CheckRangeAttack1@CBookSimonSledgehammer@@UAEHMM@Z
+?CheckRangeAttack2@CBookSimonSledgehammer@@UAEHMM@Z
+?Classify@CBookSimonSledgehammer@@UAEHXZ
+?DeathNotice@CBookSimonSledgehammer@@UAEXPAUentvars_s@@@Z
+?HandleAnimEvent@CBookSimonSledgehammer@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CBookSimonSledgehammer@@UAEHXZ
+?Killed@CBookSimonSledgehammer@@UAEXPAUentvars_s@@H@Z
+?MonsterThink@CBookSimonSledgehammer@@UAEXXZ
+?Precache@CBookSimonSledgehammer@@UAEXXZ
+?SetActivity@CBookSimonSledgehammer@@UAEXW4Activity@@@Z
+?SetYawSpeed@CBookSimonSledgehammer@@UAEXXZ
+?Spawn@CBookSimonSledgehammer@@UAEXXZ
+?TakeDamage@CBookSimonSledgehammer@@UAEHPAUentvars_s@@0MH@Z
+_monster_booksimonsledgehammer

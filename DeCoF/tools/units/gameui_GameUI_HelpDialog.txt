@@ -1,0 +1,5 @@
+??0CHelpDialog@@QAE@XZ
+??1CHelpDialog@@UAE@XZ
+?OnClose@CHelpDialog@@MAEXXZ
+?OnCommand@CHelpDialog@@MAEXPBD@Z
+??_GCHelpDialog@@UAEPAXI@Z

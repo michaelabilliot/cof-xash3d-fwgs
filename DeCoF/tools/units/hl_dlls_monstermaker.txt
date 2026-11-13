@@ -1,0 +1,15 @@
+??$GetClassPtr@VCMonsterMaker@@@@YAPAVCMonsterMaker@@PAV0@@Z
+?CallTryMakeMonster@CMonsterMaker@@QAEXXZ
+?CyclicUse@CMonsterMaker@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?DeathNotice@CMonsterMaker@@UAEXPAUentvars_s@@@Z
+?KeyValue@CMonsterMaker@@UAEXPAUKeyValueData_s@@@Z
+?MakeMonsterThink@CMonsterMaker@@QAEXXZ
+?MakerThink@CMonsterMaker@@QAEXXZ
+?Precache@CMonsterMaker@@UAEXXZ
+?Restore@CMonsterMaker@@UAEHAAVCRestore@@@Z
+?Save@CMonsterMaker@@UAEHAAVCSave@@@Z
+?Spawn@CMonsterMaker@@UAEXXZ
+?ToggleUse@CMonsterMaker@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_monstermaker
+?TryMakeMonster@CMonsterMaker@@QAEXXZ
+?MakeMonster@CMonsterMaker@@QAEPAVCBaseMonster@@XZ

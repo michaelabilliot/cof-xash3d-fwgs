@@ -1,0 +1,9 @@
+??0CImageButton@@QAE@PAVPanel@vgui2@@PBD1@Z
+?PaintBackground@CImageButton@@UAEXXZ
+?SetImagePadding@CImageButton@@QAEXH@Z
+?SetFillPadding@CImageButton@@QAEXH@Z
+?GetImageColor@CImageButton@@UAE?AVColor@@XZ
+?SetTexture@CImageButton@@UAEXPBD@Z
+?ForceUpload@CImageButton@@UAEXXZ
+?ForceReload@CImageButton@@UAEXXZ
+??_GCImageButton@@UAEPAXI@Z

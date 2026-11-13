@@ -1,0 +1,5 @@
+_NullDst
+_CommonLoadSecurityModule
+_LoadSecurityModuleFromDisk
+_LoadSecurityModuleFromMemory
+_CloseSecurityModule

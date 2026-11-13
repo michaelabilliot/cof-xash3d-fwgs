@@ -1,0 +1,15 @@
+_$E4
+_$E1
+_$E3
+_$E2
+??0CCommandLine@@QAE@XZ
+??_GCCommandLine@@UAEPAXI@Z
+??1CCommandLine@@UAE@XZ
+?CreateCmdLine@CCommandLine@@UAEXPBD@Z
+?CopyString_guess@@YAPADPBD@Z
+?RemoveParm@CCommandLine@@UAEXPBD@Z
+?AppendParm@CCommandLine@@UAEXPBD0@Z
+?SetParm@CCommandLine@@UAEXPBD0@Z
+?SetParm@CCommandLine@@UAEXPBDH@Z
+?GetCmdLine@CCommandLine@@UAEPBDXZ
+?CheckParm@CCommandLine@@UAEPADPBDPAPAD@Z

@@ -1,0 +1,14 @@
+??0CCreateMultiplayerGameGameplayPage@@QAE@PAVPanel@vgui2@@PBD@Z
+??1CCreateMultiplayerGameGameplayPage@@UAE@XZ
+?GetMaxPlayers@CCreateMultiplayerGameGameplayPage@@QAEHXZ
+?GetPassword@CCreateMultiplayerGameGameplayPage@@QAEPBDXZ
+?GetHostName@CCreateMultiplayerGameGameplayPage@@QAEPBDXZ
+?GetValue@CCreateMultiplayerGameGameplayPage@@AAEPBDPBD0@Z
+?OnApplyChanges@CCreateMultiplayerGameGameplayPage@@MAEXXZ
+?LoadGameOptionsList@CCreateMultiplayerGameGameplayPage@@AAEXXZ
+?GatherCurrentValues@CCreateMultiplayerGameGameplayPage@@AAEXXZ
+??0CServerDescription@@QAE@PAUCPanelListPanel@@@Z
+?WriteScriptHeader@CServerDescription@@UAEXPAX@Z
+?WriteFileHeader@CServerDescription@@UAEXPAX@Z
+??_GCCreateMultiplayerGameGameplayPage@@UAEPAXI@Z
+?getHint@CDescription@@QAEPBDXZ

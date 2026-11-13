@@ -1,0 +1,6 @@
+?Thread_DPrintf_guess@@YAXPADZZ
+?DownloadStatusCallback_guess@@YGXPAXKK0K@Z
+?ReadData_guess@@YAXPAURequestContext@@@Z
+?CleanUpDownload_guess@@YAXPAURequestContext@@W4HTTPStatus@@W4HTTPError@@@Z
+?DownloadThreadUnused_guess@@YAXXZ
+?DownloadThread_guess@@YGKPAX@Z

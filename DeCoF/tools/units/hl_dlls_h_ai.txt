@@ -1,0 +1,3 @@
+?FBoxVisible@@YAHPAUentvars_s@@0AAVVector@@M@Z
+?VecCheckThrow@@YA?AVVector@@PAUentvars_s@@ABV1@V1@MM@Z
+?VecCheckToss@@YA?AVVector@@PAUentvars_s@@ABV1@V1@M@Z

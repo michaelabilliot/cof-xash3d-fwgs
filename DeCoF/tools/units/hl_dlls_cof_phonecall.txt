@@ -1,0 +1,14 @@
+??$GetClassPtr@VCPhoneCall@@@@YAPAVCPhoneCall@@PAV0@@Z
+??$GetClassPtr@VCSubtitle@@@@YAPAVCSubtitle@@PAV0@@Z
+?ChangeSubtitle@CPhoneCall@@QAEXXZ
+?EndCall@CPhoneCall@@QAEXXZ
+?KeyValue@CPhoneCall@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CPhoneCall@@UAEHXZ
+?ObjectCaps@CSubtitle@@UAEHXZ
+?Precache@CPhoneCall@@UAEXXZ
+?Restore@CPhoneCall@@UAEHAAVCRestore@@@Z
+?Save@CPhoneCall@@UAEHAAVCSave@@@Z
+?Spawn@CPhoneCall@@UAEXXZ
+?Use@CPhoneCall@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?WaitForCall@CPhoneCall@@QAEXXZ
+_cof_phonecall

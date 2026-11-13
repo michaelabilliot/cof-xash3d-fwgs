@@ -1,0 +1,13 @@
+??$GetClassPtr@VCStranger@@@@YAPAVCStranger@@PAV0@@Z
+?AlertSound@CStranger@@UAEXXZ
+?Classify@CStranger@@UAEHXZ
+?DeathSound@CStranger@@UAEXXZ
+?HandleAnimEvent@CStranger@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CStranger@@UAEHXZ
+?Killed@CStranger@@UAEXPAUentvars_s@@H@Z
+?MonsterThink@CStranger@@UAEXXZ
+?Precache@CStranger@@UAEXXZ
+?SetYawSpeed@CStranger@@UAEXXZ
+?Spawn@CStranger@@UAEXXZ
+?TakeDamage@CStranger@@UAEHPAUentvars_s@@0MH@Z
+_monster_stranger

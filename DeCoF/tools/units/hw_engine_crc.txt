@@ -1,0 +1,13 @@
+_CRC32_Init
+_CRC32_Final
+_CRC32_ProcessByte
+_CRC32_ProcessBuffer
+_COM_BlockSequenceCRCByte
+_CRC_File
+_CRC_MapFile
+_MD5Init
+_MD5Update
+_MD5Final
+_MD5Transform
+_MD5_Hash_File
+_MD5_Print

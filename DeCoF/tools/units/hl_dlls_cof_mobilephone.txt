@@ -1,0 +1,17 @@
+??$GetClassPtr@VCMobile@@@@YAPAVCMobile@@PAV0@@Z
+?Deploy@CMobile@@UAEHXZ
+?FixBattery@CMobile@@QAEXXZ
+?FlashOff@CMobile@@QAEXXZ
+?FlashToggle@CMobile@@QAEXXZ
+?GetItemInfo@CMobile@@UAEHPAUItemInfo@@@Z
+?Holster@CMobile@@UAEXXZ
+?ItemPostFrame@CMobile@@UAEXXZ
+?MidBatteryFix@CMobile@@QAEXXZ
+?Precache@CMobile@@UAEXXZ
+?PrimaryAttack@CMobile@@UAEXXZ
+?SecondaryAttack@CMobile@@UAEXXZ
+?ShouldWeaponIdle@CMobile@@UAEHXZ
+?Spawn@CMobile@@UAEXXZ
+?WeaponIdle@CMobile@@UAEXXZ
+?WeaponToggle@CMobile@@UAEXXZ
+_weapon_mobile

@@ -1,0 +1,10 @@
+??1TokenLine@@UAE@XZ
+?SetLine@TokenLine@@QAE_NPBD@Z
+?GetLine@TokenLine@@QAEPADXZ
+?GetToken@TokenLine@@QAEPADH@Z
+?CheckToken@TokenLine@@QAEPADPAD@Z
+?CountToken@TokenLine@@QAEHXZ
+?GetRestOfLine@TokenLine@@QAEPADH@Z
+??0TokenLine@@QAE@PAD@Z
+??0TokenLine@@QAE@XZ
+??_GTokenLine@@UAEPAXI@Z

@@ -1,0 +1,12 @@
+??$GetClassPtr@VCRecharge@@@@YAPAVCRecharge@@PAV0@@Z
+?GetState@CRecharge@@UAE?AW4STATE@@XZ
+?KeyValue@CRecharge@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CRecharge@@UAEHXZ
+?Off@CRecharge@@QAEXXZ
+?Precache@CRecharge@@UAEXXZ
+?Recharge@CRecharge@@QAEXXZ
+?Restore@CRecharge@@UAEHAAVCRestore@@@Z
+?Save@CRecharge@@UAEHAAVCSave@@@Z
+?Spawn@CRecharge@@UAEXXZ
+?Use@CRecharge@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_func_recharge

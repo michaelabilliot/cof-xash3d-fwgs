@@ -1,0 +1,6 @@
+??0CBookMenu@@QAE@XZ
+??1CBookMenu@@QAE@XZ
+?Initialize@CBookMenu@@QAEXXZ
+?actionPerformed@CBookMenuHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?setVisible@CBookMenu@@UAEX_N@Z
+?ActionSignal@CBookMenu@@QAEXH@Z

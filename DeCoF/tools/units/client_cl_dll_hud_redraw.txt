@@ -1,0 +1,13 @@
+?GetNumWidth@CHud@@QAEHHH@Z
+?Redraw@CHud@@QAEHMH@Z
+?ScaleColors@@YAXAAH00H@Z
+?DrawHudNumberString@CHud@@QAEHHHHHHHH@Z
+?DrawHudStringReverse@CHud@@QAEHHHHPADHHH@Z
+?DrawBlurTest@CHud@@QAEXM@Z
+?DrawMP3Frame_guess@@YAXXZ
+?IsViewEntityActive_guess@@YA_NXZ
+?Think@CHud@@QAEXXZ
+?AverageFPS_guess@CHud@@QAEHH@Z
+?DrawNewFade_guess@CHud@@QAEXM@Z
+?DrawHudString@CHud@@QAEHHHHPADHHH@Z
+?DrawHudNumber@CHud@@QAEHHHHHHHH@Z

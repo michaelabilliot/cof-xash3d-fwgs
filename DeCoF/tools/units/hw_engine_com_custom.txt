@@ -1,0 +1,3 @@
+_COM_ClearCustomizationList
+_COM_CreateCustomization
+_COM_SizeofResourceList

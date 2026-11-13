@@ -1,0 +1,11 @@
+_CL_CheckPredictionError
+_CL_RunUsercmd
+_CL_SetIdealPitch
+_CL_InterpolateVector
+_CL_GetTargetTime
+_CL_PredictMove
+_CL_PushPMStates
+_CL_PopPMStates
+_CL_SetLastUpdate
+_CL_RedoPrediction
+_CL_InitPrediction

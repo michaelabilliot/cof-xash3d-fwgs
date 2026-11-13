@@ -1,0 +1,17 @@
+??0VoiceRecord_WaveIn@@QAE@XZ
+??1VoiceRecord_WaveIn@@MAE@XZ
+?Release@VoiceRecord_WaveIn@@UAEXXZ
+?Init@VoiceRecord_WaveIn@@QAE_NH@Z
+?PrintWaveInError_guess@@YAXI@Z
+?RecordStart@VoiceRecord_WaveIn@@UAE_NXZ
+?RecordStop@VoiceRecord_WaveIn@@UAEXXZ
+?Term_guess@VoiceRecord_WaveIn@@AAEXXZ
+?Idle@VoiceRecord_WaveIn@@UAEXXZ
+?GetRecordedData@VoiceRecord_WaveIn@@UAEHPAFH@Z
+?StaticWaveInCallback_guess@VoiceRecord_WaveIn@@CGXPAUHWAVEIN__@@IKKK@Z
+?WaveInCallback_guess@VoiceRecord_WaveIn@@AAEXPAUHWAVEIN__@@IKK@Z
+?RecordAddBuffer@VoiceRecord_WaveIn@@AAEHH@Z
+?NumOutstandingBuffers_guess@VoiceRecord_WaveIn@@AAEHXZ
+?CreateVoiceRecord_WaveIn_guess@@YAPAVIVoiceRecord@@H@Z
+??_GVoiceRecord_WaveIn@@MAEPAXI@Z
+??0?$CSizedCircularBuffer@$0PAA@@@QAE@XZ

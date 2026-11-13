@@ -1,0 +1,15 @@
+??0CLauncherDirectDraw@@QAE@XZ
+_$E4
+_$E1
+_$E3
+_$E2
+??1CLauncherDirectDraw@@UAE@XZ
+?Init_guess@CLauncherDirectDraw@@UAE_NXZ
+?Shutdown_guess@CLauncherDirectDraw@@UAE_NXZ
+?EnumDisplayModes_guess@CLauncherDirectDraw@@UAEXH@Z
+?EnumModesCallback_guess@@YGJPAU_DDSURFACEDESC@@PAX@Z
+?ErrorString_guess@CLauncherDirectDraw@@UAEPBDJ@Z
+??_GCLauncherDirectDraw@@UAEPAXI@Z
+??0ILauncherDirectDraw@@QAE@XZ
+??_GILauncherDirectDraw@@UAEPAXI@Z
+??1ILauncherDirectDraw@@UAE@XZ

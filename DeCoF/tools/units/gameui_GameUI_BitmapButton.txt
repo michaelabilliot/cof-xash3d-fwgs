@@ -1,0 +1,8 @@
+??0CBitmapButton@@QAE@PAVPanel@vgui2@@PBD11111@Z
+?PaintBackground@CBitmapButton@@UAEXXZ
+?ApplySchemeSettings@CBitmapButton@@UAEXPAVIScheme@vgui2@@@Z
+?OnThink@CBitmapButton@@UAEXXZ
+?Flash@CBitmapButton@@QAEXXZ
+??_GCBitmapButton@@UAEPAXI@Z
+??1CBitmapButton@@UAE@XZ
+?DrawFocusBorder@CBitmapButton@@UAEXHHHH@Z

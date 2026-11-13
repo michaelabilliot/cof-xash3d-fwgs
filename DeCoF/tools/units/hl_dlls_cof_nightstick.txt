@@ -1,0 +1,13 @@
+??$GetClassPtr@VCNightstick@@@@YAPAVCNightstick@@PAV0@@Z
+?Deploy@CNightstick@@UAEHXZ
+?Fidget@CNightstick@@UAEXXZ
+?GetItemInfo@CNightstick@@UAEHPAUItemInfo@@@Z
+?Holster@CNightstick@@UAEXXZ
+?ItemPostFrame@CNightstick@@UAEXXZ
+?Precache@CNightstick@@UAEXXZ
+?PrimaryAttack@CNightstick@@UAEXXZ
+?ShouldWeaponIdle@CNightstick@@UAEHXZ
+?Spawn@CNightstick@@UAEXXZ
+?WeaponIdle@CNightstick@@UAEXXZ
+_weapon_hammer
+_weapon_nightstick

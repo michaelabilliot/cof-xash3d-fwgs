@@ -1,0 +1,13 @@
+?Sys_SetLastError@@YAXK@Z
+?Sys_GetLastError@@YAKXZ
+?Sys_CreateMutex@@YAHPBD@Z
+?Sys_ReleaseMutex@@YAXH@Z
+?Sys_WaitForSingleObject@@YAIHH@Z
+?Sys_RegisterWindowMessage@@YAIPBD@Z
+?Sys_FindWindow@@YAHPBD0@Z
+?Sys_EnumWindows@@YAXPAXH@Z
+?Sys_GetWindowText@@YAXHPADH@Z
+?Sys_PostMessage@@YAXHIII@Z
+?Sys_SetCursorPos@@YAXHH@Z
+?Sys_CreateWindowEx@@YAHPBD@Z
+?Sys_DestroyWindow@@YAXH@Z

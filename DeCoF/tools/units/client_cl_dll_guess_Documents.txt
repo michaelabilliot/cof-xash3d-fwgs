@@ -1,0 +1,7 @@
+??0CDocuments@@QAE@XZ
+??1CDocuments@@QAE@XZ
+?Initialize@CDocuments@@QAEXXZ
+?KeyInput@CDocuments@@QAEHHHPBD@Z
+?actionPerformed@CDocumentsHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?setVisible@CDocuments@@UAEX_N@Z
+?ActionSignal@CDocuments@@QAEXH@Z

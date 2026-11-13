@@ -1,0 +1,11 @@
+?Check@CItemPadlock@@QAEXXZ
+?Finished@CItemPadlock@@QAEXXZ
+?GetState@CItemPadlock@@UAE?AW4STATE@@XZ
+?Precache@CItemPadlock@@UAEXXZ
+?Rotate@CItemPadlock@@QAEXH@Z
+?SetSequenceByName@CItemPadlock@@QAEXPAD@Z
+?Spawn@CItemPadlock@@UAEXXZ
+?Use@CItemPadlock@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_item_padlock
+?Cancel@CItemPadlock@@QAEXXZ
+?GetRotationForNumber@@YAHH@Z

@@ -1,0 +1,9 @@
+??$GetClassPtr@VCCheckBrush@@@@YAPAVCCheckBrush@@PAV0@@Z
+?KeyValue@CCheckBrush@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CCheckBrush@@UAEHXZ
+?Precache@CCheckBrush@@UAEXXZ
+?Restore@CCheckBrush@@UAEHAAVCRestore@@@Z
+?Save@CCheckBrush@@UAEHAAVCSave@@@Z
+?Spawn@CCheckBrush@@UAEXXZ
+?Use@CCheckBrush@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_trigger_checkbrush

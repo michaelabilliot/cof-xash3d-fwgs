@@ -1,0 +1,16 @@
+??0CContentControlDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CContentControlDialog@@UAE@XZ
+?Activate@CContentControlDialog@@UAEXXZ
+?ResetPassword@CContentControlDialog@@QAEXXZ
+?ApplyPassword@CContentControlDialog@@QAEXXZ
+?Explain@CContentControlDialog@@IAAXPBDZZ
+?OnCommand@CContentControlDialog@@UAEXPBD@Z
+?OnClose@CContentControlDialog@@UAEXXZ
+?BinPrintf@CContentControlDialog@@IAEPADPAEH@Z
+?WriteToken@CContentControlDialog@@IAEXPBD@Z
+?HashPassword@CContentControlDialog@@IAEXPBDPAD@Z
+?EnablePassword@CContentControlDialog@@IAE_NPBD@Z
+?DisablePassword@CContentControlDialog@@IAE_NPBD@Z
+?IsPasswordEnabledInDialog@CContentControlDialog@@QAE_NXZ
+?UpdateContentControlStatus@CContentControlDialog@@IAEXXZ
+??_GCContentControlDialog@@UAEPAXI@Z

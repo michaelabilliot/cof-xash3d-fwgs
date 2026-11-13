@@ -1,0 +1,9 @@
+??$GetClassPtr@VCThirdPersonInteraction@@@@YAPAVCThirdPersonInteraction@@PAV0@@Z
+?HandleAnimEvent@CThirdPersonInteraction@@UAEXPAUMonsterEvent_t@@@Z
+?NahThink@CThirdPersonInteraction@@QAEXXZ
+?Precache@CThirdPersonInteraction@@UAEXXZ
+?Restore@CThirdPersonInteraction@@UAEHAAVCRestore@@@Z
+?Save@CThirdPersonInteraction@@UAEHAAVCSave@@@Z
+?Spawn@CThirdPersonInteraction@@UAEXXZ
+_third_person_interaction
+?SetSequenceByName@CThirdPersonInteraction@@QAEXPAD@Z

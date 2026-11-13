@@ -1,0 +1,11 @@
+??0CSteamID@@QAE@PBDW4EUniverse@@@Z
+?SetFromString@CSteamID@@QAEXPBDW4EUniverse@@@Z
+?SetFromSteam2String@CSteamID@@QAE_NPBDW4EUniverse@@@Z
+?Render@CSteamID@@QBEPBDXZ
+?Render@CSteamID@@SAPBD_K@Z
+?BValidExternalSteamID@CSteamID@@QBE_NXZ
+?InstancedSet@CSteamID@@QAEXIIW4EUniverse@@W4EAccountType@@@Z
+?CreateBlankAnonLogon@CSteamID@@QAEXW4EUniverse@@@Z
+?SetFromSteam2@CSteamID@@QAEXPAUTSteamGlobalUserID@@W4EUniverse@@@Z
+??0CSteamID@@QAE@_K@Z
+?SetFromUint64@CSteamID@@QAEX_K@Z

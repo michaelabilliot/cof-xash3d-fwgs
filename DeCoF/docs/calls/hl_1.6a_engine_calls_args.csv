@@ -1,0 +1,914 @@
+member,arg0,arg1,arg2,arg3,arg4,call_site
+pfnServerCommand,load cofsave1\n,,,,,1001C84F
+pfnServerCommand,load cofsave2\n,,,,,1001C86E
+pfnServerCommand,load cofsave3\n,,,,,1001C88D
+pfnServerCommand,load cofsave4\n,,,,,1001C8AC
+pfnServerCommand,load cofsave5\n,,,,,1001C8CB
+pfnServerCommand,reload\n,,,,,1001F0CD
+pfnServerCommand,map c_difficulty_settings\n,,,,,100A0AB4
+pfnServerCommand,map c_video_stress_test\n,,,,,100A0ACF
+pfnServerCommand,exec skill.cfg\n,,,,,100AF50A
+pfnServerCommand,exec game.cfg\n,,,,,100AF738
+pfnServerCommand,<eax>,,,,,100B047E
+pfnServerCommand,<eax>,,,,,100C5289
+pfnServerCommand,<eax>,,,,,100C7252
+pfnServerCommand,reload\n,,,,,100E6B0C
+pfnServerCommand,<eax>,,,,,10112906
+pfnServerCommand,<eax>,,,,,1011465D
+pfnServerCommand,<eax>,,,,,10114826
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_game_menu1\n,,,,10048061
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_game_menu1\n,,,,1004AD01
+pfnClientCommand,<dword ptr [eax + 0x20c]>,finishladder\n,,,,1004EE7A
+pfnClientCommand,<dword ptr [eax + 0x20c]>,donatorcheck\n,<edi>,,,100C922A
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_intro\n,,,,100DDD80
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_city\n,,,,100DDD98
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_subwaysick1\n,,,,100DDDB0
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_forest3\n,,,,100DDDC8
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_start\n,,,,100DDDE0
+pfnClientCommand,<dword ptr [eax + 0x20c]>,<eax>,,,,100DFC5B
+pfnClientCommand,<dword ptr [eax + 0x20c]>,map c_intro\n,,,,100DFC81
+pfnClientCommand,<dword ptr [eax + 0x20c]>,donatorcheck\n,,,,100F4402
+pfnClientCommand,<esi>,cd pause\n,,,,1010EAF8
+pfnClientCommand,<esi>,<eax>,,,,1010EB24
+pfnServerPrint,<eax>,,,,,1001E4A8
+pfnPrecacheModel,sprites/radioicon.spr,,,,,100013C1
+pfnPrecacheModel,<esi>,,,,,101169BD
+pfnPrecacheSound,<ebp>,,,,,10116A34
+pfnPrecacheEvent,1,events/train.sc,,,,100D7243
+pfnPrecacheEvent,1,events/smokepuff.sc,,,,101200E6
+pfnPrecacheEvent,1,events/viewpunch.sc,,,,101200F9
+pfnPrecacheEvent,1,events/weaponshoot.sc,,,,1012010C
+pfnPrecacheEvent,1,events/clientsound.sc,,,,1012011F
+pfnPrecacheEvent,1,events/muzzleflash.sc,,,,10120132
+pfnPrecacheEvent,1,events/revolvershells.sc,,,,10120145
+pfnAlertMessage,1,%s,,,,10001772
+pfnAlertMessage,2,COND_HEAR_SOUND with no sound mask!\n,,,,1000AA9C
+pfnAlertMessage,2,Sound mask without COND_HEAR_SOUND!\n,,,,1000AABA
+pfnAlertMessage,2,Script failed for %s\n,,,,1000AF6E
+pfnAlertMessage,2,Invalid State for GetSchedule!\n,,,,1000AFA9
+pfnAlertMessage,2,Schedule Failed at %d!\n,,,,1000B154
+pfnAlertMessage,1,"ERROR: reached target, but no rush entity!\n",,,,1000B8E5
+pfnAlertMessage,1,"ERROR: reached target, but no rush entity!\n",,,,1000C3F4
+pfnAlertMessage,2,Rush target: monster %s doesnt support this movement activity\n,,,,1000C46A
+pfnAlertMessage,2,%s: MoveTarget is missing!?!\n,,,,1000C5C4
+pfnAlertMessage,2,GetPathToEnemyLKP failed!!\n,,,,1000C763
+pfnAlertMessage,2,No StartTask entry for %d\n,,,,1000D087
+pfnAlertMessage,4,%s entities cannot change value!,,,,1000D518
+pfnAlertMessage,1,"DEBUG: info_alias %s now refers to ""%s""\n",,,,1000D69F
+pfnAlertMessage,1,info_group: GetMember called with null szMemberName!?\n,,,,1000D8A6
+pfnAlertMessage,1,"info_group ""%s"" has no member called ""%s"".\n",,,,1000D9B0
+pfnAlertMessage,4,Too many members for info_group %s (limit is %d)\n,,,,1000DDAE
+pfnAlertMessage,4,Too many targets for multi_alias %s (limit is %d)\n,,,,1000DEE2
+pfnAlertMessage,1,DEBUG: info_alias %s turns on\n,,,,1000E342
+pfnAlertMessage,1,DEBUG: info_alias %s turns off\n,,,,1000E38E
+pfnAlertMessage,1,"DEBUG: info_group %s changes the contents of %s ""%s""\n",,,,1000E42D
+pfnAlertMessage,1,"info_group ""%s"": alias ""%s"" was not found or not an alias!",,,,1000E473
+pfnAlertMessage,4,"trigger_changealias %s: alias ""%s"" was not found or not an alias!",,,,1000E58E
+pfnAlertMessage,2,Gibbed monster is thinking!\n,,,,1000E619
+pfnAlertMessage,1,error in transition graph,,,,1000EFEA
+pfnAlertMessage,4,Bad header in SetBones!\n,,,,1000F1B1
+pfnAlertMessage,<ebp>,,,,,1000F248
+pfnAlertMessage,4,"Bad sound event %d in sequence %s :: %s (sound is ""%s"")\n",,,,1000F62E
+pfnAlertMessage,4,Bad header in SetBones!\n,,,,1000F831
+pfnAlertMessage,1,Not a client\n,,,,10010F23
+pfnAlertMessage,1,**CANCELLING pendulum think!\n,,,,10011EFB
+pfnAlertMessage,1,"WARNING: There are too many entities targetting multisource ""%s"". (limit is %d)\n",,,,100146D9
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" turned itself on",,,,10015795
+pfnAlertMessage,1,: firing %s,,,,100157C0
+pfnAlertMessage,1,: firing %s,,,,1001580A
+pfnAlertMessage,1,.\n,,,,1001581A
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" turned itself off",,,,10015893
+pfnAlertMessage,1,: firing %s,,,,100158BE
+pfnAlertMessage,1, and %s,,,,100158E9
+pfnAlertMessage,1,.\n,,,,100158F9
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" triggered; will turn off in %f seconds.\n",,,,10016105
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" triggered, turned off",,,,10016159
+pfnAlertMessage,1,": firing ""%s""",,,,10016184
+pfnAlertMessage,1,": firing ""%s""",,,,100161CE
+pfnAlertMessage,1,.\n,,,,100161DE
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" triggered; will turn on in %f seconds.\n",,,,10016296
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" triggered, turned on",,,,100162EA
+pfnAlertMessage,1,": firing ""%s""",,,,10016315
+pfnAlertMessage,1,": firing ""%s""",,,,1001635F
+pfnAlertMessage,1,.\n,,,,1001636F
+pfnAlertMessage,1,"DEBUG: env_state ""%s"" ",,,,10016402
+pfnAlertMessage,1,"ignored trigger %s; locked by master ""%s"".\n",,,,1001643F
+pfnAlertMessage,<esi>,ignored trigger USE_ON; already on\n,,,,10016459
+pfnAlertMessage,1,ignored trigger USE_OFF; already off\n,,,,10016473
+pfnAlertMessage,1,ignored trigger %s.\n,,,,10016490
+pfnAlertMessage,1,"multisource ""%s"": Used by non-member %s ""%s""\n",,,,10016613
+pfnAlertMessage,1,"multisource ""%s"": Used by non-member %s\n",,,,1001663B
+pfnAlertMessage,<ebx>,Multisource %s deactivated (%d inputs)\n,,,,1001669E
+pfnAlertMessage,2,Multisource %s enabled (%d inputs)\n,,,,1001670F
+pfnAlertMessage,4,Dormant entity %s is thinking!!\n,,,,10016A63
+pfnAlertMessage,4,ENTITY TABLE OR INDEX IS WRONG!!!!\n,,,,10016B10
+pfnAlertMessage,4,Global Entity %s (%s) not in table!!!\n,,,,10016FA7
+pfnAlertMessage,1,NULL Ent in Create!\n,,,,100179D6
+pfnAlertMessage,1,NULL Ent in Create!\n,,,,10017A92
+pfnAlertMessage,1,"Global entity found %s, wrong class %s\n",,,,10017B7E
+pfnAlertMessage,1,Missing movewith entity %s\n,,,,10017C0B
+pfnAlertMessage,1,Unable to fetch model pointer!\n,,,,10018103
+pfnAlertMessage,1,Syntax: hud_color RRR GGG BBB\n,,,,1001924F
+pfnAlertMessage,1,You have muschied %i times\n,,,,1001A485
+pfnAlertMessage,1,Querying donator statuses: \n,,,,1001AA57
+pfnAlertMessage,1,Donator status: %s | %i \n,,,,1001AAA5
+pfnAlertMessage,<ebp>,,,,,1001E707
+pfnAlertMessage,,,,,,1001E73A
+pfnAlertMessage,,,,,,1001E74F
+pfnAlertMessage,1,Can't instance %s\n,,,,1001EA49
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1001FECE
+pfnAlertMessage,1,Unable to find delay\n,,,,10020FB5
+pfnAlertMessage,1,Unable to fetch model pointer!\n,,,,100230F3
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1002318E
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,10024D6A
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1002C00E
+pfnAlertMessage,1,Unable to find delay\n,,,,1002C219
+pfnAlertMessage,2,Tried to move with no route!\n,,,,100411BE
+pfnAlertMessage,2,Couldn't Triangulate\n,,,,1004159D
+pfnAlertMessage,2,Failed to move!\n,,,,10041610
+pfnAlertMessage,2,GetPathToEnemyLKP failed!!\n,,,,100420C6
+pfnAlertMessage,1,No PLAYER!\n,,,,100480B8
+pfnAlertMessage,1,No TARGET!\n,,,,100482CF
+pfnAlertMessage,1,No USER!\n,,,,1004851B
+pfnAlertMessage,1,No PLAYER!\n,,,,1004AD6B
+pfnAlertMessage,1,No TARGET!\n,,,,1004AE6D
+pfnAlertMessage,1,No USER!\n,,,,1004B0C0
+pfnAlertMessage,1,Unable to fetch model pointer!\n,,,,1004B793
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1004B82E
+pfnAlertMessage,1, *\n,,,,1004DD8E
+pfnAlertMessage,1, * CheckItem parsing error: expecting { after key name\n,,,,1004DD9B
+pfnAlertMessage,1, *\n,,,,1004DDA8
+pfnAlertMessage,1,KEY ERROR: Couldn't parse token of key at %f %f %f!\n,,,,1004DDF4
+pfnAlertMessage,1, *\n,,,,1004DE1C
+pfnAlertMessage,1, * GetItemDescription failed to load file %s\n,,,,1004DE2A
+pfnAlertMessage,1, *\n,,,,1004DE37
+pfnAlertMessage,4,CoF: Key with no item .txt at %f %f %f!\n,,,,1004E1A6
+pfnAlertMessage,4,CoF: Key with no model at %f %f %f!\n,,,,1004E286
+pfnAlertMessage,1,Unable to find delay\n,,,,1004F760
+pfnAlertMessage,1,Unable to find delay\n,,,,1004FA33
+pfnAlertMessage,1,Unable to find delay\n,,,,1004FB3A
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,100563A7
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,100590D2
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1005C8EE
+pfnAlertMessage,1,X: %f - Y: %f - Z: %f\n,,,,1005CB07
+pfnAlertMessage,1,cof_numeralplate_left: Unable to create RIGHT key!\n,,,,1005D7B8
+pfnAlertMessage,1,cof_numeralplate_left: Unable to create LEFT key!\n,,,,1005D7DB
+pfnAlertMessage,1,cof_numeralplate_left: Unable to find telephone entity!\n,,,,1005D802
+pfnAlertMessage,1,cof_numeralplate_left: Unable to find cof_numeralplate_right!\n,,,,1005D819
+pfnAlertMessage,1,SUBTITLE CHANGE: Could not change number!\n,,,,1005FF0A
+pfnAlertMessage,1,%s just released use\n,,,,100617A7
+pfnAlertMessage,1,Max nerds are grabbing\n,,,,100617FD
+pfnAlertMessage,1,%s grabbed the van\n,,,,10061A54
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,10070560
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1007538E
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1007540E
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1007548E
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1007550E
+pfnAlertMessage,1,SUBTITLE CHANGE: Could not change number!\n,,,,100772B2
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,1007884F
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,1007C1C6
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,1007DD0E
+pfnAlertMessage,1,No computer at all!\n,,,,10083182
+pfnAlertMessage,1,No computer user or 3! %i %i\n,,,,100833F7
+pfnAlertMessage,1,Unable to fetch model pointer!\n,,,,10086BD3
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,10086C6E
+pfnAlertMessage,1,FVisible FAIL - FL_NOTARGET\n,,,,100882EA
+pfnAlertMessage,1,FVisible FAIL - fuser3\n,,,,1008834A
+pfnAlertMessage,1,FVisible FAIL - LOS\n,,,,1008842F
+pfnAlertMessage,1,Fading monster!\n,,,,100884E5
+pfnAlertMessage,1,Setting GOREFLAG_LOST_HEAD\n,,,,10089FF7
+pfnAlertMessage,1,Setting GOREFLAG_LOST_LEFTHAND\n,,,,1008A025
+pfnAlertMessage,1,Setting GOREFLAG_LOST_RIGHTHAND\n,,,,1008A053
+pfnAlertMessage,1,Setting GOREFLAG_LOST_LOWER_LEFTARM\n,,,,1008A08B
+pfnAlertMessage,1,Setting GOREFLAG_LOST_UPPER_LEFTARM\n,,,,1008A0CD
+pfnAlertMessage,1,Setting HITGROUP_LOWER_RIGHTARM\n,,,,1008A105
+pfnAlertMessage,1,Setting GOREFLAG_LOST_UPPER_RIGHTARM\n,,,,1008A147
+pfnAlertMessage,1,Setting GOREFLAG_LOST_LOWER_LEFTLEG\n,,,,1008A177
+pfnAlertMessage,1,Setting GOREFLAG_LOST_UPPER_LEFTLEG\n,,,,1008A1B7
+pfnAlertMessage,1,Setting HITGROUP_LOWER_RIGHTLEG\n,,,,1008A1E6
+pfnAlertMessage,1,Setting HITGROUP_UPPER_RIGHTLEG\n,,,,1008A222
+pfnAlertMessage,2,Script failed for %s\n,,,,1008CAAE
+pfnAlertMessage,1,GetScheduleOfType()\nNo CASE for Schedule Type %d!\n,,,,1008CC89
+pfnAlertMessage,1,%s set to unnamed schedule!\n,,,,1008CDA3
+pfnAlertMessage,1,Unnamed schedule!\n,,,,1008CDD4
+pfnAlertMessage,2,GibShooter Body is <= 1!\n,,,,10093F00
+pfnAlertMessage,1,CGrassSprite Warning: too many textures\n,,,,100979BB
+pfnAlertMessage,4,"env_laser ""%s"" found startsprite %s, but can't use: not an env_sprite\n",,,,10098D8C
+pfnAlertMessage,4,"env_laser ""%s"" found endsprite %s, but can't use: not an env_sprite\n",,,,10098EED
+pfnAlertMessage,1,Invalid dir value in static decal entity!\n,,,,1009BC82
+pfnAlertMessage,1,Unable to fetch model pointer!\n,,,,1009BE43
+pfnAlertMessage,4,"env_model: unknown sequence ""%s""\n",,,,1009BF51
+pfnAlertMessage,1,"DEBUG: %s ""%s"" creates a shot at %f %f %f; vel %f %f %f; pos ""%s""\n",,,,1009C562
+pfnAlertMessage,1,YesNo error! YesNo with no tga at %f %f %f!\n,,,,1009E23F
+pfnAlertMessage,1,"locus_decal ""%s"" can't find decal ""%s""\n",,,,1009E578
+pfnAlertMessage,1,Unable to find delay\n,,,,1009FA8D
+pfnAlertMessage,1,"env_beam: unknown entity ""%s""\n",,,,100A000B
+pfnAlertMessage,1,Firing targets!!!\n,,,,100A16C0
+pfnAlertMessage,1,YesNo error! YesNo with no tga at %f %f %f!\n,,,,100A81A3
+pfnAlertMessage,1,"env_elight ""%s"" can't find target %s\n",,,,100A8A41
+pfnAlertMessage,1,Rain error: only static rain in multiplayer\n,,,,100A99D0
+pfnAlertMessage,1,ERROR: cant get player!\n,,,,100A9C78
+pfnAlertMessage,1,\nGAME SKILL LEVEL:%d\n,,,,100AF852
+pfnAlertMessage,1,VOTEKICK - Found player %s with ID of %s against the kick ID of %s\n,,,,100B030B
+pfnAlertMessage,1,"Invalid sequence name ""%s"" in monster_generic_dead\n",,,,100B0AF4
+pfnAlertMessage,4,"No model specified for monster_generic ""%s""\n",,,,100B0BAB
+pfnAlertMessage,4,No model specified for monster_generic at %.2f %.2f %.2f\n,,,,100B0BE9
+pfnAlertMessage,4,cycler at %.0f %.0f %0.f missing modelname,,,,100B3E27
+pfnAlertMessage,1,"sequence: %d, frame %.0f\n",,,,100B46BE
+pfnAlertMessage,1,Sprite: %s\n,,,,100B4A2D
+pfnAlertMessage,4,"Item %s fell out of level at %f,%f,%f",,,,100B5B17
+pfnAlertMessage,1,unable to create world_item %d\n,,,,100B5DB9
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,100B643E
+pfnAlertMessage,1,this light style is not allowed to be modified\n,,,,100B7639
+pfnAlertMessage,1,this light style is not allowed to be modified\n,,,,100B7BE8
+pfnAlertMessage,4,"%s ""%s"" has bad or missing calc_position value ""%s""\n",,,,100B81A8
+pfnAlertMessage,4,"Bad or missing calc_ratio entity ""%s""\n",,,,100B8230
+pfnAlertMessage,4,"%s ""%s"" has bad or missing calc_velocity value ""%s""\n",,,,100B82D8
+pfnAlertMessage,1,NULL Ent in MonsterMaker!\n,,,,100BBDA5
+pfnAlertMessage,2,Can't Refresh Route!!\n,,,,100BC2B7
+pfnAlertMessage,2,BuildNearestRoute() - %s has no nearest node!\n,,,,100BC9ED
+pfnAlertMessage,2,Graph not ready for BuildNearestRoute!\n,,,,100BCBA0
+pfnAlertMessage,1,"CANTPLAY: Already playing %s ""%s""!\n",,,,100BCD3D
+pfnAlertMessage,1,CANTPLAY: non-interruptable state.\n,,,,100BCD8F
+pfnAlertMessage,1,CANTPLAY: Dead/Barnacled!\n,,,,100BCDB0
+pfnAlertMessage,1,DropItem() - No item name!\n,,,,100BD937
+pfnAlertMessage,1,DropItem() - Didn't create!\n,,,,100BD9CE
+pfnAlertMessage,2,AI Trigger Fire Target\n,,,,100BDBA1
+pfnAlertMessage,2,No Path from %d to %d!\n,,,,100BDC8A
+pfnAlertMessage,2,FindCover() - %s has no nearest node!\n,,,,100BE6A4
+pfnAlertMessage,2,Graph not ready for findcover!\n,,,,100BE8C2
+pfnAlertMessage,2,find_hintnode: graph not ready!\n,,,,100BE8F9
+pfnAlertMessage,2,Unhandled animation event %d for %s\n,,,,100BF6AA
+pfnAlertMessage,2,%s can't assess %s\n,,,,100C0091
+pfnAlertMessage,2,Tried to move with no route!\n,,,,100C0847
+pfnAlertMessage,2,%s Failed to move (%d)!\n,,,,100C0CBD
+pfnAlertMessage,4,Movement completed twice!\n,,,,100C11A4
+pfnAlertMessage,2,ERROR! PBestScent() has empty soundlist!\n,,,,100C1344
+pfnAlertMessage,2,ERROR! monster %s has no audible sounds!\n,,,,100C1443
+pfnAlertMessage,1,%s: ,,,,100C171B
+pfnAlertMessage,1,"State: %s, ",,,,100C173D
+pfnAlertMessage,1,"Activity %s, ",,,,100C1777
+pfnAlertMessage,1,"Schedule %s, ",,,,100C179F
+pfnAlertMessage,1,"Task %d (#%d), ",,,,100C17C2
+pfnAlertMessage,1,"No Schedule, ",,,,100C17D4
+pfnAlertMessage,1,\nEnemy is %s,,,,100C1810
+pfnAlertMessage,1,No enemy,,,,100C1822
+pfnAlertMessage,1, Moving ,,,,100C1840
+pfnAlertMessage,1,: Stopped for %.2f. ,,,,100C1875
+pfnAlertMessage,1,: In stopped anim. ,,,,100C1899
+pfnAlertMessage,1,not ,,,,100C18C6
+pfnAlertMessage,1,"In Squad, ",,,,100C18D6
+pfnAlertMessage,1,not ,,,,100C18F6
+pfnAlertMessage,1,Leader.,,,,100C1906
+pfnAlertMessage,1,\n,,,,100C1916
+pfnAlertMessage,1,"Yaw speed:%3.1f,Health: %3.1f\n",,,,100C1949
+pfnAlertMessage,1, PRISONER! ,,,,100C1966
+pfnAlertMessage,1, Pre-Disaster! ,,,,100C1986
+pfnAlertMessage,1,\n,,,,100C1996
+pfnAlertMessage,1,%s has no sequence for act:%d\n,,,,100C1FE7
+pfnAlertMessage,2,%s has no view_ofs!\n,,,,100C20A6
+pfnAlertMessage,2,%s has no sequence named:%f\n,,,,100C2128
+pfnAlertMessage,1,"%s ""%s"" stuck in wall--level design error",,,,100C259E
+pfnAlertMessage,4,"ReadyMonster()--%s couldn't find target ""%s""\n",,,,100C2683
+pfnAlertMessage,2,Can't Create Route!\n,,,,100C26C4
+pfnAlertMessage,2,***Combat state with no enemy!\n,,,,100C290F
+pfnAlertMessage,2,Stripped\n,,,,100C2AA5
+pfnAlertMessage,1,"DesiredInfo: pos %f %f %f, vel %f %f %f. Child pos %f %f %f, vel %f %f %f\n\n",,,,100C3F4F
+pfnAlertMessage,4,CheckAssistList has no AssistList!\n,,,,100C40D6
+pfnAlertMessage,1,CheckDesiredList: doingDesired is already set!?\n,,,,100C4136
+pfnAlertMessage,1,CheckDesiredList has no AssistList!\n,,,,100C4159
+pfnAlertMessage,4,Infinite(?) loop in DesiredList!,,,,100C4196
+pfnAlertMessage,1,"AddToAssistList %s ""%s"" has no AssistList!\n",,,,100C4518
+pfnAlertMessage,1,AssignOrigin %s %s: (%f %f %f) goes to (%f %f %f)\n,,,,100C46BD
+pfnAlertMessage,1,SetAngles %s %s: (%f %f %f) goes to (%f %f %f)\n,,,,100C4A4D
+pfnAlertMessage,4,SetAvelocity: Infinite sibling list for MoveWith!\n,,,,100C4C62
+pfnAlertMessage,4,Infinite child list for MoveWith!,,,,100C4CA7
+pfnAlertMessage,4,SetMoveWithAvelocity: no MoveWith entity!?\n,,,,100C4CC8
+pfnAlertMessage,4,SetMoveWithVelocity: Infinite sibling list for MoveWith!,,,,100C4D83
+pfnAlertMessage,4,Infinite child list for MoveWith!,,,,100C4DC7
+pfnAlertMessage,4,SetMoveWithVelocity: no MoveWith entity!?\n,,,,100C4DE8
+pfnAlertMessage,4,SetMoveWithVelocity: Infinite sibling list for MoveWith!,,,,100C4EA3
+pfnAlertMessage,4,SetVelocity: Infinite sibling list for MoveWith!\n,,,,100C4FA2
+pfnAlertMessage,1,Executing listen server config file\n,,,,100C526A
+pfnAlertMessage,1,Unable to load map cycle file %s\n,,,,100C7080
+pfnAlertMessage,1,CHANGE LEVEL: %s\n,,,,100C71C4
+pfnAlertMessage,1,PLAYER COUNT:  min %i max %i current %i\n,,,,100C71E5
+pfnAlertMessage,1,RULES:  %s\n,,,,100C7219
+pfnAlertMessage,1,"Skipping %s from mapcycle, not a valid map\n",,,,100C98AB
+pfnAlertMessage,2,**ERROR**\nCouldn't malloc %d nodes!\n,,,,100CA7A5
+pfnAlertMessage,2,Couldn't allocated Link Lookup Table.\n,,,,100CA7FE
+pfnAlertMessage,2,Couldn't create %s!\n,,,,100CA9D9
+pfnAlertMessage,2,**ConnectVisibleNodes FAILED!\n,,,,100CACC5
+pfnAlertMessage,2,OFFGROUND!\n,,,,100CAF46
+pfnAlertMessage,2,Couldn't malloc LinkPool!\n,,,,100CB40F
+pfnAlertMessage,2,**** j = %d ****\n,,,,100CB441
+pfnAlertMessage,2,"%d Nodes, %d Connections\n",,,,100CB661
+pfnAlertMessage,1,Done.\n,,,,100CB70B
+pfnAlertMessage,2,Couldn't allocated node ordering array.\n,,,,100CB777
+pfnAlertMessage,2,.NOD File will be updated\n\n,,,,100CBD12
+pfnAlertMessage,2,"Nodes need sorting (%d,%d)!\n",,,,100CC2F3
+pfnAlertMessage,2,"Nodes need sorting (%d,%d)!\n",,,,100CC3C2
+pfnAlertMessage,2,Size of Routes = %d\n,,,,100CC556
+pfnAlertMessage,1,Node Graph out of Date. Rebuilding...,,,,100CC7DA
+pfnAlertMessage,2,"**ERROR** Graph version is %d, expected %d\n",,,,100CC963
+pfnAlertMessage,2,**ERROR**\nCouldn't malloc %d nodes!\n,,,,100CC9D2
+pfnAlertMessage,2,***WARNING***:Node graph was longer than expected by %d bytes.!\n,,,,100CCB73
+pfnAlertMessage,2,Created: %s\n,,,,100CCCCE
+pfnAlertMessage,2,Couldn't Create: %s\n,,,,100CCCE9
+pfnAlertMessage,2,Graph not ready!\n,,,,100CCDBE
+pfnAlertMessage,2,**Could not find model %s\n,,,,100CCE39
+pfnAlertMessage,2,Graph not ready!\n,,,,100CD510
+pfnAlertMessage,2,"Can't build a path, iStart is %d!\n",,,,100CD93F
+pfnAlertMessage,2,Graph not ready!\n,,,,100CD963
+pfnAlertMessage,2,Unhandled Ent in Path %s\n,,,,100CDA1E
+pfnAlertMessage,2,dead path ent!\n,,,,100CDAC6
+pfnAlertMessage,2,Graph not ready!\n,,,,100CDAE0
+pfnAlertMessage,2,Unsupported PathEnt:\n'%s'\n,,,,100CE2C6
+pfnAlertMessage,2,No Nodes!\n,,,,100CE442
+pfnAlertMessage,2,**LinkVisibleNodes:\ncan't write to file.,,,,100CE463
+pfnAlertMessage,2,**LinkVisibleNodes:\nTotalLinks > MAX_NODE_INITIAL_LINKS * NUMNODES,,,,100CE7D7
+pfnAlertMessage,2,**LinkVisibleNodes:\nNode %d has NodeLinks > MAX_NODE_INITIAL_LINKS,,,,100CE7FE
+pfnAlertMessage,2,No Path!\n,,,,100CE974
+pfnAlertMessage,2,%d\n,,,,100CE996
+pfnAlertMessage,2,Graph not ready!\n,,,,100CEA76
+pfnAlertMessage,1,HashLinks is broken from %d to %d.\n,,,,100CEB41
+pfnAlertMessage,1,Route Failure\n,,,,100CEB5C
+pfnAlertMessage,2,Can't show connections for node %d\n,,,,100CF1BB
+pfnAlertMessage,2,**No Connections!\n,,,,100CF1F8
+pfnAlertMessage,2,Graph not ready!\n,,,,100CF2F3
+pfnAlertMessage,2,cNodes > MAX_NODES\n,,,,100CF5AC
+pfnAlertMessage,1,No nearby node\n,,,,100CF808
+pfnAlertMessage,2,basenode %d\n,,,,100CF829
+pfnAlertMessage,2,%d nodes\n,,,,100CF8F7
+pfnAlertMessage,1,Graph not ready!\n,,,,100CF92C
+pfnAlertMessage,2,No link.\n,,,,100CFB7D
+pfnAlertMessage,2,No link.\n,,,,100CFC07
+pfnAlertMessage,2,Routing is inconsistent!!!\n,,,,100CFCCD
+pfnAlertMessage,2,(%d to %d |%d/%d)1:,,,,100CFCE7
+pfnAlertMessage,2,%d ,,,,100CFD0D
+pfnAlertMessage,2,\n(%d to %d |%d/%d)2:,,,,100CFD2F
+pfnAlertMessage,2,%d ,,,,100CFD4F
+pfnAlertMessage,2,\n,,,,100CFD67
+pfnAlertMessage,1,|== Listing spread table ==\n,,,,100CFFF8
+pfnAlertMessage,1,| %d weapons total\n,,,,100D000B
+pfnAlertMessage,1,|\n,,,,100D0018
+pfnAlertMessage,1,| %s\n,,,,100D0040
+pfnAlertMessage,1,|    prim min cone: %f\n,,,,100D005C
+pfnAlertMessage,1,|    prim add cone: %f\n,,,,100D0079
+pfnAlertMessage,1,|    prim equalize: %d\n,,,,100D0089
+pfnAlertMessage,1,|    prim expand: %f\n,,,,100D00A6
+pfnAlertMessage,1,"|    prim punch (%f, %f) (%f, %f) (%f, %f)\n",,,,100D0108
+pfnAlertMessage,1,|    sec min cone: %f\n,,,,100D0125
+pfnAlertMessage,1,|    sec add cone: %f\n,,,,100D0142
+pfnAlertMessage,1,|    sec equalize: %d\n,,,,100D0152
+pfnAlertMessage,1,|    sec expand: %f\n,,,,100D016F
+pfnAlertMessage,1,"|    sec punch (%f, %f) (%f, %f) (%f, %f)\n",,,,100D01D1
+pfnAlertMessage,1,|    return time: %f\n,,,,100D01F1
+pfnAlertMessage,1,|\n,,,,100D01FE
+pfnAlertMessage,1,|== spread table end ==\n,,,,100D0222
+pfnAlertMessage,1, *\n,,,,100D05E6
+pfnAlertMessage,1, * GetConeVectorForAngle error: %d - unsupported angle value\n,,,,100D05F4
+pfnAlertMessage,1, *\n,,,,100D0601
+pfnAlertMessage,1, *\n,,,,100D0D29
+pfnAlertMessage,1, *\n,,,,100D0FF4
+pfnAlertMessage,1, * LoadSpreadTable parsing error: %s - unknown variable name\n,,,,100D1006
+pfnAlertMessage,1, *\n,,,,100D1013
+pfnAlertMessage,1, *\n,,,,100D12C9
+pfnAlertMessage,1, *\n,,,,100D1594
+pfnAlertMessage,1, * LoadSpreadTable parsing error: %s - unknown variable name\n,,,,100D15A6
+pfnAlertMessage,1, *\n,,,,100D15B3
+pfnAlertMessage,1, *\n,,,,100D1644
+pfnAlertMessage,1, * LoadSpreadTable parsing error: %s - unknown section name\n,,,,100D1656
+pfnAlertMessage,1, *\n,,,,100D1663
+pfnAlertMessage,1, *\n,,,,100D168D
+pfnAlertMessage,1, * LoadSpreadTable parsing error: expecting { after section name\n,,,,100D169A
+pfnAlertMessage,1, *\n,,,,100D16A7
+pfnAlertMessage,1, *\n,,,,100D16BC
+pfnAlertMessage,1, * LoadSpreadTable warning: max prispread lower than min in %\n,,,,100D16D9
+pfnAlertMessage,1, *\n,,,,100D16E6
+pfnAlertMessage,1, *\n,,,,100D16FB
+pfnAlertMessage,1, * LoadSpreadTable warning: max secspread lower than min in %\n,,,,100D1718
+pfnAlertMessage,1, *\n,,,,100D1725
+pfnAlertMessage,1, *\n,,,,100D180C
+pfnAlertMessage,1, * LoadSpreadTable parsing error: expecting { after weapon name\n,,,,100D1819
+pfnAlertMessage,1, *\n,,,,100D1826
+pfnAlertMessage,1,%d spread weapons info loaded from %s\n,,,,100D1841
+pfnAlertMessage,1, *\n,,,,100D18F9
+pfnAlertMessage,1, * LoadSpreadTable failed to load file %s\n,,,,100D1907
+pfnAlertMessage,1, *\n,,,,100D1914
+pfnAlertMessage,1, *\n,,,,100D1CA9
+pfnAlertMessage,1," * SetTablePointer error: cant find record for %s, using default\n",,,,100D1CB7
+pfnAlertMessage,1, *\n,,,,100D1CC4
+pfnAlertMessage,1,Dead end link %s\n,,,,100D21B8
+pfnAlertMessage,4,Bad sequence of path_tracks from %s,,,,100D27A2
+pfnAlertMessage,4,scripted_trainsequence: ArrivalNotify without a train!?\n,,,,100D3160
+pfnAlertMessage,2,%s Blocked by %s\n,,,,100D319C
+pfnAlertMessage,2,TRAIN(%s): Blocked by %s (dmg:%.2f)\n,,,,100D33E6
+pfnAlertMessage,2,TRAIN(%s): Dead end ,,,,100D3556
+pfnAlertMessage,2,at %s\n,,,,100D3640
+pfnAlertMessage,2,\n,,,,100D3682
+pfnAlertMessage,2,TRAIN(%s): Speed is 0\n,,,,100D370B
+pfnAlertMessage,2,TrackTrain %s speed to %4.2f (timed)\n,,,,100D3F5B
+pfnAlertMessage,4,Can't find train for track change! %s\n,,,,100D46C6
+pfnAlertMessage,4,Can't find bottom track for track change! %s\n,,,,100D46EF
+pfnAlertMessage,4,Can't find top track for track change! %s\n,,,,100D4713
+pfnAlertMessage,4,func_track_train must be on a path of path_track\n,,,,100D47B0
+pfnAlertMessage,1,TrackTrainControls: No train %s\n,,,,100D49A9
+pfnAlertMessage,1,NaN error during Fix!\n,,,,100D49EA
+pfnAlertMessage,2,"TRAIN: %s, Nearest track is %s\n",,,,100D5BCC
+pfnAlertMessage,1,Can't find a nearby track !!!\n,,,,100D5CFB
+pfnAlertMessage,2,Train %s speed set to %4.2f\n,,,,100D6107
+pfnAlertMessage,1,"Missing train target ""%s""\n",,,,100D6F03
+pfnAlertMessage,1,func_tracktrain with no target\n,,,,100D7E52
+pfnAlertMessage,1,func_tracktrain %s has no target\n,,,,100D7E72
+pfnAlertMessage,1,"func_train ""%s"" has no target\n",,,,100D7FBE
+pfnAlertMessage,4,scripted_trainsequence: StopSequence without a train!?\n,,,,100D849B
+pfnAlertMessage,2,"TRAIN(%s), speed to %.2f\n",,,,100D9183
+pfnAlertMessage,1,"trainsequence ""%s"" found train ""%s""",,,,100D9434
+pfnAlertMessage,1,found destination %s\n,,,,100D9463
+pfnAlertMessage,1,missing destination\n,,,,100D9475
+pfnAlertMessage,4,"Found no path to reach destination! (train has t %s, m %s; dest is %s)\n",,,,100D991D
+pfnAlertMessage,4,"scripted_trainsequence %s can't affect %s ""%s"": not a train!\n",,,,100D9A26
+pfnAlertMessage,4,"Missing train ""%s"" for scripted_trainsequence %s!\n",,,,100D9A5E
+pfnAlertMessage,1,ERROR: Missing name\n,,,,100DAD53
+pfnAlertMessage,1,You must now restart to use Grunt-o-matic.\n,,,,100DC204
+pfnAlertMessage,1,Player is audible\n,,,,100DC395
+pfnAlertMessage,1,Player is silent\n,,,,100DC3B6
+pfnAlertMessage,1,Classname: %s,,,,100DC3FF
+pfnAlertMessage,1, - Targetname: %s\n,,,,100DC42A
+pfnAlertMessage,1, - TargetName: No Targetname\n,,,,100DC43C
+pfnAlertMessage,1,Model: %s\n,,,,100DC461
+pfnAlertMessage,1,Globalname: %s\n,,,,100DC489
+pfnAlertMessage,1,State: %s\n,,,,100DC4A7
+pfnAlertMessage,1,Texture: %s\n,,,,100DC582
+pfnAlertMessage,1,%d\n,,,,100DC618
+pfnAlertMessage,1,"CheckingEndingOrUnlockables:: File failed, type was %i!\n",,,,100DD04D
+pfnAlertMessage,1,Trying to delete %s!\n,,,,100DDA91
+pfnAlertMessage,1,Note %i contains %s\n,,,,100DDD39
+pfnAlertMessage,1,DUAL WIELD ERROR: There's nothing in one or both slots: %i %i\n,,,,100DEE65
+pfnAlertMessage,4,PutClientInServer: no info_player_start on level,,,,100DF436
+pfnAlertMessage,1,GetClassnameFromSlot: %s\n,,,,100DFF10
+pfnAlertMessage,1, *\n,,,,100E010E
+pfnAlertMessage,1, * CheckItem parsing error: expecting { after key name\n,,,,100E011B
+pfnAlertMessage,1, *\n,,,,100E0128
+pfnAlertMessage,1,KEY ERROR: Couldn't parse token of key at %f %f %f!\n,,,,100E0174
+pfnAlertMessage,1, *\n,,,,100E019C
+pfnAlertMessage,1, * GetItemDescription failed to load file %s\n,,,,100E01AA
+pfnAlertMessage,1, *\n,,,,100E01B7
+pfnAlertMessage,1,GetItemFromSlot: %s\n,,,,100E0270
+pfnAlertMessage,1,GetModelFromSlot: %s\n,,,,100E02E0
+pfnAlertMessage,1,NULL Ent in GiveNamedItem!\n,,,,100E0A66
+pfnAlertMessage,1,NULL Ent in GiveNamedItem!\n,,,,100E0CC8
+pfnAlertMessage,1,NULL Ent in GiveNamedItem!\n,,,,100E0D98
+pfnAlertMessage,1,"GlobalCheckingEndingOrUnlockables:: File failed, type was %i!\n",,,,100E0DFD
+pfnAlertMessage,1,+++ Classname is %s\n,,,,100E2D02
+pfnAlertMessage,1,+++ Model is %s\n,,,,100E2D24
+pfnAlertMessage,1,+++ Has monster flag\n,,,,100E2D44
+pfnAlertMessage,1,COMBINE ERROR: No combine result\n,,,,100E3085
+pfnAlertMessage,1,COMBINE ERROR: There's nothing in one or both slots: %i %i\n,,,,100E3408
+pfnAlertMessage,4,Error: Can't find keypad entity!\n,,,,100E58B3
+pfnAlertMessage,1,**Graph Pointers Set!\n,,,,100F0551
+pfnAlertMessage,1,Slot %i contains model: %s\n,,,,100F0646
+pfnAlertMessage,1,Slot %i contains model: %s\n,,,,100F0676
+pfnAlertMessage,1,Slot %i contains: %s\n,,,,100F06C6
+pfnAlertMessage,1,Client Slot %i contains: %s\n,,,,100F06F9
+pfnAlertMessage,1,Slot %i contains: %s\n,,,,100F0726
+pfnAlertMessage,1,Client Slot %i contains: %s\n,,,,100F0759
+pfnAlertMessage,1,Slot %i contains model: %s\n,,,,100F07A6
+pfnAlertMessage,1,Slot %i contains model: %s\n,,,,100F07D6
+pfnAlertMessage,1,No Landmark:%s\n,,,,100F1520
+pfnAlertMessage,1,HEV couldn't find sentence %s\n,,,,100F3AB8
+pfnAlertMessage,1,Couldn't alloc player sound slot!\n,,,,100F4953
+pfnAlertMessage,1,Dead hevsuit with bad pose\n,,,,100F4B22
+pfnAlertMessage,,,,,,100F806D
+pfnAlertMessage,2,Rain fading finished at %i drips\n,,,,100F80DA
+pfnAlertMessage,2,Clearing rain data\n,,,,100F830F
+pfnAlertMessage,2,Player goal window cleared\n,,,,100F8367
+pfnAlertMessage,2,Player goal description set\n,,,,100F841F
+pfnAlertMessage,1,Client lost reserved sound!\n,,,,100F8710
+pfnAlertMessage,2,"script ""%s"" using monster ""%s""\n",,,,100FA929
+pfnAlertMessage,2,"script ""%s"" can't find monster ""%s""\n",,,,100FA960
+pfnAlertMessage,1,"Found %s, but can't play!\n",,,,100FAC23
+pfnAlertMessage,1,"ScriptedSentence: can't find ""player"" to play HEV sentence!?\n",,,,100FAF0C
+pfnAlertMessage,2,FixScriptMonsterSchedule - no case!\n,,,,100FAFE1
+pfnAlertMessage,2,"script ""%s"" using monster ""%s""\n",,,,100FB0CD
+pfnAlertMessage,2,"script ""%s"" can't find monster ""%s""\n",,,,100FB104
+pfnAlertMessage,1,"%s %s has a missing ""turn target"": %s\n",,,,100FB83D
+pfnAlertMessage,1,"%s %s has a missing ""move target"": %s\n",,,,100FB8B6
+pfnAlertMessage,2,Not Playing sentence %s\n,,,,100FBDF7
+pfnAlertMessage,2,Playing sentence %s (%.1f)\n,,,,100FBF02
+pfnAlertMessage,4,"%s: unknown scripted sequence ""%s""\n",,,,100FBF9C
+pfnAlertMessage,2,Unable to find %s in sentences.txt\n,,,,100FCA8C
+pfnAlertMessage,1,"WARNING: ambient_generic ""%s"" can't find ""%s"", its entity to play from.\n",,,,100FD732
+pfnAlertMessage,3,Sentence %s longer than %d letters\n,,,,100FE128
+pfnAlertMessage,4,Too many sentences in sentences.txt!\n,,,,100FE28F
+pfnAlertMessage,1,No such sentence group %s\n,,,,100FE48A
+pfnAlertMessage,4,"ambient_generic ""%s"" at (%f, %f, %f) has no sound file\n",,,,100FE93F
+pfnAlertMessage,4,"SPEAKER with no Level/Sentence! at: %f, %f, %f\n",,,,100FEA41
+pfnAlertMessage,1,Level Design Error!\nSPEAKER has bad sentence group name: %s\n,,,,100FEBBB
+pfnAlertMessage,1,Free Sound List is full!\n,,,,10100695
+pfnAlertMessage,1,Unknown Sound List Type!\n,,,,101006FA
+pfnAlertMessage,1,Could not AllocSound() for Client Reserve! (DLL)\n,,,,101007FB
+pfnAlertMessage,1,Could not AllocSound() for InsertSound() (DLL)\n,,,,10100845
+pfnAlertMessage,1,SoundPointerForIndex() - Index too large!\n,,,,1010092C
+pfnAlertMessage,1,SoundPointerForIndex() - Index < 0!\n,,,,10100944
+pfnAlertMessage,2,Soundlist: %d / %d  (%d)\n,,,,10100A36
+pfnAlertMessage,1,Unknown spectator impulse\n,,,,10100AF8
+pfnAlertMessage,1,Could not find a spawn spot.\n,,,,10100B51
+pfnAlertMessage,1,ERROR: SquadMakeEnemy() - pEnemy is NULL!\n,,,,101013AA
+pfnAlertMessage,2,Squad of %d %s formed\n,,,,10101971
+pfnAlertMessage,4,"Missing ')' in target value ""%s""",,,,101020A7
+pfnAlertMessage,2,Use_kill on %s\n,,,,1010216C
+pfnAlertMessage,2,SUB_Remove called on entity with health > 0\n,,,,1010290C
+pfnAlertMessage,2,KillTarget: %s\n,,,,10102A0C
+pfnAlertMessage,1,UpdateOnRemove has no AssistList!\n,,,,10102C66
+pfnAlertMessage,4,info_movewith can't find itself\n,,,,10102E54
+pfnAlertMessage,1,Missing movewith entity %s\n,,,,10102EB9
+pfnAlertMessage,1,SUBTITLE CHANGE: Could not change number!\n,,,,101030CC
+pfnAlertMessage,2,"I'm not following you, you evil person!\n",,,,1010496D
+pfnAlertMessage,1,DEBUG: env_customize %s does nothing; can't apply to a corpse.\n,,,,10108F52
+pfnAlertMessage,1,"DEBUG: env_customize ""%s"" affects %s ""%s"": [",,,,10108F97
+pfnAlertMessage,1, model=%s,,,,1010902F
+pfnAlertMessage,1, framerate=%f,,,,101090DE
+pfnAlertMessage,1, body = %d,,,,10109117
+pfnAlertMessage,1, skin=0,,,,10109164
+pfnAlertMessage,1, skin=1,,,,1010918F
+pfnAlertMessage,1, skin=-1,,,,101091BC
+pfnAlertMessage,1, skin=%d,,,,101091E9
+pfnAlertMessage,1, bloodcolor=%d,,,,101092D6
+pfnAlertMessage,1, voicePitch=unchanged,,,,1010933C
+pfnAlertMessage,1, voicePitch(talk)=%d,,,,1010936C
+pfnAlertMessage,1, class=%d,,,,1010939E
+pfnAlertMessage,1, playerreact=%d,,,,101093F7
+pfnAlertMessage,1, ]\n,,,,101094FB
+pfnAlertMessage,1,"DEBUG: Creating MotionThread for %s ""%s""\n",,,,1010954A
+pfnAlertMessage,4,trigger_hevcharge: invalid player in Announce!\n,,,,101099E9
+pfnAlertMessage,2,"Player isn't in the transition volume %s, aborting\n",,,,10109DCD
+pfnAlertMessage,1,CHANGE LEVEL: %s %s\n,,,,10109F00
+pfnAlertMessage,4,Too many entities across a transition!,,,,1010A0F5
+pfnAlertMessage,1,There are more to go...,,,,1010A56E
+pfnAlertMessage,1,Only 3 more to go...,,,,1010A584
+pfnAlertMessage,1,Only 2 more to go...,,,,1010A59A
+pfnAlertMessage,1,Only 1 more to go...,,,,1010A5B0
+pfnAlertMessage,1,Sequence completed!,,,,1010A5CA
+pfnAlertMessage,4,"trigger_auto: ""From Player"" is ticked, but no player found!\n",,,,1010A824
+pfnAlertMessage,4,Can't find landmark %s\n,,,,1010AE17
+pfnAlertMessage,<ebx>, %s=YES,,,,1010B504
+pfnAlertMessage,1, %s=NO,,,,1010B523
+pfnAlertMessage,1,scripted_startrush cant find entity %s\n,,,,1010B588
+pfnAlertMessage,4,Map name '%s' too long (32 chars)\n,,,,1010BDEC
+pfnAlertMessage,4,Landmark name '%s' too long (32 chars)\n,,,,1010BE97
+pfnAlertMessage,1,"WARNING - %s: Too many targets for %s ""%s"" (limit is %d)\n",,,,1010CB22
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": restarting loop.\n",,,,1010DB24
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": last burst.\n",,,,1010DB7F
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": killed.\n",,,,1010DBC2
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": firing ""%s"" (random choice).\n",,,,1010DC6B
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": firing ""%s"" (weighted random choice).\n",,,,1010DD33
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": firing ""%s"" (%f%% chance).\n",,,,1010DDEB
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": firing ""%s"" (simultaneous).\n",,,,1010DE8C
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": restarting loop.\n",,,,1010DFDB
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": last burst.\n",,,,1010E066
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": killed.\n",,,,1010E0B6
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": firing ""%s"".\n",,,,1010E137
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Loop halted on request.\n",,,,1010E1E1
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": loop halted.\n",,,,1010E232
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": loop halted (removing).\n",,,,1010E28A
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Loop already active.\n",,,,1010E2BA
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Loop already inactive.\n",,,,1010E2EE
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Can't trigger, locked by master ""%s"".\n",,,,1010E348
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Creating clone.\n",,,,1010E39E
+pfnAlertMessage,1,"DEBUG: multi_manager ""%s"": Begin in %f seconds.\n",,,,1010E523
+pfnAlertMessage,1,TriggerCDAudio - Track %d out of range\n,,,,1010EB43
+pfnAlertMessage,1,End time was %s\n,,,,1010EC34
+pfnAlertMessage,4,Sick Simon Spawn: no info_simon_spawnpoint on level,,,,1010ECDE
+pfnAlertMessage,1, bone%d=0,,,,101102E3
+pfnAlertMessage,1, bone%d=%f,,,,10110323
+pfnAlertMessage,1,a trigger_changelevel doesn't have a map,,,,10110613
+pfnAlertMessage,1,trigger_changelevel to %s doesn't have a landmark,,,,10110658
+pfnAlertMessage,1,"WARNING: multi_manager ""%s"" has too many targets (limit is %d, it has %d)\n",,,,101109D5
+pfnAlertMessage,1,"motion_thread affects %s ""%s"":\n",,,,10111CAD
+pfnAlertMessage,1,DEBUG: Set origin from %f %f %f ,,,,10111D41
+pfnAlertMessage,1,to %f %f %f\n,,,,10111DEA
+pfnAlertMessage,1,DEBUG: Offset origin from %f %f %f ,,,,10111E6D
+pfnAlertMessage,1,DEBUG: Set velocity from %f %f %f ,,,,10111F71
+pfnAlertMessage,1,DEBUG: Accelerate from %f %f %f ,,,,1011201C
+pfnAlertMessage,1,DEBUG: Set velocity (path) from %f %f %f ,,,,1011212D
+pfnAlertMessage,1,to %f %f %f\n,,,,10112211
+pfnAlertMessage,1,DEBUG: Set angles from %f %f %f ,,,,101122EC
+pfnAlertMessage,1,"Zero velocity, don't change angles\n",,,,1011231D
+pfnAlertMessage,1,DEBUG: Offset angles from %f %f %f ,,,,101123DF
+pfnAlertMessage,1,DEBUG: Rotate angles from %f %f %f ,,,,101124DD
+pfnAlertMessage,1,to %f %f %f\n,,,,101125CA
+pfnAlertMessage,1,DEBUG: Set avelocity from %f %f %f ,,,,10112655
+pfnAlertMessage,1,motion_thread expires\n,,,,101126F7
+pfnAlertMessage,1,"DEBUG: env_customize ""%s"" was fired without a locus!\n",,,,10113771
+pfnAlertMessage,1,"DEBUG: env_customize ""%s"" does nothing; can't find any entity with name or class ""%s"".\n",,,,10113862
+pfnAlertMessage,1,"DEBUG: env_customize ""%s"" removes itself.\n",,,,10113897
+pfnAlertMessage,4,"motion_manager ""%s"" can't find entity ""%s"" to affect\n",,,,10113982
+pfnAlertMessage,1,scripted_startrush cant find monster %s\n,,,,10113ABA
+pfnAlertMessage,1,%s is not a monster!\n,,,,10113AEF
+pfnAlertMessage,4,"trigger_changetarget ""%s"" requires a locus!\n",,,,10114725
+pfnAlertMessage,1,"DEBUG: trigger_motion affects %s ""%s"":\n",,,,10114A96
+pfnAlertMessage,1,DEBUG: Set origin from %f %f %f ,,,,10114B07
+pfnAlertMessage,1,DEBUG: Set origin from %f %f %f ,,,,10114BA8
+pfnAlertMessage,1,to %f %f %f\n,,,,10114C2A
+pfnAlertMessage,1,DEBUG: Rotate angles from %f %f %f ,,,,10114CCC
+pfnAlertMessage,1,DEBUG: Rotate angles from %f %f %f ,,,,10114D86
+pfnAlertMessage,1,DEBUG: Set angles from %f %f %f ,,,,10114E47
+pfnAlertMessage,1,to %f %f %f\n,,,,10114EB6
+pfnAlertMessage,1,DEBUG: Set velocity from %f %f %f ,,,,10114F25
+pfnAlertMessage,1,DEBUG: Set velocity from %f %f %f ,,,,10114FAC
+pfnAlertMessage,1,DEBUG: Rotate velocity from %f %f %f ,,,,101150EC
+pfnAlertMessage,1,DEBUG: Rotate velocity from %f %f %f ,,,,101151FD
+pfnAlertMessage,1,to %f %f %f\n,,,,101152D9
+pfnAlertMessage,1,DEBUG: Set avelocity from %f %f %f ,,,,1011535B
+pfnAlertMessage,1,DEBUG: Set avelocity from %f %f %f ,,,,101153FD
+pfnAlertMessage,1,to %f %f %f\n,,,,1011545D
+pfnAlertMessage,1,"DEBUG: trigger_relay ""%s"" locked by master %s - fired alternate target %s\n",,,,1011571F
+pfnAlertMessage,1,"DEBUG: trigger_relay ""%s"" wasn't activated: locked by master %s\n",,,,10115767
+pfnAlertMessage,1,"DEBUG: trigger_relay ""%s"" was sent %s",,,,101157A9
+pfnAlertMessage,1," from ""%s""",,,,101157DC
+pfnAlertMessage,1, (no locus),,,,101157EE
+pfnAlertMessage,1,.\n,,,,10115820
+pfnAlertMessage,1,: will send %s(same) in %f seconds.\n,,,,1011589C
+pfnAlertMessage,1,: sending %s(same) now.\n,,,,101158BD
+pfnAlertMessage,1,: will send ratio %f in %f seconds.\n,,,,10115918
+pfnAlertMessage,1,: sending ratio %f now.\n,,,,10115937
+pfnAlertMessage,1,: will send %s in %f seconds.\n,,,,1011597B
+pfnAlertMessage,1,: sending %s now.\n,,,,10115994
+pfnAlertMessage,1,"trigger_relay ""%s"" removes itself.\n",,,,101159CD
+pfnAlertMessage,4,trigger_onsight can't find player!?\n,,,,10115C1C
+pfnAlertMessage,4,Save/Restore overflow!,,,,10116161
+pfnAlertMessage,4,CSave :: BufferHeader() size parameter exceeds 'short'!,,,,101161F4
+pfnAlertMessage,4,Restore overflow!,,,,1011625F
+pfnAlertMessage,4,Bad field in entity!!\n,,,,10116659
+pfnAlertMessage,1,Warning: modelname not specified\n,,,,101169D0
+pfnAlertMessage,1,## Restore: invalid entitynum %d\n,,,,10116E79
+pfnAlertMessage,4,Bad field type\n,,,,10116F93
+pfnAlertMessage,4,CSaveRestoreBuffer :: TokenHash() is COMPLETELY FULL!,,,,101172AF
+pfnAlertMessage,1,AddToAliasList has no AliasList!\n,,,,101172F3
+pfnAlertMessage,1,FlushAliases has no AliasList!\n,,,,10118711
+pfnAlertMessage,1,"Master ""%s"" not found!\n",,,,101190D0
+pfnAlertMessage,4,"Missing ')' in master ""%s""\n",,,,1011910B
+pfnAlertMessage,5,%s,,,,10119232
+pfnAlertMessage,1,NULL Ent in UTIL_PrecacheOther\n,,,,101197F8
+pfnAlertMessage,4,Can't save more than %d entities in an array!!!\n,,,,1011AF21
+pfnAlertMessage,4,Bad field type\n,,,,1011B05E
+pfnAlertMessage,4,"Member ""%s"" of ""%s"" contains an invalid function pointer %p!",,,,1011B17D
+pfnAlertMessage,1,Setting custom v model: %s\n,,,,1011C31C
+pfnAlertMessage,1,out of named ammo slots\n,,,,1011D2B5
+pfnAlertMessage,1,WeaponBox too full! only %d ammotypes allowed\n,,,,1011DFBF
+pfnAlertMessage,1,MaxAmmoCarry() doesn't recognize '%s'!\n,,,,1011E2FA
+pfnAlertMessage,1,NULL String in PackAmmo!\n,,,,1011E345
+pfnAlertMessage,1,primary:  %f\n,,,,1011E53D
+pfnAlertMessage,1,idle   :  %f\n,,,,1011E55D
+pfnAlertMessage,1,m_finre:  %i\n,,,,1011E570
+pfnAlertMessage,1,m_iclip:  %i\n,,,,1011E583
+pfnAlertMessage,1,Respawn failed to create %s!\n,,,,1011E70B
+pfnAlertMessage,1,NULL Ent in UTIL_PrecacheOtherWeapon\n,,,,1011FC5C
+pfnAlertMessage,1,-- Globals --\n,,,,1012062A
+pfnAlertMessage,1,%s: %s (%s)\n,,,,10120656
+pfnAlertMessage,1,Can't find decal %s\n,,,,101208B6
+pfnAlertMessage,1,**COULD NOT CREATE SOUNDENT**\n,,,,1012117B
+pfnAlertMessage,1,*Error opening .NOD file\n,,,,101213A7
+pfnAlertMessage,1,\n*Graph Loaded!\n,,,,101213C3
+pfnAlertMessage,2,Chapter title: %s\n,,,,1012141E
+pfnAlertMessage,1, *\n,,,,10121BAD
+pfnAlertMessage,1, * GetTokenFromItem parsing error: %s - unknown section name\n,,,,10121BBF
+pfnAlertMessage,1, *\n,,,,10121BCC
+pfnAlertMessage,1, *\n,,,,10121CF2
+pfnAlertMessage,1, * GetTokenFromItem parsing error: expecting { after precache\n,,,,10121CFF
+pfnAlertMessage,1, *\n,,,,10121D0C
+pfnAlertMessage,1, *\n,,,,10121D21
+pfnAlertMessage,1, * GetTokenFromItem parsing error: %s - unknown token!\n,,,,10121D33
+pfnAlertMessage,1, * Probably should be precache\n,,,,10121D40
+pfnAlertMessage,1, *\n,,,,10121D4D
+pfnCreateNamedEntity,<ecx>,,,,,10017963
+pfnCreateNamedEntity,<ecx>,,,,,10017A03
+pfnCreateNamedEntity,<dword ptr [esi + 0x368]>,,,,,100BBB3A
+pfnCreateNamedEntity,<ecx>,,,,,100E09CB
+pfnCreateNamedEntity,<ecx>,,,,,100E0BEF
+pfnCreateNamedEntity,<edx>,,,,,100E0CF6
+pfnCreateNamedEntity,<ecx>,,,,,101197A3
+pfnCreateNamedEntity,<ecx>,,,,,1011FB76
+pfnCreateNamedEntity,<edi>,,,,,101207F4
+pfnCreateNamedEntity,<edi>,,,,,10120816
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10011230
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1001129D
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10011395
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1001143D
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1001164F
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100116FC
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10011769
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10011860
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100118FC
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10014D7F
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10015049
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1001532E
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10015469
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10017FD7
+pfnSetModel,<dword ptr [ecx + 0x20c]>,<eax>,,,,1001FF30
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/v_actions.mdl,,,,10020126
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,100202B5
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,10020DDC
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/null.mdl,,,,10020E96
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/axe/w_axe.mdl,,,,100217DF
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10021A17
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/boat.mdl,,,,100231CC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/booklaser/w_booklaser.mdl,,,,1002455F
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/booksimon.mdl,,,,10024E49
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/blandat/bowling_ball.mdl,,,,10025346
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/branch/w_branch.mdl,,,,10025DCF
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,100269F5
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/camera/w_camera.mdl,,,,1002781F
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/chainsawguy.mdl,,,,100280F9
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10028BF1
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10028F1C
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/slower2.mdl,,,,1002B129
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/null.mdl,,,,1002C066
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/developer_commentary.mdl,,,,1002C886
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/doctor_boss.mdl,,,,1002E97D
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/doctor_boss.mdl,,,,1002EAA7
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1002EE57
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,1002F0EC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,10035D8B
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/faceless.mdl,,,,10039B49
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/twisterv.mdl,,,,1003A819
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/famas/w_famas.mdl,,,,1003C4A5
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/faster.mdl,,,,1003D309
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/flare/w_flare.mdl,,,,1003EE6F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/flashlight/w_flashlight.mdl,,,,1003FF55
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/flashlight/flashlight_battery.mdl,,,,10040026
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/flier_spit.spr,,,,10041DE6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/flygare.mdl,,,,10041EEF
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10042C01
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/g43/w_g43.mdl,,,,10044F85
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_g43.mdl,,,,10045076
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/glock/w_glock.mdl,,,,100477C5
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/clip.mdl,,,,100478C6
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10048C44
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/coop/door_coop.mdl,,,,1004BA77
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1004BB31
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/player.mdl,,,,1004BC86
+pfnSetModel,<dword ptr [ecx + 0x20c]>,<eax>,,,,1004E248
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1004F441
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ecx>,,,,1004FD79
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/lantern/w_lantern.mdl,,,,10050995
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/m16/w_m16.mdl,,,,10052825
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_m16.mdl,,,,10052926
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/mobile/w_mobile.mdl,,,,10053C11
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/baby.mdl,,,,100545E9
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/children.mdl,,,,10054F89
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/crazywoman.mdl,,,,10056459
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/slower.mdl,,,,10057429
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/krypande.mdl,,,,10057F99
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/sewmo.mdl,,,,10059179
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/slower3.mdl,,,,10059CB9
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_mp5.mdl,,,,1005BE06
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/mp5/w_mp5.mdl,,,,1005BE65
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/camera_player.mdl,,,,1005C92C
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/tape_recorder.mdl,,,,1005C9EA
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/nightstick/w_nightstick.mdl,,,,1005D37F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/p345/w_p345.mdl,,,,1005F555
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/p345_clip.mdl,,,,1005F646
+pfnSetModel,<dword ptr [ecx + 0x20c]>,<eax>,,,,1006130B
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/puzzle_bar.mdl,,,,10062C0C
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/puzzle_bar.mdl,,,,10062CFC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/puzzle_bar.mdl,,,,10062DEC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/puzzle_bar.mdl,,,,10062EDC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/puzzle_bar.mdl,,,,10062FCC
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10063441
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,10063967
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/revolver/w_revolver.mdl,,,,100657E5
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_revolver.mdl,,,,100658F6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/rifle/w_rifle.mdl,,,,10067E95
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_rifle.mdl,,,,10067F86
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/null.mdl,,,,10068C8A
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,100697F1
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/carcassboss.mdl,,,,1006982C
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/hookedhead.mdl,,,,10069A17
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/runningcrazy.mdl,,,,1006A909
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/sawcrazy.mdl,,,,1006B289
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/sawrunner.mdl,,,,1006BD59
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/sewer_boss.mdl,,,,1006C839
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/shotgun/w_shotgun.mdl,,,,1006E76F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_shotshells.mdl,,,,1006E846
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/booksimon.mdl,,,,10070698
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/sledgehammer/w_sledgehammer.mdl,,,,100717FF
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/slower.mdl,,,,100721A9
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/tenslower2.mdl,,,,10072F59
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/spitter.mdl,,,,10073B09
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/utomhusd/eagle.mdl,,,,1007554C
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/utomhusd/horse.mdl,,,,1007567C
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/utomhusd/lion.mdl,,,,100757AC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/utomhusd/owl.mdl,,,,100758DC
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10075D41
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/stranger.mdl,,,,100763E9
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/cutscene/strangle_simon.mdl,,,,10076E43
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10077A5E
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/suicider.mdl,,,,10078B99
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/switchblade/w_switchblade.mdl,,,,1007A3AF
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/syringe/w_syringe.mdl,,,,1007B64F
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/taller.mdl,,,,1007C279
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/tape_recorder.mdl,,,,1007C866
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,1007D2FC
+pfnSetModel,<dword ptr [ecx + 0x20c]>,<eax>,,,,1007DD5F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/ammo_tmp.mdl,,,,1007FBF6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/tmp/w_tmp.mdl,,,,1007FC55
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/blandat/zombie.mdl,,,,10080A19
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/blandat/zombie2.mdl,,,,10081589
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/blandat/zombie3.mdl,,,,100820E9
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/blandat/zombie4.mdl,,,,10082C49
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/items/generic_note.mdl,,,,10083546
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/vp70/w_vp70.mdl,,,,100852E5
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/ammo/vp70_clip.mdl,,,,100853D6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/watro.mdl,,,,10085B1F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/player_sick.mdl,,,,10086CAC
+pfnSetModel,<dword ptr [eax + 0x20c]>,<dword ptr [ebp + 8]>,,,,1008ACF8
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1008EDF3
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1008EEB3
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1008F1E6
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ecx>,,,,10093BB4
+pfnSetModel,<dword ptr [eax + 0x20c]>,<eax>,,,,10094553
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/items/w_pills.mdl,,,,1009C626
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,1009C714
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/props/utomhusd/barrel_new.mdl,,,,1009C826
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/blandat/dead_cat.mdl,,,,1009CBF6
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/costumes/hoodie.mdl,,,,1009CF70
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/cafe_monitor.mdl,,,,1009D7FA
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/tall.mdl,,,,1009DFEF
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/blandat/drips.mdl,,,,1009E296
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,1009E3ED
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,1009E45C
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,1009E66A
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,1009E8EA
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1009EB6C
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,1009EC54
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/can.mdl,,,,1009ECB6
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,1009F02B
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1009F167
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/buske.mdl,,,,100A06CE
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/buske2.mdl,,,,100A06E7
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/buske3.mdl,,,,100A0700
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/granmodel.mdl,,,,100A0719
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/granmodel2.mdl,,,,100A0732
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/trainjourney/tall.mdl,,,,100A074B
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/death_scene.mdl,,,,100A445E
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ecx>,,,,100A4880
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ecx>,,,,100A4A61
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/grenade.mdl,,,,100AAE7B
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100ADA37
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100ADB10
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100B0A74
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100B0C2E
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/grenade.mdl,,,,100B1CCE
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_grenade.mdl,,,,100B1F05
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/grenade.mdl,,,,100B2136
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100B2EB1
+pfnSetModel,<dword ptr [eax + 0x20c]>,<dword ptr [ebp + 8]>,,,,100B37CD
+pfnSetModel,<dword ptr [eax + 0x20c]>,<esi>,,,,100B3DC8
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100B440D
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100B44F8
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100B45FC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/inomhusd/dave_benson_phillips.mdl,,,,100B59A6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/weapons/glock/glock_taclight.mdl,,,,100B59E6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_antidote.mdl,,,,100B5B46
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/w_armour.mdl,,,,100B5B90
+pfnSetModel,<dword ptr [ecx + 0x20c]>,models/w_battery.mdl,,,,100B5BE0
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_longjump.mdl,,,,100B5C16
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_security.mdl,,,,100B5C46
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_suit.mdl,,,,100B5C76
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/items/w_nightvision.mdl,,,,100B5CA6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/items/phone_battery.mdl,,,,100B5CE6
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/items/padlock.mdl,,,,100B6476
+pfnSetModel,<dword ptr [eax + 0x20c]>,sprites/null.spr,,,,100B78B6
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100BAF5F
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/props/blandat/headcrab.mdl,,,,100C33CF
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100C3DAC
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/player.mdl,,,,100CF957
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100D7933
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100D7EB9
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100D803F
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100D80D9
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100D8165
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/player.mdl,,,,100F4808
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/player.mdl,,,,100F4AAB
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,100FBC88
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,100FEAD9
+pfnSetModel,<dword ptr [ecx + 0x20c]>,<eax>,,,,10108FF1
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1010BAFE
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,1011073C
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10110784
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,1011083D
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10110904
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10110944
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,10110CBA
+pfnSetModel,<dword ptr [edx + 0x20c]>,<ecx>,,,,1011108A
+pfnSetModel,<dword ptr [esi + 0x20c]>,<edx>,,,,10111219
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ecx>,,,,101144DC
+pfnSetModel,<dword ptr [eax + 0x20c]>,<ebx>,,,,1011C53C
+pfnSetModel,<dword ptr [eax + 0x20c]>,models/w_weaponbox.mdl,,,,1011F8EF
+pfnEmitSound,<edi>,<dword ptr [ebp + 0xc]>,<eax>,<dword ptr [ebp + 0x1c]>,<dword ptr [ebp + 0x20]>,100FCA79
+pfnEmitSound,<edi>,<dword ptr [ebp + 0xc]>,<esi>,<dword ptr [ebp + 0x1c]>,<dword ptr [ebp + 0x20]>,100FCAD3
+pfnCvar_DirectSet,data:10214714,<eax>,,,,10107605
+pfnCvar_DirectSet,data:10214728,<eax>,,,,1010763B

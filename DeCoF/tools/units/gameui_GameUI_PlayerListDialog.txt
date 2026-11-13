@@ -1,0 +1,16 @@
+??0CPlayerListDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CPlayerListDialog@@UAE@XZ
+?Activate@CPlayerListDialog@@UAEXXZ
+?RefreshPlayerProperties@CPlayerListDialog@@AAEXXZ
+?OnCommand@CPlayerListDialog@@EAEXPBD@Z
+?ToggleMuteStateOfSelectedUser@CPlayerListDialog@@AAEXXZ
+?OnItemSelected@CPlayerListDialog@@EAEXXZ
+??_GCPlayerListDialog@@UAEPAXI@Z
+??0CPlayerListDialog_RegisterMap@CPlayerListDialog@@QAE@XZ
+?ChainToMap@CPlayerListDialog@@SAXXZ
+?GetMessageMap@CPlayerListDialog@@UAEPAUPanelMessageMap@vgui2@@XZ
+?GetPanelClassName@CPlayerListDialog@@SAPBDXZ
+?GetPanelBaseClassName@CPlayerListDialog@@SAPBDXZ
+??0PanelMessageFunc_OnItemSelected@CPlayerListDialog@@QAE@XZ
+?InitVar@PanelMessageFunc_OnItemSelected@CPlayerListDialog@@SAXXZ
+?AddToMap@CPlayerListDialog@@SAXPBDP8Panel@vgui2@@AEXXZHH0H0@Z

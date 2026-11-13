@@ -1,0 +1,8 @@
+?Init@CHudSayText@@UAEHXZ
+?InitHUDData@CHudSayText@@UAEXXZ
+?MsgFunc_SayText@CHudSayText@@QAEHPBDHPAX@Z
+?SayTextPrint@CHudSayText@@QAEXPBDHH@Z
+?ScrollTextUp@@YAHXZ
+?VidInit@CHudSayText@@UAEHXZ
+?Draw@CHudSayText@@UAEHM@Z
+?EnsureTextFitsInOneLineAndWrapIfHaveTo@CHudSayText@@QAEXH@Z

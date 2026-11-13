@@ -1,0 +1,7 @@
+??$GetClassPtr@VCCoFCoopAllPlayersButton@@@@YAPAVCCoFCoopAllPlayersButton@@PAV0@@Z
+?ObjectCaps@CCoFCoopAllPlayersButton@@UAEHXZ
+?Restore@CCoFCoopAllPlayersButton@@UAEHAAVCRestore@@@Z
+?Save@CCoFCoopAllPlayersButton@@UAEHAAVCSave@@@Z
+?Spawn@CCoFCoopAllPlayersButton@@UAEXXZ
+?Use@CCoFCoopAllPlayersButton@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_func_coopallplayersbutton

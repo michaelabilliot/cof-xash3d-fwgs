@@ -1,0 +1,16 @@
+?__CreateEngineSurfaceIEngineSurface_interface@@YAPAVIBaseInterface@@XZ
+_$E6
+_$E3
+_$E5
+_$E4
+_$E9
+_$E8
+?freeEngineSurface@EngineSurface@@SAXXZ
+??1EngineSurface@@UAE@XZ
+?drawSetColor@EngineSurface@@UAEXHHHH@Z
+?drawSetTextColor@EngineSurface@@UAEXHHHH@Z
+?drawSetTextPos@EngineSurface@@UAEXHH@Z
+?drawGetTextPos@EngineSurface@@UAEXAAH0@Z
+?createNewTextureID@EngineSurface@@UAEHXZ
+??_GEngineSurface@@UAEPAXI@Z
+??1IEngineSurface@@UAE@XZ

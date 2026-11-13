@@ -1,0 +1,9 @@
+??0CGameOver@@QAE@XZ
+??1CGameOver@@QAE@XZ
+?ActionSignal@CGameOver@@QAEXH@Z
+?Initialize@CGameOver@@QAEXXZ
+?MsgCustomDoc_guess@@YAHPBDHPAX@Z
+?VGUI_CustomDocInit_guess@@YAXXZ
+?actionPerformed@CGameOverHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?setVisible@CGameOver@@UAEX_N@Z
+?solve@CGameOver@@MAEXXZ

@@ -1,0 +1,14 @@
+_DInput_Init_guess
+_DInput_ReadSystemParms_guess
+_DInput_AcquireMouse_guess
+_DInput_ReleaseMouse_guess
+_DInput_AcquireKeyboard_guess
+_DInput_AccelerateMouse_guess
+_DInput_ReadMouse_guess
+_GetMousePos_guess
+_SetMousePos_guess
+_DInput_ReadKeyboard_guess
+_DInput_KeyEvent_guess
+_DInput_Shutdown_guess
+_IN_UpdateMouse_guess
+_SetMouseEnable

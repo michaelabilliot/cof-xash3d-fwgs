@@ -1,0 +1,11 @@
+??0CCircularBuffer@@QAE@H@Z
+?AssertValid@CCircularBuffer@@IAEXXZ
+?SetSize@CCircularBuffer@@QAEXH@Z
+?Flush@CCircularBuffer@@QAEXXZ
+?GetWriteAvailable@CCircularBuffer@@QAEHXZ
+?GetSize@CCircularBuffer@@QAEHXZ
+?GetReadAvailable@CCircularBuffer@@QAEHXZ
+?Peek@CCircularBuffer@@QAEHPADH@Z
+?Advance@CCircularBuffer@@QAEHH@Z
+?Read@CCircularBuffer@@QAEHPAXH@Z
+?Write@CCircularBuffer@@QAEHPAXH@Z

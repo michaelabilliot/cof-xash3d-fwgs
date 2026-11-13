@@ -1,0 +1,8 @@
+??0CAnimalStatue@@QAE@XZ
+??1CAnimalStatue@@QAE@XZ
+?Initialize@CAnimalStatue@@QAEXXZ
+?KeyInput@CAnimalStatue@@QAEHHHPBD@Z
+?MsgStatue_guess@@YAHPBDHPAX@Z
+?StatueInit_guess@@YAXXZ
+?actionPerformed@CAnimalStatueHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?ActionSignal@CAnimalStatue@@QAEXH@Z

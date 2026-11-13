@@ -1,0 +1,6 @@
+?KeyValue@CSubtitle@@UAEXPAUKeyValueData_s@@@Z
+?Restore@CSubtitle@@UAEHAAVCRestore@@@Z
+?Save@CSubtitle@@UAEHAAVCSave@@@Z
+?Spawn@CSubtitle@@UAEXXZ
+?Use@CSubtitle@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_subtitle_main

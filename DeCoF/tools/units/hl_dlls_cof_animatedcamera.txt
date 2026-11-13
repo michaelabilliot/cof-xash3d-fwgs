@@ -1,0 +1,16 @@
+??$GetClassPtr@VCAnimatedCamera@@@@YAPAVCAnimatedCamera@@PAV0@@Z
+??$GetClassPtr@VCAnimatedCameraModel@@@@YAPAVCAnimatedCameraModel@@PAV0@@Z
+?CameraUse@CAnimatedCamera@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?Classify@CAnimatedCamera@@UAEHXZ
+?Classify@CAnimatedCameraModel@@UAEHXZ
+?KeyValue@CAnimatedCameraModel@@UAEXPAUKeyValueData_s@@@Z
+?ModelCameraUse@CAnimatedCameraModel@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?Precache@CAnimatedCamera@@UAEXXZ
+?Precache@CAnimatedCameraModel@@UAEXXZ
+?Restore@CAnimatedCameraModel@@UAEHAAVCRestore@@@Z
+?Save@CAnimatedCameraModel@@UAEHAAVCSave@@@Z
+?Spawn@CAnimatedCamera@@UAEXXZ
+?Spawn@CAnimatedCameraModel@@UAEXXZ
+?StartNextAnimation@CAnimatedCameraModel@@QAEXXZ
+_camera
+_camera_model

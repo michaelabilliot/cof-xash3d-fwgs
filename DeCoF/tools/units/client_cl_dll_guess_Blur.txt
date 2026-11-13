@@ -1,0 +1,8 @@
+??0CBlurTexture_guess@@QAE@XZ
+?AnimateNextFrame_guess@CBlur_guess@@QAE_NH@Z
+?BindTexture_guess@CBlurTexture_guess@@QAEXHH@Z
+?DrawBlended_guess@CBlurTexture_guess@@QAEXHH@Z
+?DrawBlur_guess@CBlur_guess@@QAEXXZ
+?DrawQuad_guess@CBlurTexture_guess@@QAEXHHH@Z
+?Init_guess@CBlurTexture_guess@@QAEXHH@Z
+?Initialize_guess@CBlur_guess@@QAEXXZ

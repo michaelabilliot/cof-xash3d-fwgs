@@ -1,0 +1,13 @@
+?GetBaseDirectory@@YAPBDXZ
+_$E5
+_$E2
+_$E4
+_$E3
+?GetFileSystemFactory@@YAPAXXZ
+?CheckLiblistForFallbackDir@@YAXPBD_N01@Z
+_FileSystem_SetGameDirectory
+_FileSystem_AddFallbackGameDir
+_FileSystem_Init
+?FileSystem_LoadDLL@@YA_NP6APAVIBaseInterface@@PBDPAH@Z@Z
+_FileSystem_Shutdown
+?FileSystem_UnloadDLL@@YAXXZ

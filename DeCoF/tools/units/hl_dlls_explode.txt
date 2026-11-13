@@ -1,0 +1,15 @@
+??$GetClassPtr@VCEnvExplosion@@@@YAPAVCEnvExplosion@@PAV0@@Z
+??$GetClassPtr@VCShower@@@@YAPAVCShower@@PAV0@@Z
+?ExplosionCreate@@YAXABVVector@@0PAUedict_s@@HH@Z
+?KeyValue@CEnvExplosion@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CShower@@EAEHXZ
+?Restore@CEnvExplosion@@UAEHAAVCRestore@@@Z
+?Save@CEnvExplosion@@UAEHAAVCSave@@@Z
+?Smoke@CEnvExplosion@@QAEXXZ
+?Spawn@CEnvExplosion@@UAEXXZ
+?Spawn@CShower@@EAEXXZ
+?Think@CShower@@EAEXXZ
+?Touch@CShower@@EAEXPAVCBaseEntity@@@Z
+?Use@CEnvExplosion@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_env_explosion
+_spark_shower

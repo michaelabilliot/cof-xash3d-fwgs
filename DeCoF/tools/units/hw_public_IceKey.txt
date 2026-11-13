@@ -1,0 +1,13 @@
+??0IceKey@@QAE@H@Z
+?ice_sboxes_init@@YAXXZ
+?gf_exp7@@YAKII@Z
+?gf_mult@@YAIIII@Z
+?ice_perm32@@YAKK@Z
+??1IceKey@@QAE@XZ
+?encrypt@IceKey@@QBEXPBEPAE@Z
+?ice_f@@YAKKPBVIceSubkey@@@Z
+?decrypt@IceKey@@QBEXPBEPAE@Z
+?scheduleBuild@IceKey@@AAEXPAGHPBH@Z
+?set@IceKey@@QAEXPBE@Z
+?keySize@IceKey@@QBEHXZ
+?blockSize@IceKey@@QBEHXZ

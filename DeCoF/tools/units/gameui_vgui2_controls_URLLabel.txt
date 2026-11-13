@@ -1,0 +1,15 @@
+??0URLLabel@vgui2@@QAE@PAVPanel@1@PBD11@Z
+??0URLLabel@vgui2@@QAE@PAVPanel@1@PBDPBG1@Z
+??1URLLabel@vgui2@@UAE@XZ
+?SetURL@URLLabel@vgui2@@QAEXPBD@Z
+?OnMousePressed@URLLabel@vgui2@@MAEXW4MouseCode@2@@Z
+?ApplySettings@URLLabel@vgui2@@MAEXPAVKeyValues@@@Z
+?GetSettings@URLLabel@vgui2@@MAEXPAVKeyValues@@@Z
+?GetDescription@URLLabel@vgui2@@MAEPBDXZ
+?ApplySchemeSettings@URLLabel@vgui2@@MAEXPAVIScheme@2@@Z
+??_GURLLabel@vgui2@@UAEPAXI@Z
+??0URLLabel_RegisterMap@URLLabel@vgui2@@QAE@XZ
+?ChainToMap@URLLabel@vgui2@@SAXXZ
+?GetMessageMap@URLLabel@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@URLLabel@vgui2@@SAPBDXZ
+?GetPanelBaseClassName@URLLabel@vgui2@@SAPBDXZ

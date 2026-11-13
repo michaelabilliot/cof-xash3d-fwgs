@@ -1,0 +1,11 @@
+?DialTone@CCofTelephone@@QAEXXZ
+?Precache@CCofTelephone@@UAEXXZ
+?Restore@CCofTelephone@@UAEHAAVCRestore@@@Z
+?RightNumber@CCofTelephone@@QAEXXZ
+?Save@CCofTelephone@@UAEHAAVCSave@@@Z
+?Spawn@CCofTelephone@@UAEXXZ
+?Use@CCofTelephone@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?WrongNumber@CCofTelephone@@QAEXXZ
+_cof_telephone
+?TelephoneRight@CCofTelephone@@QAEXXZ
+?TelephoneWrong@CCofTelephone@@QAEXXZ

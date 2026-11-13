@@ -1,0 +1,9 @@
+_SafeRead
+_CleanupName
+_lump_sorter
+_ForwardSlashes
+_TEX_InitFromWad
+_TEX_CleanupWadInfo
+_TEX_LoadLump
+_FindMiptex
+_TEX_AddAnimatingTextures

@@ -1,0 +1,10 @@
+??$GetClassPtr@VCRadioWeapon@@@@YAPAVCRadioWeapon@@PAV0@@Z
+?Deploy@CRadioWeapon@@UAEHXZ
+?GetItemInfo@CRadioWeapon@@UAEHPAUItemInfo@@@Z
+?Holster@CRadioWeapon@@UAEXXZ
+?Precache@CRadioWeapon@@UAEXXZ
+?SecondaryAttack@CRadioWeapon@@UAEXXZ
+?ShouldWeaponIdle@CRadioWeapon@@UAEHXZ
+?Spawn@CRadioWeapon@@UAEXXZ
+?WeaponIdle@CRadioWeapon@@UAEXXZ
+_weapon_radio

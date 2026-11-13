@@ -1,0 +1,7 @@
+??$GetClassPtr@VCDoctorBossShoot@@@@YAPAVCDoctorBossShoot@@PAV0@@Z
+?Classify@CDoctorBossShoot@@UAEHXZ
+?ObjectCaps@CDoctorBossShoot@@UAEHXZ
+?Precache@CDoctorBossShoot@@UAEXXZ
+?Spawn@CDoctorBossShoot@@UAEXXZ
+?TraceAttack@CDoctorBossShoot@@UAEXPAUentvars_s@@MVVector@@PAUTraceResult@@H@Z
+_cof_doctorshoot

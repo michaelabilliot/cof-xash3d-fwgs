@@ -1,0 +1,11 @@
+??0CTelephone@@QAE@XZ
+?AddDigit_guess@CTelephone@@QAEXH@Z
+?Initialize@CTelephone@@QAEXXZ
+?TelephoneInit_guess@@YAXXZ
+?actionPerformed@CTelephoneHandler_Command@@UAEXPAVPanel@vgui@@@Z
+?paint@CTelephone@@MAEXXZ
+?ActionSignal@CTelephone@@QAEXH@Z
+?Dial_guess@CTelephone@@QAEXXZ
+?MsgTelephone_guess@@YAHPBDHPAX@Z
+?setVisible@CTelephone@@UAEX_N@Z
+??1CTelephone@@QAE@XZ

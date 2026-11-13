@@ -1,0 +1,17 @@
+??$GetClassPtr@VCTaller@@@@YAPAVCTaller@@PAV0@@Z
+?AlertSound@CTaller@@UAEXXZ
+?CheckRangeAttack1@CTaller@@UAEHMM@Z
+?CheckRangeAttack2@CTaller@@UAEHMM@Z
+?Classify@CTaller@@UAEHXZ
+?DeathSound@CTaller@@UAEXXZ
+?HandleAnimEvent@CTaller@@UAEXPAUMonsterEvent_t@@@Z
+?IgnoreConditions@CTaller@@UAEHXZ
+?Killed@CTaller@@UAEXPAUentvars_s@@H@Z
+?PainSound@CTaller@@UAEXXZ
+?Precache@CTaller@@UAEXXZ
+?SetActivity@CTaller@@UAEXW4Activity@@@Z
+?SetYawSpeed@CTaller@@UAEXXZ
+?Spawn@CTaller@@UAEXXZ
+?TakeDamage@CTaller@@UAEHPAUentvars_s@@0MH@Z
+_monster_taller
+?AttackSound@CTaller@@QAEXXZ

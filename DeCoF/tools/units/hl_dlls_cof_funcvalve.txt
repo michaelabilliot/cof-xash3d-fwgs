@@ -1,0 +1,15 @@
+??$GetClassPtr@VCFuncValve@@@@YAPAVCFuncValve@@PAV0@@Z
+?FindTargetEnt@CFuncValve@@QAEXXZ
+?GetState@CFuncValve@@UAE?AW4STATE@@XZ
+?KeyValue@CFuncValve@@UAEXPAUKeyValueData_s@@@Z
+?ObjectCaps@CFuncValve@@UAEHXZ
+?Precache@CFuncValve@@UAEXXZ
+?ProThink@CFuncValve@@QAEXXZ
+?Restore@CFuncValve@@UAEHAAVCRestore@@@Z
+?Save@CFuncValve@@UAEHAAVCSave@@@Z
+?Spawn@CFuncValve@@UAEXXZ
+?Use@CFuncValve@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+_func_valve
+?DegreesCheck@CFuncValve@@QAEXXZ
+?UnlockValve@CFuncValve@@QAEXPAVCBaseEntity@@@Z
+?ValveReturn@CFuncValve@@QAEXXZ

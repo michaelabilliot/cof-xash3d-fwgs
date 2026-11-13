@@ -1,0 +1,9 @@
+?EV_CreateTracer@@YAXPAM0@Z
+?EV_EjectBrass@@YAXPAM0MHH@Z
+?EV_GetDefaultShellInfo@@YAXPAUevent_args_s@@PAM111111MMM@Z
+?EV_GetGunPosition@@YAXPAUevent_args_s@@PAM1@Z
+?EV_IsLocal@@YAHH@Z
+?EV_IsPlayer@@YAHH@Z
+?EV_MuzzleFlash@@YAXXZ
+?GetEntity@@YAPAUcl_entity_s@@H@Z
+?GetViewEntity@@YAPAUcl_entity_s@@XZ

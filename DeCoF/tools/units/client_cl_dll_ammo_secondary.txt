@@ -1,0 +1,6 @@
+?Draw@CHudAmmoSecondary@@UAEHM@Z
+?Init@CHudAmmoSecondary@@UAEHXZ
+?MsgFunc_SecAmmoIcon@CHudAmmoSecondary@@QAEHPBDHPAX@Z
+?MsgFunc_SecAmmoVal@CHudAmmoSecondary@@QAEHPBDHPAX@Z
+?Reset@CHudAmmoSecondary@@UAEXXZ
+?VidInit@CHudAmmoSecondary@@UAEHXZ

@@ -1,0 +1,15 @@
+_$E4
+_$E1
+_$E3
+_$E2
+??0CRegistry@@QAE@XZ
+??1CRegistry@@UAE@XZ
+?ReadInt@CRegistry@@UAEHPBDH@Z
+?WriteInt@CRegistry@@UAEXPBDH@Z
+?ReadString@CRegistry@@UAEPBDPBD0@Z
+?WriteString@CRegistry@@UAEXPBD0@Z
+?Init@CRegistry@@UAEXXZ
+?GetGameName_guess@@YAPBDXZ
+?Shutdown@CRegistry@@UAEXXZ
+??_GCRegistry@@UAEPAXI@Z
+??0IRegistry@@QAE@XZ

@@ -1,0 +1,6 @@
+??$GetClassPtr@VCDoorPropView@@@@YAPAVCDoorPropView@@PAV0@@Z
+?CameraUse@CDoorPropView@@QAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z
+?Classify@CDoorPropView@@UAEHXZ
+?Precache@CDoorPropView@@UAEXXZ
+?Spawn@CDoorPropView@@UAEXXZ
+_door_prop_view

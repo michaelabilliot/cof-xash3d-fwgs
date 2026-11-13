@@ -1,0 +1,16 @@
+??0MemoryBitmap@vgui2@@QAE@PAEHH@Z
+??1MemoryBitmap@vgui2@@UAE@XZ
+?GetSize@MemoryBitmap@vgui2@@UAEXAAH0@Z
+?GetContentSize@MemoryBitmap@vgui2@@UAEXAAH0@Z
+?SetSize@MemoryBitmap@vgui2@@UAEXHH@Z
+?SetPos@MemoryBitmap@vgui2@@UAEXHH@Z
+?SetColor@MemoryBitmap@vgui2@@UAEXVColor@@@Z
+?GetName_guess@MemoryBitmap@vgui2@@QAEPBDXZ
+?Paint@MemoryBitmap@vgui2@@UAEXXZ
+?ForceUpload_guess@MemoryBitmap@vgui2@@QAEXPAEHH@Z
+?GetID_guess@MemoryBitmap@vgui2@@QAEHXZ
+??0Color@@QAE@XZ
+??_GMemoryBitmap@vgui2@@UAEPAXI@Z
+??0IImage@vgui2@@QAE@XZ
+??_GIImage@vgui2@@UAEPAXI@Z
+??1IImage@vgui2@@UAE@XZ

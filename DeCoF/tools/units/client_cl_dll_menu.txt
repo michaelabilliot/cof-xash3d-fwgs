@@ -1,0 +1,7 @@
+?Draw@CHudMenu@@UAEHM@Z
+?Init@CHudMenu@@UAEHXZ
+?MsgFunc_ShowMenu@CHudMenu@@QAEHPBDHPAX@Z
+?Reset@CHudMenu@@UAEXXZ
+?SelectMenuItem@CHudMenu@@QAEXH@Z
+?InitHUDData@CHudMenu@@UAEXXZ
+?VidInit@CHudMenu@@UAEHXZ

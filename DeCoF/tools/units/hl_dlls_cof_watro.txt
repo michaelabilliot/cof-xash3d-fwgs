@@ -1,0 +1,10 @@
+??$GetClassPtr@VCWatro@@@@YAPAVCWatro@@PAV0@@Z
+?ActivateWatro@CWatro@@QAEXXZ
+?Classify@CWatro@@UAEHXZ
+?HandleAnimEvent@CWatro@@UAEXPAUMonsterEvent_t@@@Z
+?InactiveThink@CWatro@@QAEXXZ
+?Precache@CWatro@@UAEXXZ
+?SetYawSpeed@CWatro@@UAEXXZ
+?Spawn@CWatro@@UAEXXZ
+?WatroThink@CWatro@@QAEXXZ
+_monster_watro

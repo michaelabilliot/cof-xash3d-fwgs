@@ -1,0 +1,5 @@
+HistoryResource::AddToHistory
+?AddToHistory@HistoryResource@@QAEXHHH@Z
+?AddToHistory@HistoryResource@@QAEXHPBDH@Z
+?CheckClearHistory@HistoryResource@@QAEXXZ
+?DrawAmmoHistory@HistoryResource@@QAEHM@Z

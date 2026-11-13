@@ -1,0 +1,13 @@
+?CanUseInit@@YAXXZ
+?LoadResolutionImage@@YAPAVBitmapTGA@vgui@@PBD@Z
+?UpdateArmor@CHud2@@QAEXH@Z
+?UpdateHealth@CHud2@@QAEXH@Z
+?paint@CHud2@@MAEXXZ
+?Initialize@CHud2@@QAEXXZ
+?ShouldDrawHUD@@YAHXZ
+?paintBackground@CHud2@@MAEXXZ
+?Hud2Init@@YAXXZ
+??0CHud2@@QAE@XZ
+?FindAmmoImageForWeapon@CHud2@@IAEPAVBitmapTGA@vgui@@PBD@Z
+?solve@CHud2@@UAEXXZ
+??1CHud2@@QAE@XZ

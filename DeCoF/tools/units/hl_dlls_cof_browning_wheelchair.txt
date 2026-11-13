@@ -1,0 +1,12 @@
+?Deploy@CBrowningWheelchair@@UAEHXZ
+?GetItemInfo@CBrowningWheelchair@@UAEHPAUItemInfo@@@Z
+?Holster@CBrowningWheelchair@@UAEXXZ
+?ItemPostFrame@CBrowningWheelchair@@UAEXXZ
+?Precache@CBrowningWheelchair@@UAEXXZ
+?PrimaryAttack@CBrowningWheelchair@@UAEXXZ
+?Reload@CBrowningWheelchair@@UAEXXZ
+?SecondaryAttack@CBrowningWheelchair@@UAEXXZ
+?Spawn@CBrowningWheelchair@@UAEXXZ
+?TertiaryAttack@CBrowningWheelchair@@UAEXXZ
+?WeaponIdle@CBrowningWheelchair@@UAEXXZ
+_weapon_browning_wheelchair

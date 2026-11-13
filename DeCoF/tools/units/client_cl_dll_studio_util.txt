@@ -1,0 +1,9 @@
+?AngleMatrix@@YAXPBMPAY03M@Z
+?AngleQuaternion@@YAXPAMQAM@Z
+?ConcatTransforms@@YAXQAY03M00@Z
+?CrossProduct@@YAXPBM0PAM@Z
+?MatrixCopy@@YAXQAY03M0@Z
+?QuaternionMatrix@@YAXQAMPAY03M@Z
+?VectorCompare@@YAHPBM0@Z
+?VectorTransform@@YAXPBMQAY03MPAM@Z
+?QuaternionSlerp@@YAXQAM0M0@Z

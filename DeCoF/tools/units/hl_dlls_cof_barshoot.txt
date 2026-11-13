@@ -1,0 +1,7 @@
+??$GetClassPtr@VCBarShoot@@@@YAPAVCBarShoot@@PAV0@@Z
+?Classify@CBarShoot@@UAEHXZ
+?ObjectCaps@CBarShoot@@UAEHXZ
+?Precache@CBarShoot@@UAEXXZ
+?Spawn@CBarShoot@@UAEXXZ
+?TraceAttack@CBarShoot@@UAEXPAUentvars_s@@MVVector@@PAUTraceResult@@H@Z
+_cof_barshoot

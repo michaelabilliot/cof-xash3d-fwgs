@@ -1,0 +1,15 @@
+??0ToggleButton@vgui2@@QAE@PAVPanel@1@PBD1@Z
+?OnMouseDoublePressed@ToggleButton@vgui2@@MAEXW4MouseCode@2@@Z
+?GetButtonFgColor@ToggleButton@vgui2@@MAE?AVColor@@XZ
+?CanBeDefaultButton@ToggleButton@vgui2@@MAE_NXZ
+?DoClick@ToggleButton@vgui2@@UAEXXZ
+?ApplySchemeSettings@ToggleButton@vgui2@@MAEXPAVIScheme@2@@Z
+?OnKeyCodePressed@ToggleButton@vgui2@@MAEXW4KeyCode@2@@Z
+??_GToggleButton@vgui2@@UAEPAXI@Z
+??1ToggleButton@vgui2@@UAE@XZ
+?OnHotkey@Button@vgui2@@UAEXXZ
+??0ToggleButton_RegisterMap@ToggleButton@vgui2@@QAE@XZ
+?ChainToMap@ToggleButton@vgui2@@SAXXZ
+?GetMessageMap@ToggleButton@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@ToggleButton@vgui2@@SAPBDXZ
+?GetPanelBaseClassName@ToggleButton@vgui2@@SAPBDXZ

@@ -1,0 +1,14 @@
+?FadeBlend@CHudMessage@@QAEMMMMM@Z
+?Init@CHudMessage@@UAEHXZ
+?MessageAdd@CHudMessage@@QAEXPBDM@Z
+?MessageScanNextChar@CHudMessage@@QAEXXZ
+?MessageScanStart@CHudMessage@@QAEXXZ
+?MsgFunc_GameTitle@CHudMessage@@QAEHPBDHPAX@Z
+?MsgFunc_HudText@CHudMessage@@QAEHPBDHPAX@Z
+?Reset@CHudMessage@@UAEXXZ
+?VidInit@CHudMessage@@UAEHXZ
+?XPosition@CHudMessage@@QAEHMHH@Z
+?YPosition@CHudMessage@@QAEHMH@Z
+?Draw@CHudMessage@@UAEHM@Z
+?MessageAdd@CHudMessage@@QAEXPAUclient_textmessage_s@@@Z
+?MessageDrawScan@CHudMessage@@QAEXPAUclient_textmessage_s@@M@Z

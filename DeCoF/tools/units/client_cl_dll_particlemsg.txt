@@ -1,0 +1,11 @@
+?MsgFunc_DelParticle@CHudParticle@@QAEHPBDHPAX@Z
+?VidInit@CHudParticle@@UAEHXZ
+?Draw@CHudParticle@@UAEHM@Z
+?__MsgFunc_DelParticle@@YAHPBDHPAX@Z
+?__MsgFunc_Particle@@YAHPBDHPAX@Z
+?MsgFunc_Particle@CHudParticle@@QAEHPBDHPAX@Z
+?Init@CHudParticle@@UAEHXZ
+?MsgFunc_Ignite@CHudParticle@@QAEHPBDHPAX@Z
+?MsgFunc_KillWpnPart@CHudParticle@@QAEHPBDHPAX@Z
+?__MsgFunc_Ignite@@YAHPBDHPAX@Z
+?__MsgFunc_KillWpnPart@@YAHPBDHPAX@Z

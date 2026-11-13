@@ -1,0 +1,7 @@
+_R_AllocObjects
+_R_DestroyObjects
+_GlowBlend
+_RotatedBBox
+_AddTEntity
+_AppendTEntity
+_R_DrawTEntitiesOnList

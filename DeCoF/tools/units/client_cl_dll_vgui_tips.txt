@@ -1,0 +1,9 @@
+??1CTips@@QAE@XZ
+?Initialize@CTips@@QAEXXZ
+?LoadMsg@CTips@@IAEXPAUclient_textmessage_s@@@Z
+?Show@CTips@@QAEXPAUclient_textmessage_s@@@Z
+?ShowTip@@YAXPAUclient_textmessage_s@@@Z
+?VGuiAddScreenMessage@@YAXPAUclient_textmessage_s@@@Z
+?VGuiAddScrollingMessage@@YAXPAUclient_textmessage_s@@@Z
+?paintBackground@CTips@@MAEXXZ
+??0CTips@@QAE@XZ

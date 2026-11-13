@@ -1,0 +1,5 @@
+?SeedRandomNumberGenerator@@YAXJ@Z
+?ran1@@YA_HXZ
+?fran1@@YAMXZ
+?RandomFloat@@YAMMM@Z
+?RandomLong@@YA_H_H0@Z

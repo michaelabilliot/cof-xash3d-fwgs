@@ -1,0 +1,2 @@
+??0CMessageWindowPanel@@QAE@PBD0HHHHHH@Z
+?CMessageWindowPanel_Create@@YAPAVCMenuPanel@@PBD0HHHHHH@Z

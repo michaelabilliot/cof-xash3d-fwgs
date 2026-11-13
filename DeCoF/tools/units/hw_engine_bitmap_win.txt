@@ -1,0 +1,2 @@
+_LoadBMP8
+_LoadBMP16

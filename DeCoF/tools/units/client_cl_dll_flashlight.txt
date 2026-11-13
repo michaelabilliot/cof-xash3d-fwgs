@@ -1,0 +1,6 @@
+?Init@CHudFlashlight@@UAEHXZ
+?MsgFunc_FlashBat@CHudFlashlight@@QAEHPBDHPAX@Z
+?MsgFunc_Flashlight@CHudFlashlight@@QAEHPBDHPAX@Z
+?VidInit@CHudFlashlight@@UAEHXZ
+?Draw@CHudFlashlight@@UAEHM@Z
+?Reset@CHudFlashlight@@UAEXXZ

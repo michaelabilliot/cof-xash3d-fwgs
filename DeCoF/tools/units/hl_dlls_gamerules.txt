@@ -1,0 +1,8 @@
+?CanHaveAmmo@CGameRules@@UAEHPAVCBasePlayer@@PBDH@Z
+?CanHavePlayerItem@CGameRules@@UAEHPAVCBasePlayer@@PAVCBasePlayerItem@@@Z
+?GetPlayerSpawnSpot@CGameRules@@UAEPAUedict_s@@PAVCBasePlayer@@@Z
+?InstallGameRules@@YAPAVCGameRules@@XZ
+?RefreshSkillData@CGameRules@@UAEXXZ
+?StartVoteKick@CGameRules@@UAEXPAVCBasePlayer@@0@Z
+?VoteKickThink@CGameRules@@UAEXXZ
+?IsMapperMode_guess@CGameRules@@QAE_NXZ

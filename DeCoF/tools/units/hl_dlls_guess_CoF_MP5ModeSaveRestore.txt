@@ -1,0 +1,6 @@
+??$GetClassPtr@VCMP5ModeSaveRestoreMP5@@@@YAPAVCMP5ModeSaveRestoreMP5@@PAV0@@Z
+_cof_mp5modesaverestore
+?KeyValue@CMP5ModeSaveRestoreMP5@@UAEXPAUKeyValueData_s@@@Z
+?Spawn@CMP5ModeSaveRestoreMP5@@UAEXXZ
+?ObjectCaps@CMP5ModeSaveRestoreMP5@@UAEHXZ
+?Use@CMP5ModeSaveRestoreMP5@@UAEXPAVCBaseEntity@@0W4USE_TYPE@@M@Z

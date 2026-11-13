@@ -1,0 +1,7 @@
+??0COptionsDialog@@QAE@PAVPanel@vgui2@@@Z
+??1COptionsDialog@@UAE@XZ
+?SetTitle@COptionsDialog@@UAEXPBD_N@Z
+?Activate@COptionsDialog@@UAEXXZ
+?Run@COptionsDialog@@QAEXXZ
+?OnClose@COptionsDialog@@UAEXXZ
+??_GCOptionsDialog@@UAEPAXI@Z

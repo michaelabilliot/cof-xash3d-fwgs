@@ -1,0 +1,14 @@
+_$E4
+_$E1
+_$E3
+_$E2
+??0CThread@@QAE@XZ
+??1CThread@@UAE@XZ
+?Shutdown@CThread@@UAE_NXZ
+?Init@CThread@@UAE_NXZ
+?ThreadFunc@@YGKPAX@Z
+?AddThreadItem@CThread@@UAE_NP8CCDAudio@@AEXHH@ZHH@Z
+??_GCThread@@UAEPAXI@Z
+??0IThread@@QAE@XZ
+??_GIThread@@UAEPAXI@Z
+??1IThread@@UAE@XZ

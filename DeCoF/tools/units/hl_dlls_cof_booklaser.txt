@@ -1,0 +1,15 @@
+??$GetClassPtr@VCBookLaser@@@@YAPAVCBookLaser@@PAV0@@Z
+?Deploy@CBookLaser@@UAEHXZ
+?GetItemInfo@CBookLaser@@UAEHPAUItemInfo@@@Z
+?Holster@CBookLaser@@UAEXXZ
+?ItemPostFrame@CBookLaser@@UAEXXZ
+?Precache@CBookLaser@@UAEXXZ
+?PrimaryAttack@CBookLaser@@UAEXXZ
+?Restore@CBookLaser@@UAEHAAVCRestore@@@Z
+?Save@CBookLaser@@UAEHAAVCSave@@@Z
+?SecondaryAttack@CBookLaser@@UAEXXZ
+?SendInitMessage@CBookLaser@@UAEXPAVCBasePlayer@@@Z
+?ShouldWeaponIdle@CBookLaser@@UAEHXZ
+?Spawn@CBookLaser@@UAEXXZ
+?WeaponIdle@CBookLaser@@UAEXXZ
+_weapon_booklaser

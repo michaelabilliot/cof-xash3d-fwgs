@@ -1,0 +1,8 @@
+??0CCreateMultiplayerGameDialog@@QAE@PAVPanel@vgui2@@@Z
+??1CCreateMultiplayerGameDialog@@UAE@XZ
+?SetTitle@CCreateMultiplayerGameDialog@@MAEXPBD_N@Z
+?OnOK@CCreateMultiplayerGameDialog@@MAEXXZ
+?OnClose@CCreateMultiplayerGameDialog@@MAEXXZ
+?GetMessageMap@PropertyDialog@vgui2@@UAEPAUPanelMessageMap@2@XZ
+?GetPanelClassName@PropertyDialog@vgui2@@SAPBDXZ
+??_GCCreateMultiplayerGameDialog@@UAEPAXI@Z

@@ -1,0 +1,6 @@
+?HasCpuid@@YAIXZ
+?HasTsc@@YAIXZ
+?GetRDTSC@@YA_KXZ
+?PROC_GetSpeed@@YAHXZ
+?PROC_IsMMX@@YAHXZ
+?PROC_Is3DNow_guess@@YAHXZ

@@ -1,0 +1,73 @@
+//========= Copyright (c) 1996-2003, Valve LLC, All rights reserved. ============
+//
+// Purpose:
+//
+// $NoKeywords: $
+//=============================================================================
+
+#ifndef CREATEMULTIPLAYERGAMESERVERPAGE_H
+#define CREATEMULTIPLAYERGAMESERVERPAGE_H
+
+#ifdef _WIN32
+#pragma once
+#endif
+
+#include <vgui_controls/PropertyPage.h>
+
+namespace vgui = vgui2;
+
+class CCvarToggleCheckButton;
+
+namespace vgui2
+{
+class CheckButton;
+class ComboBox;
+class TextEntry;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: server options page of the create game server dialog
+//-----------------------------------------------------------------------------
+class CCreateMultiplayerGameServerPage : public vgui2::PropertyPage
+{
+	DECLARE_CLASS_SIMPLE( CCreateMultiplayerGameServerPage, vgui::PropertyPage );
+
+public:
+	CCreateMultiplayerGameServerPage( vgui2::Panel *parent, const char *name );
+	~CCreateMultiplayerGameServerPage();
+
+	// returns currently entered information about the server
+	int GetMaxPlayers() { return m_iMaxPlayers; }
+	const char *GetPassword() { return m_szPassword; }
+	const char *GetHostName() { return m_szHostName; }
+	const char *GetMapName();
+	void SetMap( const char *name );
+	bool IsRandomMapSelected();
+
+	void SetBotQuota( int quota );
+	void SetBotsEnabled( bool enabled );
+	int GetBotQuota( void );
+	bool GetBotsEnabled( void );
+
+protected:
+	virtual void OnApplyChanges();
+
+private:
+	void LoadMapList();
+	void LoadMaps( const char *pszPathID );
+
+	MESSAGE_FUNC( OnCheckButtonChecked, "CheckButtonChecked" );
+
+	vgui2::ComboBox *m_pMapList;
+	vgui2::TextEntry *m_pBotQuotaCombo;
+	vgui2::CheckButton *m_pEnableBotsCheck;
+	CCvarToggleCheckButton *m_pEnableTutorCheck;
+
+	enum { DATA_STR_LENGTH = 64 };
+	char m_szHostName[DATA_STR_LENGTH];
+	char m_szPassword[DATA_STR_LENGTH];
+	char m_szMapName[DATA_STR_LENGTH];
+	int m_iMaxPlayers;
+};
+
+#endif // CREATEMULTIPLAYERGAMESERVERPAGE_H
