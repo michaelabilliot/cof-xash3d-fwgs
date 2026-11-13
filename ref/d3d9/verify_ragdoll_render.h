@@ -71,6 +71,8 @@ static float R_StudioGlowShellScale(const cl_entity_s*){return 0;}
 static D3DCOLOR R_StudioGlowShellColor(const cl_entity_s*){return 0;}
 static void R_BeginStudioGlowShellPass(D3DCOLOR){}
 void DX_Bind(int,int){}
+static int R_StudioViewHandsTexture(const cl_entity_s*,int textureId){return textureId;}
+static bool R_LakeForestStudioTextureSuppressed(const cl_entity_s*,int){return false;}
 void R_ApplyStudioMaterialState(unsigned int,const cl_entity_s*,studio_material_state_t&){}
 #include "verify_ragdoll_render.inc"
 #undef device
