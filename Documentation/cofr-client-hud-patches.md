@@ -23,6 +23,28 @@ by `scripts/cofr/patch_client_hud.py`. No game DLL is stored in this repository.
   other item's -1 and showed nothing, and two pistols each showed the other
   gun's magazine.
 
+## Source (DeCoF)
+
+The DeCoF client in `DeCoF/src` already rebuilds the Remixed HUD from
+source (`cl_dll/cofr_legacy.cpp`, `game_shared/cofr_hud_layout.hpp`), and it
+has all three fixes above:
+
+- `cof::hideWeaponAmmo` (`game_shared/cofr_ammo_policy.hpp`) gives no counter
+  to the flashlight and the other tools and melee weapons;
+- `HudPanel::paint` uses the dual-wield counters whenever weapon 15 is held;
+- it pairs `g_iDualWeapon1_guess` (the first weapon byte of `DualWield`,
+  `0x104a82dc`) with `m_iDualAmmoLeft_guess` (the first `DualAmmo` value),
+  as the native dual ammo draw in `ammo.cpp` does.
+
+`HudPanel::capacity` also falls back to fixed magazine sizes until a `WpnInfo`
+message (sent only when reserve ammo changes) gives the real one. The HUD
+draws exactly that many bullet slots, so a low value hid rounds. The table now
+uses each weapon's `iMaxClip`: P345 8 (was 12), M16 20 (was 30), Browning 13
+(was 5), revolver 5 (was 6) and FAMAS 30 (was missing).
+
+The patch script below is for the shipped 0.1.4.2 `cofr13_client.dll`, which is
+a different build from this source.
+
 ## Apply
 
 Close the game, then run (Python 3, no extra packages):
