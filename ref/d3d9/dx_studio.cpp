@@ -1202,9 +1202,10 @@ bool R_GetAttachmentPoint( const cl_entity_s *ent, int attachmentIndex, vec3_t o
 	return true;
 }
 
+float R_ViewModelAttachmentScale();
 static void R_StudioStoreAttachments( cl_entity_s *ent,
 	studiohdr_t *hdr, const BoneMat34 *boneMatrices, const D3DMATRIX &world,
-	float renderTime )
+	float renderTime, bool viewModel = false )
 {
 	if( !ent )
 		return;
@@ -1232,9 +1233,26 @@ static void R_StudioStoreAttachments( cl_entity_s *ent,
 	}
 	// Client effects (including CoF's Aurora particles) read the public entity
 	// attachments directly, rather than going through R_GetAttachmentPoint.
+	// Those effects draw with the world projection, while the viewmodel uses
+	// r_viewmodel_fov: rescale about the view axis so they sit on the drawn
+	// model. The renderer's own cache stays in viewmodel space.
+	const float fovScale = viewModel ? R_ViewModelAttachmentScale() : 1.0f;
 	for( int i = 0; i < count; ++i )
-		if( cache.valid[i] )
+	{
+		if( !cache.valid[i] )
+			continue;
+		if( fovScale == 1.0f )
+		{
 			VectorCopy( cache.points[i], ent->attachment[i] );
+			continue;
+		}
+		vec3_t delta;
+		VectorSubtract( cache.points[i], g_vOrigin, delta );
+		const float depth = DotProduct( delta, g_vForward );
+		for( int axis = 0; axis < 3; ++axis )
+			ent->attachment[i][axis] = g_vOrigin[axis] + g_vForward[axis] * depth +
+				( delta[axis] - g_vForward[axis] * depth ) * fovScale;
+	}
 	if( count > 0 && cache.valid[0] )
 	{
 		for( int i = count; i < MAXSTUDIOATTACHMENTS; ++i )
@@ -1249,13 +1267,13 @@ static void R_StudioUpdateAttachments( studiohdr_t *hdr,
 	cl_entity_s *ent, const BoneMat34 *boneMatrices, const D3DMATRIX &world,
 	bool viewModel, float renderTime )
 {
-	R_StudioStoreAttachments( ent, hdr, boneMatrices, world, renderTime );
+	R_StudioStoreAttachments( ent, hdr, boneMatrices, world, renderTime, viewModel );
 
 	if( viewModel && gp_cl && gEngfuncs.R_BeamGetEntity )
 	{
 		cl_entity_s *player = gEngfuncs.R_BeamGetEntity( gp_cl->playernum + 1 );
 		if( player && player != ent )
-			R_StudioStoreAttachments( player, hdr, boneMatrices, world, renderTime );
+			R_StudioStoreAttachments( player, hdr, boneMatrices, world, renderTime, true );
 	}
 }
 

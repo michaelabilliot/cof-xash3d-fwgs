@@ -120,6 +120,11 @@ extern "C" __declspec(dllexport) int __cdecl DX_CofLightStateV2(const dx_cof_lig
  }
  return valid?1:0;
 }
+// Unfiltered native FlashFlags (bit 16: a held flare is burning).
+unsigned R_CofRawLightFlags() {
+ const float now=R_CurrentRenderTime(0.f);
+ return g_cofV2&&g_cofLightBridge.published&&DX_CofFresh(g_cofLightBridge.packet.time,now)?g_cofLightBridge.packet.rawFlags:0;
+}
 static unsigned R_CofLightFlags() {
  const float now=R_CurrentRenderTime(0.f);
  return g_cofV2?g_cofLightBridge.flags(now):(DX_CofFresh(g_cofLightUpdate,now)?g_cofLightFlags:0);

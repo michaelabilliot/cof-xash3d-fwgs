@@ -14,6 +14,7 @@ GNU General Public License for more details.
 */
 
 #include <string.h>
+#include <unordered_map>
 #include "xash3d_types.h"
 #include "const.h"
 #include "beamdef.h"
@@ -69,6 +70,10 @@ static std::vector<cof_pickup::Span> g_cofPickupOutline;
 static dx_cof_dual_state_t g_cofDual;
 cl_entity_s* R_CofShadowSecondary(float now){return g_cofDual.current(now);}
 bool R_CofDualSecondary(const cl_entity_s* ent){return ent&&ent==&g_cofDual.entity;}
+// Native CoF mirrors the primary viewmodel too when it is the flare (its
+// right arm is hidden, hand rule 2), so the flare and the mirrored secondary
+// end up in opposite hands instead of both in the left one.
+static bool R_CofPrimaryMirrored(float now){return g_cofDual.current(now)&&g_cofDual.primaryHiddenArm==2;}
 static uint64_t g_cofDualPass=0;
 static dx_cof_player_visibility_t g_cofPlayerVisibility;
 static cof_features::Pickups g_cofPickups;
@@ -494,8 +499,21 @@ convar_t r_viewmodel_offset_x = { (char *)"r_viewmodel_offset_x", (char *)"0", 0
 convar_t r_viewmodel_offset_y = { (char *)"r_viewmodel_offset_y", (char *)"0", 0 };
 convar_t r_viewmodel_offset_z = { (char *)"r_viewmodel_offset_z", (char *)"0.5", 0 };
 
+convar_t dx_viewmodel_attachment_fov =
+{ (char *)"dx_viewmodel_attachment_fov", (char *)"1", FCVAR_ARCHIVE };
+convar_t dx_cof_shell_unstick = { (char *)"dx_cof_shell_unstick", (char *)"1", FCVAR_ARCHIVE };
 convar_t dx_viewmodel_beam_offset =
 { (char *)"dx_viewmodel_beam_offset", (char *)"-3", 0 };
+// The viewmodel is drawn with r_viewmodel_fov, but client effects that read
+// its public attachments (Aurora flare particles, smoke) are drawn with the
+// world projection. Returns the lateral scale (about the view axis) that makes
+// a world-space attachment land on the drawn viewmodel; 1 when not applicable.
+float R_ViewModelAttachmentScale() {
+ if(dx_viewmodel_attachment_fov.value==0.f||g_sceneProjection._34!=1.f||g_sceneProjection._22<=0.f)return 1.f;
+ const float fov=std::max(10.f,std::min(170.f,r_viewmodel_fov.value));
+ const float scale=(1.f/tanf(D3DXToRadian(fov)*.5f))/g_sceneProjection._22;
+ return std::isfinite(scale)&&scale>.2f&&scale<5.f?scale:1.f;
+}
 
 convar_t dx_player_stale_timeout =
 { (char *)"dx_player_stale_timeout", (char *)"0.50", 0 };
@@ -2153,6 +2171,8 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &r_viewmodel_offset_y );
 	gEngfuncs.Cvar_RegisterVariable( &r_viewmodel_offset_z );
 	gEngfuncs.Cvar_RegisterVariable( &dx_viewmodel_beam_offset );
+	gEngfuncs.Cvar_RegisterVariable( &dx_viewmodel_attachment_fov );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_shell_unstick );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_stale_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_dead_body_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_use_engine_state );
@@ -4472,10 +4492,50 @@ static cl_entity_s *R_PreparePlayerEntity( cl_entity_s *entity )
 	return &copy;
 }
 
+#include "r_efx.h"
+// CoF's server spawns casings at eye + forward*80 (+ right*20), which is
+// under the floor once the player aims down (or behind a wall when pressed
+// against it), so the casing is born inside solid and never seen. The first
+// time a casing temp entity is submitted, pull it back along the eye ray to
+// just in front of whatever world surface blocks that ray. The client's
+// temp-entity physics integrates entity.origin, so this moves the casing.
+static void R_CofUnstickShell( cl_entity_s *clent, int type )
+{
+	if( type != ET_TEMPENTITY || dx_cof_shell_unstick.value == 0.0f || !gEngfuncs.CL_TraceLine ||
+		clent->model->type != mod_studio || !Q_stristr( clent->model->name, "shell" ) )
+		return;
+	TEMPENTITY *temp = reinterpret_cast<TEMPENTITY *>(
+		reinterpret_cast<byte *>( clent ) - offsetof( TEMPENTITY, entity ) );
+	// One check per spawn: pool slots are reused, but never with the same die time.
+	static std::unordered_map<const TEMPENTITY *, float> seen;
+	auto found = seen.find( temp );
+	if( found != seen.end() && found->second == temp->die )
+		return;
+	if( seen.size() > 4096 )
+		seen.clear();
+	seen[temp] = temp->die;
+	vec3_t eye, target, delta;
+	VectorCopy( g_vOrigin, eye );
+	VectorCopy( clent->origin, target );
+	VectorSubtract( target, eye, delta );
+	if( DotProduct( delta, delta ) > 256.0f * 256.0f )
+		return; // not a first-person casing
+	const pmtrace_t trace = gEngfuncs.CL_TraceLine( eye, target, PM_WORLD_ONLY );
+	if( trace.startsolid || trace.allsolid || trace.fraction >= 1.0f )
+		return;
+	vec3_t fixed;
+	VectorMA( trace.endpos, 2.0f, trace.plane.normal, fixed );
+	VectorCopy( fixed, clent->origin );
+	VectorCopy( fixed, clent->curstate.origin );
+	VectorCopy( fixed, clent->prevstate.origin );
+	VectorCopy( fixed, clent->latched.prevorigin );
+}
+
 static qboolean R_AddEntity( cl_entity_s *clent, int type )
 {
 	if( !clent || !clent->model )
 		return false;
+	R_CofUnstickShell( clent, type );
 	if( clent->curstate.effects & EF_NODRAW )
 		return false;
 	if( R_DeadPlayerExpired( clent ) )
@@ -5526,7 +5586,7 @@ static cl_entity_s* R_CofHandheldViewModel(bool* mirrored=nullptr) {
  if(mirrored)*mirrored=false;
  const auto flashlight=[](const cl_entity_s* ent){return ent&&ent->model&&ent->model->type==mod_studio&&
   !(ent->curstate.effects&EF_NODRAW)&&!Q_stricmp(ent->model->name,"models/weapons/flashlight/v_flashlight.mdl");};
- auto ent=R_CurrentViewModel();if(flashlight(ent))return ent;
+ auto ent=R_CurrentViewModel();if(flashlight(ent)){if(mirrored)*mirrored=R_CofPrimaryMirrored(R_CurrentRenderTime(0.f));return ent;}
  ent=g_cofDual.current(R_CurrentRenderTime(0.f));
  if(!flashlight(ent))return nullptr;
  if(mirrored)*mirrored=g_cofDual.mirror;
@@ -5570,7 +5630,7 @@ bool R_CofWeaponLightPose(dx_cof_light_state_v2& pose) {
  const auto taclight=[](const cl_entity_s* ent){return ent&&ent->model&&ent->model->type==mod_studio&&
   !(ent->curstate.effects&EF_NODRAW)&&(!Q_stricmp(ent->model->name,"models/weapons/glock/v_glock.mdl")||
   !Q_stricmp(ent->model->name,"models/weapons/glock/v_glock_doctor.mdl"));};
- bool mirrored=false;auto ent=R_CurrentViewModel();
+ bool mirrored=R_CofPrimaryMirrored(R_CurrentRenderTime(0.f));auto ent=R_CurrentViewModel();
  if(!taclight(ent)){ent=g_cofDual.current(R_CurrentRenderTime(0.f));mirrored=g_cofDual.mirror;}
  if(!taclight(ent))return false;
  float points[6],offsets[3]={
@@ -5785,9 +5845,11 @@ static void R_DrawViewModel( void )
 		r_viewmodel_offset_z.value ) );
 
 	const bool dualCurrent=g_cofDual.current(static_cast<float>(gp_cl->time))!=nullptr;
+	const bool primaryMirrored=R_CofPrimaryMirrored(static_cast<float>(gp_cl->time));
+	DX_SetRenderStateCached(D3DRS_CULLMODE,primaryMirrored?D3DCULL_CW:D3DCULL_CCW);
 	if(viewModel)R_DrawStudioViewModel( viewModel, g_vOrigin, g_vAngles,
 		g_vForward, g_vRight, g_vUp,
-		forwardOffset, rightOffset, upOffset, false, true, dualCurrent?g_cofDual.primaryHiddenArm:0 );
+		forwardOffset, rightOffset, upOffset, primaryMirrored, true, dualCurrent?g_cofDual.primaryHiddenArm:0 );
 	g_cofDual.submit(static_cast<float>(gp_cl->time),g_cofDualPass,[&](cl_entity_t* secondary,bool mirrored) {
 		DX_SetRenderStateCached(D3DRS_CULLMODE,mirrored?D3DCULL_CW:D3DCULL_CCW);
 		R_DrawStudioViewModel(secondary,g_vOrigin,g_vAngles,g_vForward,g_vRight,g_vUp,
@@ -5992,7 +6054,7 @@ static void R_CollectLanternLights() {
     std::clamp(r_viewmodel_offset_y.value,-128.f,128.f),std::clamp(r_viewmodel_offset_z.value,-128.f,128.f)};
    for(int hand=0;hand<2;++hand)if((!draw||draw->value!=0.f)&&R_CofLanternModel(hands[hand],true)) {
     float points[6];
-    if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,points,hand==1&&g_cofDual.mirror))
+    if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(R_CurrentRenderTime(0.f))))
      submit(-1-hand,points);
    }
   }
@@ -6008,6 +6070,7 @@ static void R_CollectLanternLights() {
  }
 }
 
+unsigned R_CofRawLightFlags();
 static void R_CollectCofFlareLights() {
  if(!R_CofClientPresent()||!gp_cl||dx_dlights.value==0.f||dx_dlight_entities.value==0.f)return;
  const float now=R_CurrentRenderTime(0.f);
@@ -6024,9 +6087,13 @@ static void R_CollectCofFlareLights() {
    const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
    const auto& seq=seqs[ent->curstate.sequence];char label[33]{};memcpy(label,seq.label,32);
    const float frame=R_StudioEstimateFrame(ent,const_cast<mstudioseqdesc_t*>(&seq),now);
-   if(!cof_features::litFlareSequence(label,frame))continue;
+   // Dual wield keeps a burning flare on flare_draw/flare_idle, so trust the
+   // client's burning flag there instead of the sequence name.
+   const bool dualBurning=hands[1]&&(R_CofRawLightFlags()&16u)&&!std::strstr(label,"unlit")&&
+    std::strcmp(label,"discard")&&std::strcmp(label,"flare_holster");
+   if(!dualBurning&&!cof_features::litFlareSequence(label,frame))continue;
    float points[6],offsets[3]={r_viewmodel_offset_x.value,r_viewmodel_offset_y.value,r_viewmodel_offset_z.value};
-   if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAngles,offsets,points,hand==1&&g_cofDual.mirror))
+   if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(now)))
     R_AddDLight(points,220.f,255,8,3,now+.1f,-20-hand);
   }
  }
