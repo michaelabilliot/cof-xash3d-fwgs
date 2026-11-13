@@ -2568,6 +2568,17 @@ static bool R_StudioPoseBudgetOK( bool isViewModel,
 	return true;
 }
 
+static void R_FreeStudioRemixBlendBuffer( const studio_cache_t &cache )
+{
+	if( cache.remixBlendVertexBuffer )
+	{
+		cache.remixBlendVertexBuffer->Release( );
+		cache.remixBlendVertexBuffer = nullptr;
+	}
+	cache.remixBlendVertexCount = 0;
+	cache.remixBlendSplitNormals = false;
+}
+
 static void R_FreeStudioBuffers( studio_cache_t &cache )
 {
 	if( cache.combinedVertexBuffer )
@@ -2580,6 +2591,7 @@ static void R_FreeStudioBuffers( studio_cache_t &cache )
 		cache.gpuSkinSourceVertexBuffer->Release( );
 		cache.gpuSkinSourceVertexBuffer = nullptr;
 	}
+	R_FreeStudioRemixBlendBuffer( cache );
 	cache.combinedVertexCount = 0;
 	cache.combinedVertexBufferMode = false;
 	cache.gpuSkinSourceVertexCount = 0;
@@ -2684,6 +2696,7 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 			cache.gpuSkinSourceVertexBuffer->Release( );
 			cache.gpuSkinSourceVertexBuffer = nullptr;
 		}
+		R_FreeStudioRemixBlendBuffer( cache );
 		cache.combinedVertexCount = 0;
 		cache.gpuSkinSourceVertexCount = 0;
 		cache.poseUploaded = false;
@@ -2738,6 +2751,7 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 				cache.gpuSkinSourceVertexBuffer->Release( );
 				cache.gpuSkinSourceVertexBuffer = nullptr;
 			}
+			R_FreeStudioRemixBlendBuffer( cache );
 
 			UINT sourceVertexBytes = 0;
 			if( !R_UIntMul( combinedVertexCount, static_cast<UINT>( sizeof( studio_skin_vertex_t ) ), sourceVertexBytes ) ||
@@ -3954,6 +3968,148 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 	return true;
 }
 
+static bool R_EnsureStudioRemixBlendBuffer( const studio_cache_t &cache )
+{
+	if( cache.remixBlendVertexBuffer && cache.remixBlendVertexCount == cache.gpuSkinSourceVertexCount )
+		return true;
+	R_FreeStudioRemixBlendBuffer( cache );
+	if( cache.gpuSkinSourceVertexCount == 0 )
+		return false;
+
+	UINT vertexBytes = 0;
+	if( !R_UIntMul( cache.gpuSkinSourceVertexCount, static_cast<UINT>( sizeof( studio_blend_vertex_t ) ), vertexBytes ) ||
+		vertexBytes > DX_SCRATCH_MAX_BYTES )
+		return false;
+
+	// Managed, so Remix can read the blend indices to find the bones a draw uses.
+	HRESULT result = device->CreateVertexBuffer( vertexBytes, D3DUSAGE_WRITEONLY, 0, D3DPOOL_MANAGED,
+		&cache.remixBlendVertexBuffer, nullptr );
+	if( FAILED( result ) || !cache.remixBlendVertexBuffer )
+	{
+		cache.remixBlendVertexBuffer = nullptr;
+		return false;
+	}
+
+	void *memory = nullptr;
+	result = cache.remixBlendVertexBuffer->Lock( 0, 0, &memory, 0 );
+	if( FAILED( result ) || !memory )
+	{
+		R_FreeStudioRemixBlendBuffer( cache );
+		return false;
+	}
+
+	auto *destination = static_cast<studio_blend_vertex_t *>( memory );
+	bool splitNormals = false;
+	for( const auto &batch : cache.batches )
+	{
+		for( size_t sourceIndex = 0; sourceIndex < batch.sources.size( ); ++sourceIndex )
+		{
+			const studio_source_vertex_t &source = batch.sources[sourceIndex];
+			studio_blend_vertex_t &vertex = destination[batch.vertexStart + static_cast<UINT>( sourceIndex )];
+			const int bone = source.bone < MAXSTUDIOBONES ? source.bone : 0;
+			const int normalBone = source.normalBone < MAXSTUDIOBONES ? source.normalBone : bone;
+			splitNormals |= normalBone != bone;
+			vertex.x = source.x; vertex.y = source.y; vertex.z = source.z;
+			vertex.weight = 1.0f;
+			vertex.indices[0] = vertex.indices[1] = static_cast<byte>( bone );
+			vertex.indices[2] = vertex.indices[3] = 0;
+			vertex.nx = source.nx; vertex.ny = source.ny; vertex.nz = source.nz;
+			vertex.u = source.u; vertex.v = source.v;
+		}
+	}
+	cache.remixBlendVertexBuffer->Unlock( );
+	cache.remixBlendVertexCount = cache.gpuSkinSourceVertexCount;
+	cache.remixBlendSplitNormals = splitNormals;
+	return true;
+}
+
+// Remix captures a vertex shader draw again whenever any of its constants change, and the camera
+// matrices are among them, so every GPU-skinned model is captured and refit each time the view moves.
+// Indexed vertex blending gives Remix the bone palette instead: it skins the mesh itself and updates
+// it only when a bone moves. Chrome and the glow shell need view-dependent texture coordinates and
+// keep the vertex shader.
+// Off by default (dx_studio_remix_vertex_blend): Remix computes smooth normals of the meshes it skins
+// from their bind pose and then skinning overwrites them, so textures in rtx.smoothNormalsTextures lose
+// their smoothing on this path.
+static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl_entity_s *ent )
+{
+	if( dx_remix.value == 0.0f || dx_studio_remix_vertex_blend.value == 0.0f )
+		return false;
+	if( !cache.gpuSkinningBufferMode || !cache.gpuSkinSourceVertexBuffer || !cache.gpuSkinningPoseValid ||
+		cache.gpuSkinningBoneCount <= 0 || cache.gpuSkinningBoneCount > DX_STUDIO_REMIX_BLEND_MAX_BONES ||
+		cache.containsChrome )
+	{
+		return false;
+	}
+	if( !R_EnsureStudioRemixBlendBuffer( cache ) || cache.remixBlendSplitNormals )
+		return false;
+	if( !DX_BindStudioRemixBlendDeclaration( ) )
+		return false;
+
+	// Bone matrices are 3x4 rows applied to column vectors. D3D applies its matrices to row vectors,
+	// so each bone goes in transposed, followed by the entity's world matrix.
+	D3DMATRIX d3dWorld{};
+	device->GetTransform( D3DTS_WORLD, &d3dWorld );
+	D3DXMATRIX world;
+	DX_ToD3DXMatrix( d3dWorld, world );
+	for( int bone = 0; bone < cache.gpuSkinningBoneCount; ++bone )
+	{
+		const BoneMat34 &m = cache.gpuSkinningBoneMatrices[bone];
+		const D3DXMATRIX boneMatrix(
+			m[0][0], m[1][0], m[2][0], 0.0f,
+			m[0][1], m[1][1], m[2][1], 0.0f,
+			m[0][2], m[1][2], m[2][2], 0.0f,
+			m[0][3], m[1][3], m[2][3], 1.0f );
+		const D3DXMATRIX blend = boneMatrix * world;
+		device->SetTransform( D3DTS_WORLDMATRIX( bone ), &blend );
+	}
+	DX_RagdollSubmitted( ent, cache, cache.gpuSkinningBoneMatrices, cache.gpuSkinningBoneCount, &d3dWorld,
+		"remix-vertex-blend" );
+
+	DX_SetRenderStateCached( D3DRS_VERTEXBLEND, D3DVBF_1WEIGHTS );
+	DX_SetRenderStateCached( D3DRS_INDEXEDVERTEXBLENDENABLE, TRUE );
+	device->SetStreamSource( 0, cache.remixBlendVertexBuffer, 0, sizeof( studio_blend_vertex_t ) );
+
+	int boundTexture = -1;
+	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
+	for( const auto &batch : cache.batches )
+	{
+		if( !batch.indexBuffer || batch.primitiveCount == 0 )
+			continue;
+		if( R_LakeForestStudioTextureSuppressed( ent, batch.textureId ) )
+			continue;
+		if( batch.textureId != boundTexture )
+		{
+			DX_Bind( 0, batch.textureId );
+			boundTexture = batch.textureId;
+		}
+		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
+		device->SetIndices( batch.indexBuffer );
+		DX_ProfileDraw( true, batch.primitiveCount );
+		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
+		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
+			static_cast<INT>( batch.vertexStart ), 0, batch.vertexCount,
+			0, batch.primitiveCount );
+	}
+
+	// D3DTS_WORLDMATRIX( 0 ) is D3DTS_WORLD.
+	DX_SetRenderStateCached( D3DRS_VERTEXBLEND, D3DVBF_DISABLE );
+	DX_SetRenderStateCached( D3DRS_INDEXEDVERTEXBLENDENABLE, FALSE );
+	device->SetTransform( D3DTS_WORLD, &d3dWorld );
+	device->SetVertexDeclaration( nullptr );
+	device->SetFVF( BRUSH_FVF );
+	return true;
+}
+
+// Draws the cached GPU-skinned pose, through vertex blending when Remix runs.
+static bool R_DrawStudioSkinnedPose( const studio_cache_t &cache, const cl_entity_s *ent )
+{
+	const bool drawn = R_DrawStudioRemixBlendBatches( cache, ent ) || R_DrawStudioSkinBatches( cache, ent, false );
+	if( drawn && R_StudioGlowShellEnabled( ent ) )
+		R_DrawStudioSkinBatches( cache, ent, true );
+	return drawn;
+}
+
 static void R_DrawStudioGlowShellCPU( const studio_cache_t &cache,
 	const cl_entity_s *ent )
 {
@@ -4046,12 +4202,8 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 	// Use immutable source vertices/indices whenever GPU skinning is available.
 	// R_DrawViewModel already sets the weapon projection and near plane. Let
 	// hardware clip after skinning rather than changing the submitted topology.
-	if( R_DrawStudioSkinBatches( cache, ent, false ) )
-	{
-		if( R_StudioGlowShellEnabled( ent ) )
-			R_DrawStudioSkinBatches( cache, ent, true );
+	if( R_DrawStudioSkinnedPose( cache, ent ) )
 		return true;
-	}
 
 	// Unsupported hardware, oversized skeletons and an explicit opt-out retain
 	// the compatibility path. Its CPU-skinned geometry is inherently dynamic.
@@ -4157,12 +4309,8 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 
 static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity_s *ent )
 {
-	if( R_DrawStudioSkinBatches( cache, ent, false ) )
-	{
-		if( R_StudioGlowShellEnabled( ent ) )
-			R_DrawStudioSkinBatches( cache, ent, true );
+	if( R_DrawStudioSkinnedPose( cache, ent ) )
 		return;
-	}
 
 	const bool studioNormals = R_StudioNormalsEnabled( );
 	const bool uploadNormals = cache.buffersUploadNormals;
@@ -5893,6 +6041,8 @@ static void R_DrawPlayerWeapon( model_t *playerModel,
 		studioDirectLightScale, false, &entityWorld, weaponBones, false );
 }
 
+static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,float now);
+
 void R_DrawStudioEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
@@ -5971,6 +6121,7 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 	R_DrawStudioEntityModel( mod, ent, ent->curstate.sequence,
 		renderFrame, gaitSeq, gaitFrame, gaitBoneYaw, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, false, &entityWorld );
+	R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 	const float pickupStrength=R_CofPickupStrength(ent);
 	if(pickupStrength>0.f) {
 		const auto& pickupCache=R_GetStudioEntityGpuCache(ent);
@@ -6523,6 +6674,34 @@ static void R_ProcessCofFlareEvents(studiohdr_t* hdr,cl_entity_s* ent,float fram
  }
 }
 
+// Forward client-side studio events (>= 5000) to HUD_StudioEvent like the GL
+// and software renderers do. CoF relies on this for animation-driven sounds,
+// e.g. ladder_climb.mdl fires 5093/5094/5095 for the climb start, rung steps
+// and finish. Muzzle flashes and the CoF flare pair keep their dedicated
+// renderer paths above, so they are skipped here to avoid double dispatch.
+static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,float now) {
+ if(!ent||!ent->model)return;
+ auto& state=R_GetEntityCache(ent).clientEvents;
+ if(!R_StudioHeaderValid(hdr)||!gEngfuncs.pfnStudioEvent||ent->curstate.sequence<0||ent->curstate.sequence>=hdr->numseq)return;
+ if(state.model!=ent->model){state={};state.model=ent->model;}
+ auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ const auto& seq=seqs[ent->curstate.sequence];
+ if(seq.numevents<=0||seq.numevents>4096||!R_StudioRangeValid(hdr,seq.eventindex,size_t(seq.numevents)*sizeof(mstudioevent_t)))return;
+ const float last=std::max(1.f,float(seq.numframes-1));
+ const float nativeFrame=std::clamp(frame*last/256.f,0.f,last);
+ const float window=std::clamp(float(gp_cl->time-gp_cl->oldtime),0.f,.1f)*std::fabs(ent->curstate.framerate)*seq.fps;
+ state.cursor.begin(ent->curstate.sequence,ent->curstate.animtime,now,nativeFrame,last,(seq.flags&STUDIO_LOOPING)!=0,window);
+ const bool flareModel=R_CofClientPresent()&&cof_features::flareModel(ent->model->name,true);
+ const auto events=reinterpret_cast<const mstudioevent_t*>(reinterpret_cast<const byte*>(hdr)+seq.eventindex);
+ for(int i=0;i<seq.numevents;++i) {
+  const int id=events[i].event;int attachment;
+  if(id<5000||R_StudioMuzzleAttachment(id,attachment))continue;
+  if(flareModel&&(id==5050||id==5051))continue;
+  if(!state.cursor.event(i,float(events[i].frame)))continue;
+  gEngfuncs.pfnStudioEvent(&events[i],ent);
+ }
+}
+
 void R_DrawStudioViewModel( cl_entity_s *ent,
 	const vec3_t viewOrigin, const vec3_t viewAngles,
 	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
@@ -6553,6 +6732,10 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 	R_DrawStudioEntityModel( ent->model, ent, ent->curstate.sequence,
 		renderFrame, -1, 0.0f, 0.0f, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, true, &viewModelWorld, nullptr, muzzleEvents, hiddenArm );
+	// Secondary (dual-wield mirror) passes are geometry-only copies; only the
+	// real engine viewmodel forwards its client events.
+	if( muzzleEvents )
+		R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 
 	D3DMATRIX identity;
 	DX_MatrixIdentity( identity );

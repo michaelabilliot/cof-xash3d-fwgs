@@ -359,6 +359,9 @@ convar_t dx_studio_gpu_max_bones =
 convar_t dx_studio_gpu_smooth =
 { (char *)"dx_studio_gpu_smooth", (char *)"1", 0 };
 
+convar_t dx_studio_remix_vertex_blend =
+{ (char *)"dx_studio_remix_vertex_blend", (char *)"0", 0 };
+
 convar_t dx_studio_glowshell =
 { (char *)"dx_studio_glowshell", (char *)"1", 0 };
 
@@ -526,6 +529,7 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_chrome );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_max_bones );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_gpu_smooth );
+	gEngfuncs.Cvar_RegisterVariable( &dx_studio_remix_vertex_blend );
 	gEngfuncs.Cvar_RegisterVariable( &dx_studio_glowshell );
 	gEngfuncs.Cvar_RegisterVariable( &dx_glowshell_freq );
 	gEngfuncs.Cvar_RegisterVariable( &dx_muzzleflash_sprite );

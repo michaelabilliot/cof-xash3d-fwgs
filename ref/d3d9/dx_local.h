@@ -363,9 +363,11 @@ struct glow_occlusion_query_t
 };
 
 struct cof_flare_event_state_t { const model_t* model=nullptr;dx_muzzle_cursor_t cursor; };
+struct studio_client_event_state_t { const model_t* model=nullptr;dx_muzzle_cursor_t cursor; };
 struct entity_cache_t
 {
  cof_flare_event_state_t flare;
+ studio_client_event_state_t clientEvents;
 	attachment_cache_t attachments;
 	muzzleflash_state_t muzzleflash;
 	studio_light_probe_cache_t lightProbe;
@@ -516,6 +518,17 @@ struct studio_skin_vertex_t
 	float chromeFlag;
 };
 
+// Fixed-function indexed vertex blending input for Remix: one bone per vertex,
+// given as a full weight on the first of two equal blend indices.
+struct studio_blend_vertex_t
+{
+	float x, y, z;
+	float weight;
+	byte indices[4];
+	float nx, ny, nz;
+	float u, v;
+};
+
 struct studio_batch_t
 {
 	int textureId = 0;
@@ -548,6 +561,13 @@ struct studio_cache_t
 	bool physicsPoseUploaded = false;
 	int gpuSkinningBoneCount = 0;
 	BoneMat34 gpuSkinningBoneMatrices[MAXSTUDIOBONES];
+	// Built on first use by the Remix vertex blending path, from the same sources
+	// as gpuSkinSourceVertexBuffer, and released with it.
+	mutable IDirect3DVertexBuffer9 *remixBlendVertexBuffer = nullptr;
+	mutable UINT remixBlendVertexCount = 0;
+	// Some vertex's normal follows another bone than its position. Vertex blending
+	// applies one matrix to both, so such a model keeps the vertex shader path.
+	mutable bool remixBlendSplitNormals = false;
 
 	bool topologyValid = false;
 	bool poseUploaded = false;
@@ -1108,6 +1128,7 @@ extern convar_t dx_studio_gpu_chrome;
 extern convar_t dx_studio_gpu_max_bones;
 extern convar_t dx_studio_gpu_skinning;
 extern convar_t dx_studio_gpu_smooth;
+extern convar_t dx_studio_remix_vertex_blend;
 extern convar_t dx_studio_light_cache_dist;
 extern convar_t dx_studio_normal_lighting;
 extern convar_t dx_studio_normals;
