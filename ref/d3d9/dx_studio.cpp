@@ -6024,6 +6024,8 @@ static void R_DrawPlayerWeapon( model_t *playerModel,
 		studioDirectLightScale, false, &entityWorld, weaponBones, false );
 }
 
+static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,float now);
+
 void R_DrawStudioEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
@@ -6100,6 +6102,7 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 	R_DrawStudioEntityModel( mod, ent, ent->curstate.sequence,
 		renderFrame, gaitSeq, gaitFrame, gaitBoneYaw, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, false, &entityWorld );
+	R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 	const float pickupStrength=R_CofPickupStrength(ent);
 	if(pickupStrength>0.f) {
 		const auto& pickupCache=R_GetStudioEntityGpuCache(ent);
@@ -6652,6 +6655,34 @@ static void R_ProcessCofFlareEvents(studiohdr_t* hdr,cl_entity_s* ent,float fram
  }
 }
 
+// Forward client-side studio events (>= 5000) to HUD_StudioEvent like the GL
+// and software renderers do. CoF relies on this for animation-driven sounds,
+// e.g. ladder_climb.mdl fires 5093/5094/5095 for the climb start, rung steps
+// and finish. Muzzle flashes and the CoF flare pair keep their dedicated
+// renderer paths above, so they are skipped here to avoid double dispatch.
+static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,float now) {
+ if(!ent||!ent->model)return;
+ auto& state=R_GetEntityCache(ent).clientEvents;
+ if(!R_StudioHeaderValid(hdr)||!gEngfuncs.pfnStudioEvent||ent->curstate.sequence<0||ent->curstate.sequence>=hdr->numseq)return;
+ if(state.model!=ent->model){state={};state.model=ent->model;}
+ auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ const auto& seq=seqs[ent->curstate.sequence];
+ if(seq.numevents<=0||seq.numevents>4096||!R_StudioRangeValid(hdr,seq.eventindex,size_t(seq.numevents)*sizeof(mstudioevent_t)))return;
+ const float last=std::max(1.f,float(seq.numframes-1));
+ const float nativeFrame=std::clamp(frame*last/256.f,0.f,last);
+ const float window=std::clamp(float(gp_cl->time-gp_cl->oldtime),0.f,.1f)*std::fabs(ent->curstate.framerate)*seq.fps;
+ state.cursor.begin(ent->curstate.sequence,ent->curstate.animtime,now,nativeFrame,last,(seq.flags&STUDIO_LOOPING)!=0,window);
+ const bool flareModel=R_CofClientPresent()&&cof_features::flareModel(ent->model->name,true);
+ const auto events=reinterpret_cast<const mstudioevent_t*>(reinterpret_cast<const byte*>(hdr)+seq.eventindex);
+ for(int i=0;i<seq.numevents;++i) {
+  const int id=events[i].event;int attachment;
+  if(id<5000||R_StudioMuzzleAttachment(id,attachment))continue;
+  if(flareModel&&(id==5050||id==5051))continue;
+  if(!state.cursor.event(i,float(events[i].frame)))continue;
+  gEngfuncs.pfnStudioEvent(&events[i],ent);
+ }
+}
+
 void R_DrawStudioViewModel( cl_entity_s *ent,
 	const vec3_t viewOrigin, const vec3_t viewAngles,
 	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
@@ -6682,6 +6713,10 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 	R_DrawStudioEntityModel( ent->model, ent, ent->curstate.sequence,
 		renderFrame, -1, 0.0f, 0.0f, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, true, &viewModelWorld, nullptr, muzzleEvents, hiddenArm );
+	// Secondary (dual-wield mirror) passes are geometry-only copies; only the
+	// real engine viewmodel forwards its client events.
+	if( muzzleEvents )
+		R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 
 	D3DMATRIX identity;
 	DX_MatrixIdentity( identity );

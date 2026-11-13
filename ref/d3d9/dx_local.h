@@ -363,9 +363,11 @@ struct glow_occlusion_query_t
 };
 
 struct cof_flare_event_state_t { const model_t* model=nullptr;dx_muzzle_cursor_t cursor; };
+struct studio_client_event_state_t { const model_t* model=nullptr;dx_muzzle_cursor_t cursor; };
 struct entity_cache_t
 {
  cof_flare_event_state_t flare;
+ studio_client_event_state_t clientEvents;
 	attachment_cache_t attachments;
 	muzzleflash_state_t muzzleflash;
 	studio_light_probe_cache_t lightProbe;
