@@ -895,7 +895,7 @@ bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount, UIN
 bool R_DrawScratchPrimitive( D3DPRIMITIVETYPE type, UINT primitiveCount, UINT vertexCount, const void *vertices, UINT stride );
 void R_DrawSpriteImmediate( cl_entity_s *ent );
 void R_DrawStudioEntity( cl_entity_s *ent );
-void R_DrawStudioViewModel( cl_entity_s *ent, const vec3_t viewOrigin, const vec3_t viewAngles, const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp, float forwardOffset, float rightOffset, float upOffset, bool mirror=false, bool muzzleEvents=true, int hiddenArm=0 );
+void R_DrawStudioViewModel( cl_entity_s *ent, const vec3_t viewOrigin, const vec3_t viewAngles, const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp, float forwardOffset, float rightOffset, float upOffset, bool mirror=false, bool muzzleEvents=true, int hiddenArm=0, bool clientEvents=true );
 void R_DrawWaterIndexed( world_water_batch_t &batch );
 bool R_DrawWorldBrushes( model_t *mod );
 void R_DrawWorldWater( model_t *mod );
@@ -1192,6 +1192,7 @@ void R_QueueCofPickupOutline(const studio_cache_t& cache,const D3DMATRIX& world,
 
 extern convar_t dx_cof_player_shadow;
 cl_entity_s* R_CofShadowSecondary(float now);
+bool R_CofDualSecondary(const cl_entity_s* ent);
 bool R_CofShadowCrouchInput(float now,bool& held,float& height);
 
 void R_CofShadowProbeCmd();

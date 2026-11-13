@@ -1579,8 +1579,10 @@ static bool R_StudioProcessMuzzleEvents( studiohdr_t *hdr,
 	if( !hdr || !ent || !boneMatrices || sequence < 0 || sequence >= hdr->numseq )
 		return false;
 
+	// The dual-wield secondary must not overwrite the player's attachments,
+	// which belong to the primary (right-hand) viewmodel.
 	R_StudioUpdateAttachments( hdr, ent, boneMatrices, world,
-		viewModel, renderTime );
+		viewModel && !R_CofDualSecondary( ent ), renderTime );
 
 	mstudioseqdesc_t *seqdesc =
 		(mstudioseqdesc_t *)( (byte *)hdr + hdr->seqindex ) + sequence;
@@ -6831,7 +6833,7 @@ static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float 
 void R_DrawStudioViewModel( cl_entity_s *ent,
 	const vec3_t viewOrigin, const vec3_t viewAngles,
 	const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp,
-	float forwardOffset, float rightOffset, float upOffset, bool mirror, bool muzzleEvents, int hiddenArm )
+	float forwardOffset, float rightOffset, float upOffset, bool mirror, bool muzzleEvents, int hiddenArm, bool clientEvents )
 {
 	R_RegisterModelCvars( );
 	if( !ent || !ent->model || ent->model->type != mod_studio ||
@@ -6858,9 +6860,11 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 	R_DrawStudioEntityModel( ent->model, ent, ent->curstate.sequence,
 		renderFrame, -1, 0.0f, 0.0f, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, true, &viewModelWorld, nullptr, muzzleEvents, hiddenArm );
-	// Secondary (dual-wield mirror) passes are geometry-only copies; only the
-	// real engine viewmodel forwards its client events.
-	if( muzzleEvents )
+	// The secondary (dual-wield left hand) pass is a copy of a model the CoF
+	// client already animates and dispatches events for, so only the real
+	// engine viewmodel forwards client events (sounds etc.). Its renderer
+	// muzzle flash still has to be produced here, from its own attachments.
+	if( clientEvents )
 		R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 
 	D3DMATRIX identity;

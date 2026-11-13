@@ -68,6 +68,7 @@ bool R_CofShadowCrouchInput(float now,bool& held,float& height){return g_cofCrou
 static std::vector<cof_pickup::Span> g_cofPickupOutline;
 static dx_cof_dual_state_t g_cofDual;
 cl_entity_s* R_CofShadowSecondary(float now){return g_cofDual.current(now);}
+bool R_CofDualSecondary(const cl_entity_s* ent){return ent&&ent==&g_cofDual.entity;}
 static uint64_t g_cofDualPass=0;
 static dx_cof_player_visibility_t g_cofPlayerVisibility;
 static cof_features::Pickups g_cofPickups;
@@ -5790,11 +5791,11 @@ static void R_DrawViewModel( void )
 	g_cofDual.submit(static_cast<float>(gp_cl->time),g_cofDualPass,[&](cl_entity_t* secondary,bool mirrored) {
 		DX_SetRenderStateCached(D3DRS_CULLMODE,mirrored?D3DCULL_CW:D3DCULL_CCW);
 		R_DrawStudioViewModel(secondary,g_vOrigin,g_vAngles,g_vForward,g_vRight,g_vUp,
-			forwardOffset,rightOffset,upOffset,mirrored,false,g_cofDual.secondaryHiddenArm);
+			forwardOffset,rightOffset,upOffset,mirrored,true,g_cofDual.secondaryHiddenArm,false);
 		const auto debug=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("cof8_dual_debug"):nullptr;
 		static unsigned budget=120;
 		if(debug && debug->value!=0.f && budget && gEngfuncs.Con_Printf) {
-			--budget;gEngfuncs.Con_Printf("DUAL MODEL: draw-request model=%s seq=%d body=%d mirror=%d geometryOnly=1\n",secondary->model->name,secondary->curstate.sequence,secondary->curstate.body,mirrored);
+			--budget;gEngfuncs.Con_Printf("DUAL MODEL: draw-request model=%s seq=%d body=%d mirror=%d clientEvents=0\n",secondary->model->name,secondary->curstate.sequence,secondary->curstate.body,mirrored);
 		}
 	});
 
