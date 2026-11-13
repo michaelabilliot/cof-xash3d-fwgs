@@ -3042,7 +3042,11 @@ static bool R_CofPublishedLightDescription(D3DLIGHT9& light) {
  const bool phoneSource=!(flags&(DX_COF_HANDHELD|DX_COF_WEAPON))&&(flags&(DX_COF_MAIN|DX_COF_REDUCED));
  const bool heldPhone=!testing&&phoneSource&&R_CofPhoneLightActive(flags);
  const bool stowed=!testing&&(((flags&DX_COF_HANDHELD)&&!heldHandheld)||(phoneSource&&!heldPhone));
+ const bool weaponSource=!testing&&(flags&DX_COF_WEAPON)&&!heldHandheld;
  const auto build=[&](dx_cof_light_state_v2 p,float advance) {
+  // Anchor the weapon light to the taclight lens; if the viewmodel pose is
+  // unavailable, keep the published camera origin as before.
+  if(weaponSource&&R_CofWeaponLightPose(p))advance=0.f;
   if(heldHandheld&&!R_CofHandheldLightPose(p))return false;
   if(heldPhone&&!R_CofPhoneLightPose(p))return false;
   if(stowed) {

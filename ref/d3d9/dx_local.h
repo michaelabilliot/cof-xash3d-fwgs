@@ -1181,7 +1181,9 @@ bool R_CofHandheldLightPose(dx_cof_light_state_v2& pose);
 bool R_CofHandheldLightEquipped();
 bool R_CofPhoneLightActive(unsigned flags);
 bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose);
+bool R_CofWeaponLightPose(dx_cof_light_state_v2& pose);
 int R_StudioViewModelLightAttachments(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror=false);
+int R_StudioViewModelTacLightPoints(cl_entity_s* ent,float time,const float* viewOrigin,const float* viewAngles,const float* offsets,float* points,bool mirror=false);
 
 void R_ResetCofShadow();
 void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_entity_s* viewmodel);

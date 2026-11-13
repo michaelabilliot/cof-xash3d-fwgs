@@ -5563,6 +5563,23 @@ bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose) {
  for(int i=0;i<3;++i)pose.origin[i]=points[3+i];
  return DX_CofValid(pose);
 }
+// Weapon-mounted light: start the beam at the Glock taclight lens rather than
+// the camera, which sits behind the viewmodel hands.
+bool R_CofWeaponLightPose(dx_cof_light_state_v2& pose) {
+ const auto taclight=[](const cl_entity_s* ent){return ent&&ent->model&&ent->model->type==mod_studio&&
+  !(ent->curstate.effects&EF_NODRAW)&&(!Q_stricmp(ent->model->name,"models/weapons/glock/v_glock.mdl")||
+  !Q_stricmp(ent->model->name,"models/weapons/glock/v_glock_doctor.mdl"));};
+ bool mirrored=false;auto ent=R_CurrentViewModel();
+ if(!taclight(ent)){ent=g_cofDual.current(R_CurrentRenderTime(0.f));mirrored=g_cofDual.mirror;}
+ if(!taclight(ent))return false;
+ float points[6],offsets[3]={
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
+  std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
+ if(!R_StudioViewModelTacLightPoints(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points,mirrored))return false;
+ for(int i=0;i<3;++i){pose.origin[i]=points[i];pose.direction[i]=points[3+i]-points[i];}
+ return DX_CofValid(pose);
+}
 
 static bool g_sceneViewModelHidden=false;
 #include "dx_camera_viewmodel.h"
