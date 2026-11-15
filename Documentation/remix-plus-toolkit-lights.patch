@@ -1,0 +1,422 @@
+diff --git a/src/dxvk/rtx_render/rtx_game_capturer.cpp b/src/dxvk/rtx_render/rtx_game_capturer.cpp
+index 73a6865..e809d63 100644
+--- a/src/dxvk/rtx_render/rtx_game_capturer.cpp
++++ b/src/dxvk/rtx_render/rtx_game_capturer.cpp
+@@ -346,6 +346,14 @@ namespace dxvk {
+     for (auto&& pair : m_sceneManager.getLightManager().getExternallyTrackedLightTable()) {
+       captureLight(pair.second);
+     }
++    // External handles are cleared after GPU preparation. Capture the same
++    // resolved source lights that were submitted to the frame.
++    for (const auto* light : m_sceneManager.getLightManager().getResolvedExternalLights()) {
++      if ((light->getType() == RtLightType::Sphere || light->getType() == RtLightType::Distant) &&
++          light->getColorAndIntensity().w > 0.f) {
++        captureLight(*light);
++      }
++    }
+   }
+ 
+   void GameCapturer::captureSphereLight(const dxvk::RtSphereLight& rtLight) {
+diff --git a/src/dxvk/rtx_render/rtx_game_lights.cpp b/src/dxvk/rtx_render/rtx_game_lights.cpp
+index b224402..5ffa26a 100644
+--- a/src/dxvk/rtx_render/rtx_game_lights.cpp
++++ b/src/dxvk/rtx_render/rtx_game_lights.cpp
+@@ -31,6 +31,7 @@
+ #include "rtx_options.h"
+ #include "rtx_retained_scene.h"
+ #include "rtx_scene_manager.h"
++#include "rtx_utils.h"
+ #include "translator/rtx_translator_lifetime.h"
+ 
+ namespace dxvk {
+@@ -66,6 +67,10 @@ namespace dxvk {
+       const XXH64_hash_t key = XXH64(&position, sizeof(Vector3), assetHash);
+       const std::shared_ptr<const ReplacementBucket> bucket = m_scene.getAssetReplacer()->getReplacementsForLight(assetHash);
+       if (bucket == nullptr) {
++        if (Logger::logLevel() <= LogLevel::Debug) {
++          Logger::debug(str::format("[GameLight] hash=", hashToString(assetHash),
++            " position=", position.x, ",", position.y, ",", position.z, " state=unmatched (original submitted)"));
++        }
+         // A light that had a replacement (replacement lights toggled off) loses its replacement lights first.
+         const auto stale = m_entries.find(key);
+         if (stale != m_entries.end()) {
+@@ -77,6 +82,7 @@ namespace dxvk {
+         continue;
+       }
+ 
++      lightManager.suppressGameLight(assetHash);
+       const Matrix4 transform = LightUtils::getLightTransform(light);
+       auto [found, inserted] = m_entries.try_emplace(key);
+       Entry& entry = found->second;
+@@ -93,6 +99,7 @@ namespace dxvk {
+       const bool boundsNeeded = !entry.lightBounds.isValid();
+       AxisAlignedBoundingBox litBounds;
+       size_t slot = 0;
++      bool emits = false;
+       for (const AssetReplacement& replacement : bucket->replacements) {
+         if (replacement.type != AssetReplacement::eLight || !replacement.lightData.has_value()) {
+           continue;  // Meshes under lights are not supported.
+@@ -101,6 +108,7 @@ namespace dxvk {
+         // Merged before the bounds, since some replacements take type, position and radius from the game light.
+         replacementLight.merge(light);
+         RtLight rtReplacement = replacementLight.toRtLight();
++        emits |= rtReplacement.getColorAndIntensity().w > 0.f;
+         if (boundsNeeded) {
+           const Vector3 p = rtReplacement.getPosition();
+           const float radius = rtReplacement.getType() == RtLightType::Sphere ? rtReplacement.getSphereLight().getRadius() : 0.f;
+@@ -129,6 +137,10 @@ namespace dxvk {
+       }
+       entry.transform = transform;
+       entry.frameLastSeen = frame;
++      if (Logger::logLevel() <= LogLevel::Debug) {
++        Logger::debug(str::format("[GameLight] hash=", hashToString(assetHash),
++          " position=", position.x, ",", position.y, ",", position.z, " state=", emits ? "replaced" : "suppressed"));
++      }
+       m_stats.replaced++;
+     }
+   }
+diff --git a/src/dxvk/rtx_render/rtx_light_manager.cpp b/src/dxvk/rtx_render/rtx_light_manager.cpp
+index cf0fea6..78ad8b4 100644
+--- a/src/dxvk/rtx_render/rtx_light_manager.cpp
++++ b/src/dxvk/rtx_render/rtx_light_manager.cpp
+@@ -28,6 +28,7 @@
+ #include "rtx_fork_hooks.h"
+ #include "rtx_light_manager.h"
+ #include "rtx_context.h"
++#include "rtx_asset_replacer.h"
+ #include "rtx_options.h"
+ #include "rtx_utils.h"
+ 
+@@ -91,6 +92,7 @@ namespace dxvk {
+     }
+     m_lights.clear();
+     m_linearizedLights.clear();
++    m_resolvedExternalLights.clear();
+     m_lightDebugUILock.unlock();
+   }
+ 
+@@ -242,6 +244,7 @@ namespace dxvk {
+     ScopedCpuProfileZone();
+     // Ensure external light updates/removals are applied before we linearize and draw UI
+     fork_hooks::flushPendingLightMutations(*this);
++    resolveExternalLights(*device()->getCommon()->getSceneManager().getAssetReplacer());
+     // Note: Early outing in this function (via returns) should be done carefully (or not at all ideally) as it may skip important
+     // logic such as swapping the current/previous frame light buffer, updating light count information or allocating/updating the
+     // light buffer which may cause issues in some cases (or rather already has, which is why this warning exists).
+@@ -373,12 +376,8 @@ namespace dxvk {
+       m_linearizedLights.emplace_back(&pair.second);
+     }
+ 
+-    for (auto& handle : m_externalActiveLightList) {
+-      auto found = m_externalLights.find(handle);
+-      if (found != m_externalLights.end()) {
+-        m_linearizedLights.emplace_back(&found->second);
+-     }
+-    }
++    m_linearizedLights.insert(m_linearizedLights.end(),
++      m_resolvedExternalLights.begin(), m_resolvedExternalLights.end());
+ 
+     // Count the active light of each type
+ 
+@@ -713,6 +712,17 @@ namespace dxvk {
+     return addLight(rtLight, antiCullingType);
+   }
+ 
++  void LightManager::suppressGameLight(XXH64_hash_t hash) {
++    if (!m_lightDebugUILock.owns_lock()) {
++      m_lightDebugUILock.lock();
++    }
++    const auto found = m_lights.find(hash);
++    if (found != m_lights.end() && found->second.getInitialHash() == hash &&
++        found->second.getPrimInstanceOwner().getReplacementInstance() == nullptr) {
++      m_lights.erase(found);
++    }
++  }
++
+   void LightManager::addGameLight(const frontend::FixedFunctionLight::Type type, const RtLight& rtLight) {
+     switch (type) {
+     case frontend::FixedFunctionLight::Type::Directional:
+@@ -866,6 +876,76 @@ namespace dxvk {
+     fork_hooks::updateLightStaticSleep(light, newLight, m_device, externalId);
+   }
+ 
++  void LightManager::resolveExternalLights(AssetReplacer& replacer) {
++    m_resolvedExternalLights.clear();
++    for (const auto handle : m_externalActiveLightList) {
++      auto& source = m_externalLights.at(handle);
++      const bool supported = source.getType() == RtLightType::Sphere ||
++                             source.getType() == RtLightType::Distant;
++      const auto bucket = supported ? replacer.getReplacementsForLight(source.getInitialHash()) : nullptr;
++      auto previous = m_externalLightReplacements.find(handle);
++      const bool logDecision = Logger::logLevel() <= LogLevel::Debug;
++      if (!bucket) {
++        if (logDecision) {
++          const auto p = source.getPosition();
++          Logger::debug(str::format("[ExternalLight] hash=", hashToString(source.getInitialHash()),
++            " position=", p.x, ",", p.y, ",", p.z, " state=unmatched (original submitted)"));
++        }
++        if (previous != m_externalLightReplacements.end()) {
++          m_externalLightReplacements.erase(previous);
++        }
++        m_resolvedExternalLights.push_back(&source);
++        continue;
++      }
++
++      // A present bucket owns the source even when empty or all entries are dark.
++      source.setBufferIdx(kNewLightIdx);
++      auto& entry = m_externalLightReplacements[handle];
++      if (entry.bucket != bucket) {
++        entry.bucket = bucket;
++        entry.lights.clear();
++        entry.lights.reserve(bucket->replacements.size());
++      }
++      size_t slot = 0;
++      bool emits = false;
++      for (const auto& replacement : bucket->replacements) {
++        if (replacement.type != AssetReplacement::eLight || !replacement.lightData) {
++          continue;
++        }
++        auto data = *replacement.lightData;
++        data.merge(source);
++        auto light = data.toRtLight();
++        if (data.relativeTransform()) {
++          light.applyTransform(LightData::getSourceTransform(source));
++        }
++        light.isDynamic = source.isDynamic;
++        light.ignoreViewModel = source.ignoreViewModel;
++        if (slot == entry.lights.size()) {
++          entry.lights.push_back(light);
++        } else {
++          auto& existing = entry.lights[slot];
++          light.setStableIdentity(existing.getStableIdentity());
++          light.setBufferIdx(existing.getBufferIdx());
++          existing = light;
++        }
++        m_resolvedExternalLights.push_back(&entry.lights[slot++]);
++        emits |= logDecision && light.getColorAndIntensity().w > 0.f;
++      }
++      if (logDecision) {
++        const auto p = source.getPosition();
++        Logger::debug(str::format("[ExternalLight] hash=", hashToString(source.getInitialHash()),
++          " position=", p.x, ",", p.y, ",", p.z, " state=", emits ? "replaced" : "suppressed"));
++      }
++    }
++    for (auto it = m_externalLightReplacements.begin(); it != m_externalLightReplacements.end();) {
++      if (m_externalActiveLightList.count(it->first) == 0) {
++        it = m_externalLightReplacements.erase(it);
++      } else {
++        ++it;
++      }
++    }
++  }
++
+   void LightManager::addExternalLight(remixapi_LightHandle handle, const RtLight& rtlight) {
+     auto found = m_externalLights.find(handle);
+     if (found != m_externalLights.end()) {
+diff --git a/src/dxvk/rtx_render/rtx_light_manager.h b/src/dxvk/rtx_render/rtx_light_manager.h
+index 4f70bce..bdd34eb 100644
+--- a/src/dxvk/rtx_render/rtx_light_manager.h
++++ b/src/dxvk/rtx_render/rtx_light_manager.h
+@@ -47,6 +47,8 @@ namespace dxvk {
+ class DxvkContext;
+ class DxvkDevice;
+ struct RtLight;
++struct ReplacementBucket;
++struct AssetReplacer;
+ struct LightManager;
+ 
+ // Forward declarations of fork_hooks functions that require friend access to
+@@ -128,6 +130,7 @@ public:
+   // the packed buffer: the shader-side decode lives behind rtx/concept/light, whose include chain
+   // reaches cb-dependent headers that standalone compute passes have no constant buffer for.
+   const std::vector<RtLight*>& getLinearizedLights() const { return m_linearizedLights; }
++  const std::vector<RtLight*>& getResolvedExternalLights() const { return m_resolvedExternalLights; }
+   const DomeLightArgs& getDomeLightArgs();
+ 
+   void clear();
+@@ -143,6 +146,7 @@ public:
+   void prepareSceneData(Rc<DxvkContext> ctx, CameraManager const& cameraManager);
+ 
+   void addGameLight(frontend::FixedFunctionLight::Type type, const RtLight& light);
++  void suppressGameLight(XXH64_hash_t hash);
+   RtLight* addLight(const RtLight& light, const RtLightAntiCullingType antiCullingType);
+   RtLight* addLight(const RtLight& light, const SceneDraw& drawCallState, const RtLightAntiCullingType antiCullingType);
+ 
+@@ -179,6 +183,13 @@ private:
+   // lights provided from the application.
+   std::optional<RtLight> m_fallbackLight{};
+   std::unordered_map<remixapi_LightHandle, RtLight> m_externalLights;
++  struct ExternalLightReplacement {
++    std::shared_ptr<const ReplacementBucket> bucket;
++    std::vector<RtLight> lights;
++  };
++  std::unordered_map<remixapi_LightHandle, ExternalLightReplacement> m_externalLightReplacements;
++  std::vector<RtLight*> m_resolvedExternalLights;
++  void resolveExternalLights(AssetReplacer& replacer);
+   std::unordered_map<remixapi_LightHandle, DomeLight> m_externalDomeLights;
+   std::unordered_set<remixapi_LightHandle> m_externalActiveLightList;
+   remixapi_LightHandle m_externalActiveDomeLight = nullptr;
+diff --git a/src/dxvk/rtx_render/rtx_lights_data.cpp b/src/dxvk/rtx_render/rtx_lights_data.cpp
+index 5beaf8b..a544dbc 100644
+--- a/src/dxvk/rtx_render/rtx_lights_data.cpp
++++ b/src/dxvk/rtx_render/rtx_lights_data.cpp
+@@ -28,6 +28,8 @@
+ 
+ #include <remix/remix_c.h>
+ 
++#include "../../util/util_quat.h"
++
+ #include <regex>
+ #include <cassert>
+ 
+@@ -151,6 +153,56 @@ namespace dxvk {
+     }
+   }
+ 
++  Matrix4 LightData::getSourceTransform(const RtLight& light) {
++    const auto position = light.getPosition();
++    if (light.getType() == RtLightType::Sphere) {
++      const auto& shaping = light.getSphereLight().getShaping();
++      if (!shaping.getEnabled()) {
++        return Matrix4(position);
++      }
++      return Matrix4(getOrientation(Vector3(0.f, 0.f, -1.f), shaping.getDirection()), position);
++    }
++    if (light.getType() == RtLightType::Distant) {
++      return Matrix4(getOrientation(Vector3(0.f, 0.f, -1.f), light.getDirection()), position);
++    }
++    return Matrix4(position);
++  }
++
++  void LightData::merge(const RtLight& light) {
++    // Sphere and distant are the analytic source types supported by legacy
++    // capture and by the map-light API bridge.
++    const bool isSphere = light.getType() == RtLightType::Sphere;
++    const auto sourceType = isSphere ? Sphere : Distant;
++    LightData input(sourceType);
++    const Vector4 colorAndIntensity = light.getColorAndIntensity();
++    input.m_Color = Vector3(colorAndIntensity.x, colorAndIntensity.y, colorAndIntensity.z);
++    input.m_Intensity = colorAndIntensity.w;
++    input.m_VolumetricRadianceScale = light.getVolumetricRadianceScale();
++    if (!relativeTransform()) {
++      const auto transform = getSourceTransform(light);
++      input.m_position = light.getPosition();
++      input.m_xAxis = Vector3(transform[0][0], transform[0][1], transform[0][2]);
++      input.m_yAxis = Vector3(transform[1][0], transform[1][1], transform[1][2]);
++      input.m_zAxis = -Vector3(transform[2][0], transform[2][1], transform[2][2]);
++    }
++    if (isSphere) {
++      const auto& sphere = light.getSphereLight();
++      input.m_Radius = sphere.getRadius();
++      const auto& shaping = sphere.getShaping();
++      if (shaping.getEnabled()) {
++        input.m_ConeAngleRadians = std::acos(std::clamp(shaping.getCosConeAngle(), -1.f, 1.f));
++        input.m_ConeSoftness = shaping.getConeSoftness();
++        input.m_Focus = shaping.getFocusExponent();
++      }
++    } else {
++      input.m_AngleRadians = light.getDistantLight().getHalfAngle() * 2.f;
++    }
++    if (m_lightType == Unknown) {
++      m_lightType = sourceType;
++    }
++    merge(input);
++  }
++
+   // Note: This can only be called after LightData::deserialize has been called due to relying on deserialized values.
+   bool LightData::isShapingEnabled() const {
+     return m_ConeAngleRadians != (180.f * kDegreesToRadians) || m_ConeSoftness != 0.0f || m_Focus != 0.0f;
+diff --git a/src/dxvk/rtx_render/rtx_lights_data.h b/src/dxvk/rtx_render/rtx_lights_data.h
+index 1c2796b..1bfca96 100644
+--- a/src/dxvk/rtx_render/rtx_lights_data.h
++++ b/src/dxvk/rtx_render/rtx_lights_data.h
+@@ -65,6 +65,8 @@ namespace dxvk {
+     RtLight toRtLight() const;
+ 
+     void merge(const frontend::FixedFunctionLight& light);
++    void merge(const RtLight& light);
++    static Matrix4 getSourceTransform(const RtLight& light);
+ 
+     static bool isSupportedUsdLight(const pxr::UsdPrim& lightPrim);
+ 
+diff --git a/src/dxvk/rtx_render/rtx_mod_usd.cpp b/src/dxvk/rtx_render/rtx_mod_usd.cpp
+index 22af829..28fe89b 100644
+--- a/src/dxvk/rtx_render/rtx_mod_usd.cpp
++++ b/src/dxvk/rtx_render/rtx_mod_usd.cpp
+@@ -2083,7 +2083,7 @@ bool UsdMod::Impl::processUSD(const Rc<DxvkContext>& context, AssetReplacements&
+ 
+   pxr::UsdPrim lights = stage->GetPrimAtPath(pxr::SdfPath("/RootNode/lights"));
+   if (lights.IsValid()) {
+-    const auto children = lights.GetFilteredChildren(pxr::UsdPrimIsActive);
++    const auto children = lights.GetAllChildren();
+     std::uint32_t currentLightCount{ 0U };
+ 
+     for (pxr::UsdPrim child : children) {
+@@ -2098,7 +2098,10 @@ bool UsdMod::Impl::processUSD(const Rc<DxvkContext>& context, AssetReplacements&
+         continue;
+       }
+ 
+-      if (hash != 0) {
++      if (hash != 0 && !child.IsActive()) {
++        // An explicitly disabled root has a hash but no emitting replacements.
++        target.set<AssetReplacement::eLight>(hash, {});
++      } else if (hash != 0) {
+         std::vector<AssetReplacement> replacementVec;
+         Args args = {context, xformCache, child, replacementVec};
+         args.target = &target;
+diff --git a/tests/rtx/unit/test_hot_reload.cpp b/tests/rtx/unit/test_hot_reload.cpp
+index fded82f..3671aad 100644
+--- a/tests/rtx/unit/test_hot_reload.cpp
++++ b/tests/rtx/unit/test_hot_reload.cpp
+@@ -730,6 +730,43 @@ static void testDeleteMeshPrimDirtiesHash() {
+ }
+ 
+ // ─── Test: adding a light prim dirties its light hash ────────────────────────
++static void testExternalLightOverride() {
++  const auto stage = pxr::UsdStage::CreateInMemory();
++  const auto prim = stage->OverridePrim(pxr::SdfPath("/RootNode/lights/light_0000000000ABCDEF"));
++  const auto intensity = prim.CreateAttribute(pxr::TfToken("inputs:intensity"), pxr::SdfValueTypeNames->Float);
++  const auto makeSource = [](float brightness) {
++    return RtLight(RtSphereLight(Vector3(12.f, 30.f, 45.f), Vector3(brightness, brightness * .5f, 0.f),
++      8.f, RtLightShaping(true, Vector3(1.f, 0.f, 0.f), .5f, .1f, 1.f), 1.f));
++  };
++  const auto source = makeSource(20.f);
++  const auto brighter = makeSource(80.f);
++  if (source.getInitialHash() != brighter.getInitialHash() ||
++      source.getInitialHash() != source.getSphereLight().getHash()) {
++    throw DxvkError("The captured sphere hash must survive API brightness updates");
++  }
++  for (const float authored : { 0.f, 3.f, 0.f }) {
++    intensity.Set(authored);
++    auto data = LightData::tryCreate(prim, nullptr, true, false);
++    if (!data) {
++      throw DxvkError("Could not load an untyped Toolkit light override");
++    }
++    data->merge(source);
++    const auto light = data->toRtLight();
++    const auto& sphere = light.getSphereLight();
++    const auto color = light.getColorAndIntensity();
++    if (color.w != authored || sphere.getRadius() != 8.f ||
++        length(light.getPosition() - source.getPosition()) > .001f ||
++        length(sphere.getShaping().getDirection() - Vector3(1.f, 0.f, 0.f)) > .001f ||
++        std::abs(sphere.getShaping().getCosConeAngle() - .5f) > .001f) {
++      throw DxvkError("External light override did not preserve its unedited geometry or honor intensity");
++    }
++  }
++  if (source.getColorAndIntensity().w != 20.f) {
++    throw DxvkError("A replacement modified the original API definition");
++  }
++  Logger::info("testExternalLightOverride passed");
++}
++
+ static void testAddLightPrimDirtiesHash() {
+   auto stage = pxr::UsdStage::CreateInMemory("test.usda");
+   stage->DefinePrim(pxr::SdfPath("/RootNode/lights"));
+@@ -1232,6 +1269,7 @@ int main() {
+     dxvk::testMaterialNestedUnderMeshIsClassified();
+     dxvk::testDeletedExternalMaterialIsClassified();
+     dxvk::testDeletedMaterialAncestorIsClassified();
++    dxvk::testExternalLightOverride();
+     dxvk::testAddLightPrimDirtiesHash();
+     dxvk::testLegacySphereLightNaming();
+     dxvk::testEditGeomSubsetDirtiesMesh();

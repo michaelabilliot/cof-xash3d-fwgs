@@ -2606,7 +2606,8 @@ static bool R_DynamicLightsEnabled( )
 
 static int R_DynamicLightsMax( )
 {
-	return std::max( 0, std::min( 128, static_cast<int>( dx_dlight_max.value ) ) );
+	return R_RemixCaptureAll() ? UINT16_MAX :
+		std::max( 0, std::min( 128, static_cast<int>( dx_dlight_max.value ) ) );
 }
 
 float R_DynamicLightIntensityScale( )
@@ -3251,7 +3252,8 @@ void R_ApplyDLights( void )
 		return;
 	}
 
-	const int maxLights = std::min( 8, R_DynamicLightsMax( ) );
+	const bool captureAll = R_RemixCaptureAll();
+	const int maxLights = captureAll ? R_DynamicLightsMax() : std::min( 8, R_DynamicLightsMax() );
 	int emitted = R_EmitRemixFlashlights( maxLights );
 	for( size_t sourceIndex = 0;
 		sourceIndex < g_dxDLights.size( ) && emitted < maxLights; ++sourceIndex )
@@ -3271,8 +3273,17 @@ void R_ApplyDLights( void )
 		light.Attenuation0 = 0.0f;
 		light.Attenuation1 = 1.0f / std::max( 1.0f, source.radius );
 		light.Attenuation2 = 1.0f / std::max( 1.0f, source.radius * source.radius );
-		device->SetLight( emitted, &light );
-		device->LightEnable( emitted, TRUE );
+		if( captureAll )
+		{
+			if( FAILED( device->SetLight( emitted, &light ) ) ||
+				FAILED( device->LightEnable( emitted, TRUE ) ) )
+				break;
+		}
+		else
+		{
+			device->SetLight( emitted, &light );
+			device->LightEnable( emitted, TRUE );
+		}
 		++emitted;
 	}
 
@@ -4459,7 +4470,7 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 
 	const bool needsEntityState = ent && ent->curstate.rendermode != kRenderNormal;
 	const bool remixSingleSidedGlass =
-		dx_remix.value != 0.0f && dx_remix_glass_single_sided.value != 0.0f &&
+		!R_RemixCaptureAll() && dx_remix.value != 0.0f && dx_remix_glass_single_sided.value != 0.0f &&
 		ent && ent->curstate.rendermode == kRenderTransTexture;
 	D3DMATRIX remixGlassWorld{};
 	if( remixSingleSidedGlass )

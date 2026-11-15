@@ -949,8 +949,10 @@ qboolean CL_AddVisibleEntity( cl_entity_t *ent, int entityType )
 		}
 	}
 
-	// check for adding this entity
-	if( !clgame.dllFuncs.pfnAddEntity( entityType, ent, ent->model->name ))
+	// Run the DLL callback for its effects even when capture mode bypasses
+	// its renderer-specific entity filters.
+	if( !clgame.dllFuncs.pfnAddEntity( entityType, ent, ent->model->name ) &&
+		( entityType == ET_PLAYER || Cvar_VariableValue( "r_remixcull" ) == 0.0f ))
 	{
 		// local player was reject by game code, so ignore any effects
 		if( RP_LOCALCLIENT( ent ))

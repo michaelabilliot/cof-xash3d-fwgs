@@ -74,6 +74,18 @@ int main(int argc, char** argv) try {
     check(batches(draw)->size() == 1 && batches(draw)->front() == 0, "enabling frustum invalidates PVS-only cache");
     symbol<float*>("g_dxCullForward")[0] = -1;
     check(batches(draw)->size() == 1 && batches(draw)->front() == 1, "camera turn invalidates megabatch visibility");
-    puts("PASS: production frustum tangencies across 3 FOVs, near/far, overrides, rotated bounds, megabatch cache toggle and camera turn. No GPU/window/game.");
+    auto capture = symbol<convar_t*>("r_remixcull");
+    auto bounds = symbol<bool(*)(const float*, const float*, bool)>("R_BoundsVisibleInCurrentView");
+    check(!bounds(draw.batches[0].mins, draw.batches[0].maxs, true), "normal bounds rejection");
+    capture->value = 1;
+    check(sphere(front,10) && bounds(draw.batches[0].mins, draw.batches[0].maxs, true),
+          "capture bypasses entity and world frustum planes");
+    check(batches(draw) == nullptr, "capture uses uncached world submission");
+    auto pvs = symbol<bool(*)(const world_model_draw_t&, const std::vector<int>&, bool)>("R_PVSLeafsVisible");
+    draw.pvsApplicable = true;
+    check(pvs(draw, {12345}, false), "capture accepts batches regardless of PVS leaf");
+    capture->value = 0;
+    check(batches(draw)->size() == 1 && batches(draw)->front() == 1, "capture toggle restores normal culling");
+    puts("PASS: production frustum, capture visibility override, and world cache toggling. No GPU/window/game.");
     return 0;
 } catch (const std::exception& error) { fprintf(stderr, "FAIL FRUSTUM: %s\n", error.what()); return 1; }
