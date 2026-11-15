@@ -195,6 +195,21 @@ intptr_t CL_RenderGetParm( const int parm, const int arg, const qboolean checkRe
             return sv.state==ss_active && !cls.demoplayback?(intptr_t)SV_RagdollClaim(arg):0;
         case PARM_RAGDOLL_ACK:
             return sv.state==ss_active && !cls.demoplayback?(intptr_t)SV_RagdollAck(arg):0;
+		case PARM_RAGDOLL_BRUSH:
+		{
+			static ref_ragdoll_brush_t brush;
+			if( sv.state != ss_active || !svgame.edicts || cls.demoplayback )
+				return 0;
+			if( arg < 0 ) return CL_GetRagdollBrush( arg );
+			if( arg == 0 || arg >= svgame.numEntities || svgame.edicts[arg].free )
+				return 0;
+
+			brush.entity = CL_GetEntityByIndex( arg );
+			brush.serial = svgame.edicts[arg].serialnumber;
+			brush.modelindex = svgame.edicts[arg].v.modelindex;
+			brush.solid = svgame.edicts[arg].v.solid;
+			return (intptr_t)&brush;
+		}
         case PARM_GET_RAGDOLL_ENTITY:
 		{
 			static ref_ragdoll_entity_t snapshot;

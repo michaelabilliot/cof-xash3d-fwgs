@@ -17,22 +17,26 @@ void DX_FreeStudioSkinningShaders( void )
 {
 	if( s_studioRemixBlendDeclaration )
 	{
+		DX_ForgetGeometryResource( s_studioRemixBlendDeclaration );
 		s_studioRemixBlendDeclaration->Release( );
 		s_studioRemixBlendDeclaration = nullptr;
 	}
 	s_studioRemixBlendTriedCreate = false;
 	if( s_studioGpuSkinShader )
 	{
+		DX_ForgetGeometryResource( s_studioGpuSkinShader );
 		s_studioGpuSkinShader->Release( );
 		s_studioGpuSkinShader = nullptr;
 	}
 	if( s_studioGpuSkinLocalShader )
 	{
+		DX_ForgetGeometryResource( s_studioGpuSkinLocalShader );
 		s_studioGpuSkinLocalShader->Release( );
 		s_studioGpuSkinLocalShader = nullptr;
 	}
 	if( s_studioGpuSkinDeclaration )
 	{
+		DX_ForgetGeometryResource( s_studioGpuSkinDeclaration );
 		s_studioGpuSkinDeclaration->Release( );
 		s_studioGpuSkinDeclaration = nullptr;
 	}
@@ -293,8 +297,8 @@ int DX_StudioGpuSkinningBoneCap( void )
 
 void DX_BindStudioGpuSkinningShader( bool localLights )
 {
-	device->SetVertexDeclaration( s_studioGpuSkinDeclaration );
-	device->SetVertexShader( localLights ? s_studioGpuSkinLocalShader : s_studioGpuSkinShader );
+	DX_SetVertexDeclarationCached( s_studioGpuSkinDeclaration );
+	DX_SetVertexShaderCached( localLights ? s_studioGpuSkinLocalShader : s_studioGpuSkinShader );
 }
 
 bool DX_BindStudioRemixBlendDeclaration( void )
@@ -322,7 +326,7 @@ bool DX_BindStudioRemixBlendDeclaration( void )
 			return false;
 		}
 	}
-	device->SetVertexShader( nullptr );
-	device->SetVertexDeclaration( s_studioRemixBlendDeclaration );
+	DX_SetVertexShaderCached( nullptr );
+	DX_SetVertexDeclarationCached( s_studioRemixBlendDeclaration );
 	return true;
 }

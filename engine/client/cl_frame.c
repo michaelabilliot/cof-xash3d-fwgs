@@ -286,6 +286,57 @@ void CL_ResetLatchedVars( cl_entity_t *ent, qboolean full_reset )
 		clgame.drawFuncs.CL_UpdateLatchedVars( ent, true );
 }
 
+static int cl_ragdoll_brushes[MAX_EDICTS];
+static int cl_ragdoll_brush_slots[MAX_EDICTS]; // Dense slot plus one, or zero.
+static int cl_ragdoll_brush_count;
+
+void CL_ClearRagdollBrushes( void )
+{
+	while( cl_ragdoll_brush_count )
+		cl_ragdoll_brush_slots[cl_ragdoll_brushes[--cl_ragdoll_brush_count]] = 0;
+}
+
+intptr_t CL_GetRagdollBrush( int arg )
+{
+	if( arg == -1 ) return cl_ragdoll_brush_count;
+	if( arg == -2 ) return (intptr_t)cl_ragdoll_brushes;
+	return 0;
+}
+
+static void CL_RemoveRagdollBrush( int index )
+{
+	if( index <= 0 || index >= MAX_EDICTS )
+		return;
+
+	const int slot = cl_ragdoll_brush_slots[index];
+	if( !slot )
+		return;
+
+	const int last = cl_ragdoll_brushes[--cl_ragdoll_brush_count];
+	cl_ragdoll_brushes[slot - 1] = last;
+	cl_ragdoll_brush_slots[last] = slot;
+	cl_ragdoll_brush_slots[index] = 0;
+}
+
+static void CL_UpdateRagdollBrush( const cl_entity_t *ent )
+{
+	const int index = ent->index;
+	if( index <= 0 || index >= MAX_EDICTS )
+		return;
+
+	if( !ent->model || ent->model->type != mod_brush )
+	{
+		CL_RemoveRagdollBrush( index );
+		return;
+	}
+
+	if( !cl_ragdoll_brush_slots[index] )
+	{
+		cl_ragdoll_brushes[cl_ragdoll_brush_count++] = index;
+		cl_ragdoll_brush_slots[index] = cl_ragdoll_brush_count;
+	}
+}
+
 /*
 ==================
 CL_ProcessEntityUpdate
@@ -297,6 +348,7 @@ static void CL_ProcessEntityUpdate( cl_entity_t *ent )
 {
 	ent->model = CL_ModelHandle( ent->curstate.modelindex );
 	ent->index = ent->curstate.number;
+	CL_UpdateRagdollBrush( ent );
 
 	if( FBitSet( ent->curstate.entityType, ENTITY_NORMAL ))
 		COM_NormalizeAngles( ent->curstate.angles );
@@ -760,6 +812,9 @@ static void CL_DeltaEntity( sizebuf_t *msg, frame_t *frame, int newnum, entity_s
 	if( !alive )
 	{
 		CL_KillDeadBeams( ent ); // release dead beams
+		// A PVS-only removal can still own local collision.
+		if( state->number == -1 )
+			CL_RemoveRagdollBrush( newnum );
 #if 0
 		// this is for reference
 		if( state->number == -1 )

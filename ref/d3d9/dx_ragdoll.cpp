@@ -1,3 +1,4 @@
+#include <unordered_map>
 #include "dx_ragdoll.h"
 #include "ragdoll_physics.h"
 
@@ -44,10 +45,18 @@ struct Entry {
     int boneCount=0;
     std::array<float,ragdoll::MaxBones> scales{};
 };
-struct Brush {int index,serial;model_t *model;ragdoll::Mesh *mesh;};
+struct Brush {
+    int serial;
+    model_t *model;
+    ragdoll::Mesh *mesh;
+    bool seen = false;
+    bool transformValid = false;
+    bool interpolated = false;
+    vec3_t origin{}, angles{};
+};
 std::unique_ptr<ragdoll::World> physics;
 std::vector<Entry> entries;
-std::vector<Brush> brushes;
+std::unordered_map<int, Brush> brushes;
 model_t *worldModel=nullptr;
 model_t *failedWorld=nullptr;
 double lastTime=-1;
@@ -365,29 +374,72 @@ void DX_RagdollFrame() {
     for(auto &entry:entries) if(entry.doll && !entry.doll->frozen) ++active;
     for(auto &entry:entries) if(active>limit && entry.doll && !entry.doll->frozen && physics->safeToRetire(*entry.doll)) {physics->freeze(*entry.doll);--active;}
 
-    // Cache each BSP mesh once. Detached/hidden brushes retain no collision;
-    // their cached object is masked until the same model is solid again.
-    const int count=std::clamp(std::min(available,static_cast<int>(gEngfuncs.EngineGetParm(PARM_MAX_ENTITIES,0))),0,32768);
-    for(auto &brush:brushes) brush.mesh->body->setCollisionFlags(brush.mesh->body->getCollisionFlags()|btCollisionObject::CF_NO_CONTACT_RESPONSE);
-    for(int i=1;i<count;++i) {
-        auto *ent=gEngfuncs.R_BeamGetEntity(i);
-        const auto *s=snapshot(i);
-        if(!ent || !s || s->solid!=SOLID_BSP || !ent->model || ent->model->type!=mod_brush ||
-            s->modelindex!=ent->curstate.modelindex) continue;
-        auto found=std::find_if(brushes.begin(),brushes.end(),[i,ent](const Brush &b){return b.index==i && b.model==ent->model;});
-        if(found==brushes.end()) {
-            if(brushes.size()>=256) continue;
-            std::vector<btVector3> vertices;
-            if(!meshVertices(ent->model,vertices)) continue;
-            auto *mesh=physics->addMesh(vertices,true);if(!mesh) continue;
-            brushes.push_back({i,s->serial,ent->model,mesh});found=brushes.end()-1;
+    // Keep brush candidates across PVS changes. The native edict is authoritative
+    // for solidity and lifetime, even when no new client packet contains it.
+    const auto *indices=reinterpret_cast<const int*>(gEngfuncs.EngineGetParm(PARM_RAGDOLL_BRUSH,-2));
+    const int count=indices?static_cast<int>(gEngfuncs.EngineGetParm(PARM_RAGDOLL_BRUSH,-1)):0;
+    for(int i=0;i<count;++i) {
+        const int index=indices[i];
+        const auto *state=reinterpret_cast<const ref_ragdoll_brush_t*>(gEngfuncs.EngineGetParm(PARM_RAGDOLL_BRUSH,index));
+        if(!state || !state->entity) continue;
+        const cl_entity_t &ent=*state->entity;
+        if(!ent.model || ent.model->type!=mod_brush || state->modelindex!=ent.curstate.modelindex) continue;
+
+        auto found=brushes.find(index);
+        if(found!=brushes.end() && (found->second.serial!=state->serial || found->second.model!=ent.model)) {
+            if(found->second.mesh) physics->removeMesh(found->second.mesh);
+            brushes.erase(found);
+            found=brushes.end();
         }
-        if(found->serial!=s->serial) {found->serial=s->serial;found->mesh->initialized=false;}
-        D3DMATRIX matrix;R_SetEntityWorldTransform(ent,static_cast<float>(now),&matrix);
-        float scale;const btTransform transform=fromWorld(matrix,scale);
-        if(!ragdoll::valid(transform) || btFabs(scale-1)>.001f) continue;
-        found->mesh->body->setCollisionFlags(btCollisionObject::CF_KINEMATIC_OBJECT);
-        physics->moveMesh(*found->mesh,transform);
+        if(found==brushes.end()) {
+            if(state->solid!=SOLID_BSP || brushes.size()>=256) continue;
+            std::vector<btVector3> vertices;
+            ragdoll::Mesh *mesh=meshVertices(ent.model,vertices)?physics->addMesh(vertices,true):nullptr;
+            found=brushes.emplace(index,Brush{state->serial,ent.model,mesh}).first;
+        }
+
+        Brush &brush=found->second;
+        brush.seen=true;
+        if(!brush.mesh) continue;
+        const int flags=brush.mesh->body->getCollisionFlags();
+        if(state->solid!=SOLID_BSP) {
+            if(brush.transformValid)
+                brush.mesh->body->setCollisionFlags(flags|btCollisionObject::CF_NO_CONTACT_RESPONSE);
+            brush.transformValid=false;
+            continue;
+        }
+
+        const float time=static_cast<float>(now);
+        const bool interpolated=!ent.player && ent.curstate.movetype==MOVETYPE_STEP &&
+            time<ent.curstate.animtime+1.0f && ent.curstate.animtime!=ent.latched.prevanimtime;
+        if(brush.transformValid && !interpolated && !brush.interpolated &&
+            VectorCompare(brush.origin,ent.origin) && VectorCompare(brush.angles,ent.angles))
+            continue;
+
+        D3DMATRIX matrix;
+        R_SetEntityWorldTransform(&ent,time,&matrix);
+        float scale;
+        const btTransform transform=fromWorld(matrix,scale);
+        const bool valid=ragdoll::valid(transform) && btFabs(scale-1)<=.001f;
+        if(valid!=brush.transformValid || !brush.mesh->initialized) {
+            const int next=valid?flags&~btCollisionObject::CF_NO_CONTACT_RESPONSE:flags|btCollisionObject::CF_NO_CONTACT_RESPONSE;
+            if(next!=flags) brush.mesh->body->setCollisionFlags(next);
+        }
+        brush.transformValid=valid;
+        if(!valid) continue;
+        brush.interpolated=interpolated;
+        VectorCopy(ent.origin,brush.origin);
+        VectorCopy(ent.angles,brush.angles);
+        physics->moveMesh(*brush.mesh,transform);
+    }
+    for(auto it=brushes.begin();it!=brushes.end();) {
+        if(it->second.seen) {
+            it->second.seen=false;
+            ++it;
+        } else {
+            if(it->second.mesh) physics->removeMesh(it->second.mesh);
+            it=brushes.erase(it);
+        }
     }
     physics->sleeping=sleepSetting.value!=0;
     if(lastTime>=0 && !gp_cl->paused) {const float g=setting(gravity,800,0,4000);physics->step(now-lastTime,g);captureSteps(now,now-lastTime,g);}

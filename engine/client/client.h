@@ -1102,6 +1102,8 @@ void CL_InitViewBeams( void );
 void CL_ClearViewBeams( void );
 void CL_FreeViewBeams( void );
 cl_entity_t *R_BeamGetEntity( int index );
+void CL_ClearRagdollBrushes( void );
+intptr_t CL_GetRagdollBrush( int arg );
 void CL_KillDeadBeams( cl_entity_t *pDeadEntity );
 void CL_ParseViewBeam( sizebuf_t *msg, int beamType );
 void CL_LoadClientSprites( void );

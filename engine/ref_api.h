@@ -336,6 +336,12 @@ typedef struct ref_ragdoll_hit_s
     float damage; /* native accumulated contribution; -1 when only state evidence survives */
 	float time, position[3], direction[3];
 } ref_ragdoll_hit_t;
+typedef struct ref_ragdoll_brush_s
+{
+	struct cl_entity_s *entity;
+	int serial, modelindex, solid;
+} ref_ragdoll_brush_t;
+
 typedef struct ref_ragdoll_entity_s
 {
 	int serial, modelindex, monster, dead, solid, effects;
@@ -401,6 +407,7 @@ typedef enum
 	PARM_GET_RAGDOLL_RETAINED = -25, // index=acquire, -index-3=lookup; -1=generation, -2=version, -3=count, -65536-slot=iterate
     PARM_RAGDOLL_CLAIM = -27, // arg=index: generation-checked ownership mailbox; -2=version
     PARM_RAGDOLL_ACK = -26, // arg=index: unsigned event acknowledgement mailbox
+    PARM_RAGDOLL_BRUSH = -29, // -1=count, -2=index list, positive index=native brush state
     PARM_COF_PLAYER_LIGHT = -28, // arg=player index: 0x10000 | native ScoreInfo flags; 0=unknown
     PARM_GET_RAGDOLL_ENTITY = -24, // snapshot pointer; arg=index, -1=local edict high-water mark
 

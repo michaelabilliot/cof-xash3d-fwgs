@@ -86,8 +86,8 @@ static void R_BeginParticlePass( bool additive, bool remixParticleTexture )
 
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );
-	device->SetTransform( D3DTS_WORLD, &identity );
-	device->SetFVF( D3D_PARTICLE_FVF );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
+	DX_SetFVFCached( D3D_PARTICLE_FVF );
 
 	const int particleTexture = remixParticleTexture
 		? DX_FindTexture( REF_PARTICLE_TEXTURE ) : 0;
@@ -141,7 +141,7 @@ static void R_EndParticlePass( )
 	if( !device )
 		return;
 	DX_BindRawTexture( 0, nullptr );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
 	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
@@ -376,7 +376,7 @@ static void R_RestoreBeamState( beam_render_state_t &state )
 	if( dx_remix_perf.value != 0.0f )
 	{
 		DX_AllowFog( true );
-		device->SetFVF( BRUSH_FVF );
+		DX_SetFVFCached( BRUSH_FVF );
 		DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 		DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
 		DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, FALSE );
@@ -396,7 +396,7 @@ static void R_RestoreBeamState( beam_render_state_t &state )
 		return;
 	}
 
-	device->SetFVF( state.fvf );
+	DX_SetFVFCached( state.fvf );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, state.zEnable );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, state.zWrite );
 	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, state.alphaBlend );
@@ -432,7 +432,7 @@ static void R_BeginBeamPass( bool transparent, beam_render_state_t &state )
 	if( dx_remix_perf.value == 0.0f )
 		R_SaveBeamRenderState( state );
 	DX_AllowFog( transparent ? false : true );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, transparent ? FALSE : TRUE );
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_NONE );
@@ -1868,7 +1868,7 @@ static void R_SetSpritePipelineBaseline( void )
 	DX_SetRenderStateCached( D3DRS_LIGHTING, FALSE );
 	DX_SetTextureStageStateCached( 0, D3DTSS_TEXCOORDINDEX, 0 );
 	DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 }
 
 static bool R_SpriteHasLightmap( const cl_entity_s *ent, const msprite_t *sprite )
@@ -2072,7 +2072,7 @@ static void R_DrawGlowOcclusionMarker( const vec3_t origin, float size )
 	verts[3].diffuse = white; verts[3].u = 1.0f; verts[3].v = 1.0f;
 
 	DX_BindRawTexture( 0, nullptr );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	R_DrawScratchPrimitive( D3DPT_TRIANGLEFAN, 2, 4,
 		verts, sizeof( brush_vertex_t ) );
 }

@@ -49,7 +49,7 @@ static D3DCOLOR R_StudioApplyDiffuseFactor(D3DCOLOR c,float){return c;}
 static D3DCOLOR R_StudioApplyLightFactor(D3DCOLOR c,float,float){return c;}
 static D3DCOLOR R_StudioApplyLocalLights(D3DCOLOR c,const float*,const float*,const studio_local_light_t*,int){return c;}
 static void R_StudioBuildChromeUV(const D3DMATRIX&,const BoneMat34*,int,const float*,float,float,float &u,float &v){u=v=0;}
-static int R_StudioLocalLights(const cl_entity_s*,const D3DMATRIX*,studio_local_light_t*){return 0;}
+static int R_StudioLocalLights(const cl_entity_s*,const D3DMATRIX*,studio_local_light_t*,studio_local_light_cache_t*){return 0;}
 static bool R_StudioLocalLightsEqual(const studio_local_light_t*,int,const studio_local_light_t*,int){return true;}
 void R_StudioStoreLocalLights(studio_cache_t &c,const studio_local_light_t*,int){c.localLightCount=0;}
 static UINT R_StudioVertexStride(bool n,bool u){return u?sizeof(studio_normal_lit_vertex_t):(n?sizeof(studio_fast_lit_vertex_t):sizeof(brush_vertex_t));}
@@ -74,7 +74,21 @@ void DX_Bind(int,int){}
 static int R_StudioViewHandsTexture(const cl_entity_s*,int textureId){return textureId;}
 static bool R_LakeForestStudioTextureSuppressed(const cl_entity_s*,int){return false;}
 void R_ApplyStudioMaterialState(unsigned int,const cl_entity_s*,studio_material_state_t&){}
+#define DX_SetFVFCached(...) device->SetFVF(__VA_ARGS__)
+#define DX_SetStreamSourceCached(...) device->SetStreamSource(__VA_ARGS__)
+#define DX_SetIndicesCached(...) device->SetIndices(__VA_ARGS__)
+#define DX_SetVertexShaderCached(...) device->SetVertexShader(__VA_ARGS__)
+#define DX_SetVertexDeclarationCached(...) device->SetVertexDeclaration(__VA_ARGS__)
+#define DX_SetTransformCached(...) device->SetTransform(__VA_ARGS__)
+#define DX_GetTransformCached(...) device->GetTransform(__VA_ARGS__)
 #include "verify_ragdoll_render.inc"
+#undef DX_SetFVFCached
+#undef DX_SetStreamSourceCached
+#undef DX_SetIndicesCached
+#undef DX_SetVertexShaderCached
+#undef DX_SetVertexDeclarationCached
+#undef DX_SetTransformCached
+#undef DX_GetTransformCached
 #undef device
 static void renderChecks(const studiohdr_t *hdr,const BoneMat34 *base,const BoneMat34 *reacted,const cl_entity_t &ent) {
     studio_cache_t c{};c.model=ent.model;c.batches.emplace_back();auto &batch=c.batches[0];

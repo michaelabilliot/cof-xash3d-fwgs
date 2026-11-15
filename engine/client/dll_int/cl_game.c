@@ -1016,6 +1016,7 @@ void CL_InitEdicts( int maxclients )
 
 void CL_FreeEdicts( void )
 {
+	CL_ClearRagdollBrushes();
 	ref.dllFuncs.R_ProcessEntData( false, NULL, 0 );
 
 	if( clgame.entities )

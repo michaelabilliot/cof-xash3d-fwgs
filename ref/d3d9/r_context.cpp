@@ -273,11 +273,13 @@ static void R_FreeScratchBuffers( void )
 {
 	if( g_contextScratchVB )
 	{
+		DX_ForgetGeometryResource( g_contextScratchVB );
 		g_contextScratchVB->Release( );
 		g_contextScratchVB = nullptr;
 	}
 	if( g_contextScratchIB )
 	{
+		DX_ForgetGeometryResource( g_contextScratchIB );
 		g_contextScratchIB->Release( );
 		g_contextScratchIB = nullptr;
 	}
@@ -302,6 +304,7 @@ static bool R_EnsureScratchVB( UINT neededBytes )
 		return true;
 	if( g_contextScratchVB )
 	{
+		DX_ForgetGeometryResource( g_contextScratchVB );
 		g_contextScratchVB->Release( );
 		g_contextScratchVB = nullptr;
 	}
@@ -329,6 +332,7 @@ static bool R_EnsureScratchIB( UINT neededBytes, D3DFORMAT format )
 	}
 	if( g_contextScratchIB )
 	{
+		DX_ForgetGeometryResource( g_contextScratchIB );
 		g_contextScratchIB->Release( );
 		g_contextScratchIB = nullptr;
 	}
@@ -400,7 +404,7 @@ bool R_DrawBoundVertexIndices(INT baseVertex,UINT vertexCount,const DWORD* indic
     UINT start=0;
     if(!R_UploadScratchIndices(indices,count*sizeof(DWORD),D3DFMT_INDEX32,start)) return false;
     DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_INDEX_BYTES,count*sizeof(DWORD));
-    device->SetIndices(g_contextScratchIB);
+    DX_SetIndicesCached(g_contextScratchIB);
     const HRESULT result=device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,baseVertex,0,vertexCount,start,count/3);
     if(FAILED(result)) return false;
     DX_ProfileDraw(true,count/3);
@@ -416,7 +420,7 @@ bool R_DrawScratch( D3DPRIMITIVETYPE type,
 	UINT vertexOffset = 0;
 	if( !R_UploadScratchVerts( vertices, vertexCount * stride, stride, vertexOffset ) )
 		return false;
-	device->SetStreamSource( 0, g_contextScratchVB, vertexOffset, stride );
+	DX_SetStreamSourceCached( 0, g_contextScratchVB, vertexOffset, stride );
 	DX_ProfileDraw( false, primitiveCount );
 	return SUCCEEDED(device->DrawPrimitive( type, 0, primitiveCount ));
 }
@@ -438,8 +442,8 @@ static bool R_DrawScratchIndexed( D3DPRIMITIVETYPE type,
 	{
 		return false;
 	}
-	device->SetStreamSource( 0, g_contextScratchVB, vertexOffset, stride );
-	device->SetIndices( g_contextScratchIB );
+	DX_SetStreamSourceCached( 0, g_contextScratchVB, vertexOffset, stride );
+	DX_SetIndicesCached( g_contextScratchIB );
 	DX_ProfileDraw( true, primitiveCount );
 	device->DrawIndexedPrimitive( type, 0, 0, vertexCount, startIndex, primitiveCount );
 	return true;
@@ -1040,6 +1044,12 @@ struct remix_map_light_t
 	char parentModel[64] = {};
 	D3DXMATRIX parentInverse;
 	bool parentResolved = false;
+	size_t parentLookup = 0;
+	D3DMATRIX lastParentWorld{};
+	vec3_t lastParentSource{};
+	D3DLIGHT9 descriptor{};
+	float descriptorRangeScale = 0.0f;
+	int legacySlot = -1;
 	vec3_t movingOrigin = {}, movingDirection = {};
 	dx_map_light::Instance instance;
 	remix_map_light_type_t type = REMIX_MAP_LIGHT_POINT;
@@ -1093,12 +1103,34 @@ struct remix_map_light_candidate_t
 	size_t lightIndex = 0;
 	float distanceSquared = 0.0f;
 	bool directional = false;
+	bool active = false;
+	float style = 1.0f;
+};
+
+struct remix_map_light_parent_t
+{
+	const char *name;
+	const cl_entity_s *entity = nullptr;
+	D3DXMATRIX world{ D3DMATRIX{} };
+	bool ambiguous = false;
+	bool valid = false;
+};
+
+struct remix_legacy_map_light_t
+{
+	size_t lightIndex;
+	D3DLIGHT9 descriptor;
 };
 
 static std::vector<dx_studio_fixture::Bulb> g_studioBulbs;
 static std::vector<dx_light_position::Fixture> g_brushGlobes;
 static std::vector<remix_map_light_t> g_remixMapLights;
 static std::vector<remix_map_light_candidate_t> g_remixMapLightCandidates;
+static std::vector<remix_map_light_parent_t> g_remixMapLightParents;
+static std::vector<size_t> g_remixAttachedLights;
+static std::vector<remix_legacy_map_light_t> g_remixMapLightSlots;
+static std::vector<remix_legacy_map_light_t> g_pendingLegacyMapLights;
+static std::vector<size_t> g_legacyMapLightOrder;
 static int g_remixMapLightSlotCount = 0;
 static int g_remixEnabledLightLimit = -1;
 static bool g_remixMapLightCapacityWarned = false;
@@ -1378,9 +1410,8 @@ static bool R_BuildMapLightDirection( const map_light_debug_t &raw,
 	return R_NormalizeMapDirection( direction );
 }
 
-static void R_DisableRemixMapLights( void )
+static void R_DisableLegacyMapLightSlots()
 {
-	for( auto &light : g_remixMapLights ){g_mapEmitterBridge.retire( light.instance );light.submissionRoute="disabled";}
 	if( device )
 	{
 		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
@@ -1389,9 +1420,21 @@ static void R_DisableRemixMapLights( void )
 	g_remixMapLightSlotCount = 0;
 }
 
+static void R_DisableRemixMapLights( void )
+{
+	for( auto &light : g_remixMapLights )
+	{
+		g_mapEmitterBridge.retire( light.instance );
+		light.submissionRoute = "disabled";
+	}
+	R_DisableLegacyMapLightSlots();
+}
+
 static void R_ClearRemixMapLights( void )
 {
 	R_DisableRemixMapLights( );
+	g_remixMapLightParents.clear();
+	g_remixAttachedLights.clear();
 	g_remixMapLights.clear( );
 	g_studioBulbs.clear();
 	g_brushGlobes.clear();
@@ -1439,29 +1482,114 @@ static void R_BindMapLightParent(remix_map_light_t& light,const std::vector<map_
     snprintf(light.parentModel,sizeof(light.parentModel),"%s",parent->fields.model);
 }
 
+static auto R_FindMapLightParent( const char *name )
+{
+	return std::lower_bound( g_remixMapLightParents.begin(), g_remixMapLightParents.end(),
+		name, []( const auto &parent, const char *key ) { return Q_stricmp( parent.name, key ) < 0; } );
+}
+
+static void R_BuildMapLightParentLookup()
+{
+	for( const auto &light : g_remixMapLights )
+		if( light.parentModel[0] )
+			g_remixMapLightParents.push_back( { light.parentModel } );
+
+	auto &parents = g_remixMapLightParents;
+	std::sort( parents.begin(), parents.end(),
+		[]( const auto &a, const auto &b ) { return Q_stricmp( a.name, b.name ) < 0; } );
+	parents.erase( std::unique( parents.begin(), parents.end(),
+		[]( const auto &a, const auto &b ) { return Q_stricmp( a.name, b.name ) == 0; } ), parents.end() );
+
+	for( size_t i = 0; i < g_remixMapLights.size(); ++i )
+	{
+		auto &light = g_remixMapLights[i];
+		if( light.parentModel[0] )
+		{
+			light.parentLookup = R_FindMapLightParent( light.parentModel ) - parents.begin();
+			g_remixAttachedLights.push_back( i );
+		}
+	}
+}
+
 static void R_UpdateMapLightParents()
 {
-    for(auto& light:g_remixMapLights)if(light.parentModel[0]){
-        light.parentResolved=false;const cl_entity_s* parent=nullptr;bool ambiguous=false;
-        auto inspect=[&](const std::vector<cl_entity_s*>& list){for(auto entity:list){
-            if(!entity||!entity->model||entity->model->type!=mod_brush||
-                (entity->curstate.effects&EF_NODRAW)||Q_stricmp(entity->model->name,light.parentModel))continue;
-            if(parent&&parent!=entity){ambiguous=true;continue;}parent=entity;
-        }};
-        inspect(g_opaqueBrushEntities);inspect(g_translucentCandidates);
-        if(!parent||ambiguous)continue;
-        bool finite=true;for(int a=0;a<3;++a)if(!std::isfinite(parent->origin[a])||!std::isfinite(parent->angles[a]))finite=false;
-        if(!finite)continue;
-        D3DXMATRIX world;R_SetEntityWorldTransform(parent,R_CurrentRenderTime(0.f),&world);
-        const auto position=dx_remix_map_light_centering.value!=0.f?light.centeredOrigin:light.origin;
-        D3DXVECTOR3 authored(position),direction(light.direction),local,moved;
-        D3DXVec3TransformCoord(&local,&authored,&light.parentInverse);D3DXVec3TransformCoord(&moved,&local,&world);
-        for(int a=0;a<3;++a)light.movingOrigin[a]=moved[a];
-        D3DXVec3TransformNormal(&local,&direction,&light.parentInverse);D3DXVec3TransformNormal(&moved,&local,&world);
-        const float length=D3DXVec3Length(&moved);if(!std::isfinite(length)||length<1e-8f)continue;
-        for(int a=0;a<3;++a){light.movingDirection[a]=moved[a]/length;if(!std::isfinite(light.movingOrigin[a])||!std::isfinite(light.movingDirection[a]))finite=false;}
-        light.parentResolved=finite;
-    }
+	if( g_remixMapLightParents.empty() )
+		return;
+
+	for( auto &parent : g_remixMapLightParents )
+	{
+		parent.entity = nullptr;
+		parent.ambiguous = parent.valid = false;
+	}
+
+	const auto collect = []( const std::vector<cl_entity_s *> &entities )
+	{
+		for( const auto *entity : entities )
+		{
+			if( !entity || !entity->model || entity->model->type != mod_brush ||
+				( entity->curstate.effects & EF_NODRAW ) )
+				continue;
+
+			auto match = R_FindMapLightParent( entity->model->name );
+			if( match == g_remixMapLightParents.end() || Q_stricmp( match->name, entity->model->name ) )
+				continue;
+
+			if( match->entity && match->entity != entity )
+				match->ambiguous = true;
+			else
+				match->entity = entity;
+		}
+	};
+	collect( g_opaqueBrushEntities );
+	collect( g_translucentCandidates );
+
+	const float time = R_CurrentRenderTime( 0.0f );
+	for( auto &parent : g_remixMapLightParents )
+	{
+		const auto *entity = parent.entity;
+		if( !entity || parent.ambiguous )
+			continue;
+		parent.valid = true;
+		for( int i = 0; i < 3; ++i )
+			parent.valid &= std::isfinite( entity->origin[i] ) && std::isfinite( entity->angles[i] );
+		if( parent.valid )
+			R_SetEntityWorldTransform( entity, time, &parent.world );
+	}
+
+	for( const size_t i : g_remixAttachedLights )
+	{
+		auto &light = g_remixMapLights[i];
+		const auto &parent = g_remixMapLightParents[light.parentLookup];
+		const auto *position = dx_remix_map_light_centering.value != 0.0f ? light.centeredOrigin : light.origin;
+		if( parent.valid && light.parentResolved &&
+			memcmp( &parent.world, &light.lastParentWorld, sizeof( light.lastParentWorld ) ) == 0 &&
+			memcmp( position, light.lastParentSource, sizeof( light.lastParentSource ) ) == 0 )
+			continue;
+
+		light.parentResolved = false;
+		if( !parent.valid )
+			continue;
+
+		D3DXVECTOR3 authored( position ), direction( light.direction ), local, moved;
+		D3DXVec3TransformCoord( &local, &authored, &light.parentInverse );
+		D3DXVec3TransformCoord( &moved, &local, &parent.world );
+		VectorCopy( static_cast<const float *>( moved ), light.movingOrigin );
+		D3DXVec3TransformNormal( &local, &direction, &light.parentInverse );
+		D3DXVec3TransformNormal( &moved, &local, &parent.world );
+		const float length = D3DXVec3Length( &moved );
+		if( !std::isfinite( length ) || length < 1e-8f )
+			continue;
+
+		light.parentResolved = true;
+		for( int i = 0; i < 3; ++i )
+		{
+			light.movingDirection[i] = moved[i] / length;
+			light.parentResolved &= std::isfinite( light.movingOrigin[i] ) &&
+				std::isfinite( light.movingDirection[i] );
+		}
+		light.lastParentWorld = parent.world;
+		VectorCopy( position, light.lastParentSource );
+	}
 }
 
 static bool R_MapLightPositionAllowed( const vec3_t original, const vec3_t position )
@@ -1698,7 +1826,17 @@ static void R_BuildRemixMapLights( void )
 	R_LoadLightPositions();
 	int centered=0;for(const auto& light:g_remixMapLights)if(light.fixture>=0||light.manualPosition)++centered;
 	gEngfuncs.Con_Printf("D3D9: lamp centering: %d local fixtures (%d studio), %d matched lights (dx_remix_map_light_centering)\n",int(lampFixtures.size()),int(g_studioBulbs.size()),centered);
-	g_remixMapLightCandidates.reserve( g_remixMapLights.size( ) );
+	R_BuildMapLightParentLookup();
+	g_remixMapLightCandidates.resize( g_remixMapLights.size() );
+	g_remixMapLightSlots.resize( g_remixMapLights.size() );
+	g_pendingLegacyMapLights.reserve( g_remixMapLights.size() );
+	g_legacyMapLightOrder.resize( g_remixMapLights.size() );
+	for( size_t i = 0; i < g_remixMapLightCandidates.size(); ++i )
+	{
+		auto &candidate = g_remixMapLightCandidates[i];
+		candidate.lightIndex = i;
+		candidate.directional = g_remixMapLights[i].type == REMIX_MAP_LIGHT_DIRECTIONAL;
+	}
 	if( !g_remixMapLights.empty( ) )
 	{
 		int corrected = 0;
@@ -1725,10 +1863,14 @@ static float R_RemixMapLightDistanceSquared( const remix_map_light_t &light )
 	return x * x + y * y + z * z;
 }
 
-static float R_RemixMapLightRange( const remix_map_light_t &light )
+
+static float R_RemixMapLightRangeScale()
 {
-	const float rangeScale = std::max( 0.05f,
-		std::min( 16.0f, dx_remix_map_light_range_scale.value ) );
+	return std::max( 0.05f, std::min( 16.0f, dx_remix_map_light_range_scale.value ) );
+}
+
+static float R_RemixMapLightRange( const remix_map_light_t &light, float rangeScale )
+{
 	return std::max( 32.0f, std::min( 8192.0f,
 		light.brightness * 2.0f * rangeScale / light.fade ) );
 }
@@ -1753,59 +1895,56 @@ static const char *R_RemixMapLightTypeName( remix_map_light_type_t type )
 	}
 }
 
-static void R_FillRemixMapD3DLight( const remix_map_light_t &source,
-	float styleScale, D3DLIGHT9 &light )
+static D3DLIGHT9 R_FillRemixMapD3DLight( remix_map_light_t &source,
+	float styleScale, float rangeScale, float intensityScale )
 {
-	light = D3DLIGHT9{};
-	const float intensityScale = std::max( 0.0f,
-		std::min( 16.0f, dx_remix_map_light_intensity.value ) );
+	if( source.descriptorRangeScale != rangeScale )
+	{
+		auto &base = source.descriptor;
+		base.Diffuse.a = 1.0f;
+		if( source.type == REMIX_MAP_LIGHT_DIRECTIONAL )
+		{
+			base.Type = D3DLIGHT_DIRECTIONAL;
+			base.Direction = { source.direction[0], source.direction[1], source.direction[2] };
+		}
+		else
+		{
+			base.Type = source.type == REMIX_MAP_LIGHT_SPOT ? D3DLIGHT_SPOT : D3DLIGHT_POINT;
+			base.Range = R_RemixMapLightRange( source, rangeScale );
+			base.Attenuation0 = 1.0f;
+			if( source.falloff == 1 )
+				base.Attenuation1 = 3.0f / base.Range;
+			else
+				base.Attenuation2 = 3.0f / ( base.Range * base.Range );
+
+			if( source.type == REMIX_MAP_LIGHT_SPOT )
+			{
+				// D3D9 uses full cone apertures; Hammer stores half-angles.
+				base.Theta = DEG2RAD( std::min( 179.0f, source.innerCone * 2.0f ) );
+				base.Phi = DEG2RAD( std::min( 179.0f, source.outerCone * 2.0f ) );
+				base.Falloff = 1.0f;
+			}
+		}
+		source.descriptorRangeScale = rangeScale;
+	}
+
+	D3DLIGHT9 light = source.descriptor;
 	const float intensity = source.brightness / 255.0f * styleScale * intensityScale;
 	light.Diffuse.r = source.r * intensity;
 	light.Diffuse.g = source.g * intensity;
 	light.Diffuse.b = source.b * intensity;
-	light.Diffuse.a = 1.0f;
 
-	if( source.type == REMIX_MAP_LIGHT_DIRECTIONAL )
+	if( source.type != REMIX_MAP_LIGHT_DIRECTIONAL )
 	{
-		light.Type = D3DLIGHT_DIRECTIONAL;
-		light.Direction.x = source.direction[0];
-		light.Direction.y = source.direction[1];
-		light.Direction.z = source.direction[2];
-		return;
+		const auto *position = R_MapLightPosition( source );
+		light.Position = { position[0], position[1], position[2] };
+		if( source.type == REMIX_MAP_LIGHT_SPOT )
+		{
+			const auto *direction = source.parentResolved ? source.movingDirection : source.direction;
+			light.Direction = { direction[0], direction[1], direction[2] };
+		}
 	}
-
-	light.Type = source.type == REMIX_MAP_LIGHT_SPOT ? D3DLIGHT_SPOT : D3DLIGHT_POINT;
-	const auto position=R_MapLightPosition(source);
-	light.Position.x = position[0];
-	light.Position.y = position[1];
-	light.Position.z = position[2];
-	light.Range = R_RemixMapLightRange( source );
-	light.Attenuation0 = 1.0f;
-	if( source.falloff == 1 )
-	{
-		light.Attenuation1 = 3.0f / light.Range;
-		light.Attenuation2 = 0.0f;
-	}
-	else
-	{
-		light.Attenuation1 = 0.0f;
-		light.Attenuation2 = 3.0f / ( light.Range * light.Range );
-	}
-
-	if( source.type == REMIX_MAP_LIGHT_SPOT )
-	{
-		const auto direction=source.parentResolved?source.movingDirection:source.direction;
-		light.Direction.x = direction[0];
-		light.Direction.y = direction[1];
-		light.Direction.z = direction[2];
-
-		// D3D9 uses full cone apertures; Hammer stores half-angles.
-		const float d3dInnerCone = std::min( 179.0f, source.innerCone * 2.0f );
-		const float d3dOuterCone = std::min( 179.0f, source.outerCone * 2.0f );
-		light.Theta = DEG2RAD( d3dInnerCone );
-		light.Phi = DEG2RAD( d3dOuterCone );
-		light.Falloff = 1.0f;
-	}
+	return light;
 }
 
 static void R_ApplyRemixMapLights( void )
@@ -1819,55 +1958,70 @@ static void R_ApplyRemixMapLights( void )
 	}
 
 	R_UpdateMapLightParents();
-	g_remixMapLightCandidates.clear( );
-	for( size_t i = 0; i < g_remixMapLights.size( ); ++i )
+	size_t activeCount = 0;
+	for( auto &candidate : g_remixMapLightCandidates )
 	{
-		remix_map_light_t &light = g_remixMapLights[i];
+		auto &light = g_remixMapLights[candidate.lightIndex];
+		candidate.active = false;
 		if( light.captureOnly && !captureAll )
 		{
 			light.submissionRoute = "capture only";
 			g_mapEmitterBridge.retire( light.instance );
 			continue;
 		}
-		if(!captureAll && light.parentModel[0]&&!light.parentResolved){
-			light.submissionRoute="moving parent absent";g_mapEmitterBridge.retire(light.instance);continue;
-		}
-		if( !captureAll && R_RemixMapLightStyleScale( light ) <= 0.001f )
+		if( !captureAll && light.parentModel[0] && !light.parentResolved )
 		{
-			light.submissionRoute="style off";
-			g_mapEmitterBridge.retire(light.instance);
+			light.submissionRoute = "moving parent absent";
+			g_mapEmitterBridge.retire( light.instance );
 			continue;
 		}
-		remix_map_light_candidate_t candidate{};
-		candidate.lightIndex = i;
-		candidate.directional = light.type == REMIX_MAP_LIGHT_DIRECTIONAL;
+		candidate.style = R_RemixMapLightStyleScale( light );
+		if( !captureAll && candidate.style <= 0.001f )
+		{
+			light.submissionRoute = "style off";
+			g_mapEmitterBridge.retire( light.instance );
+			continue;
+		}
+		candidate.active = true;
+		++activeCount;
 		candidate.distanceSquared = captureAll || candidate.directional ? 0.0f : R_RemixMapLightDistanceSquared( light );
-		g_remixMapLightCandidates.push_back( candidate );
+		if( std::isnan( candidate.distanceSquared ) )
+			candidate.distanceSquared = std::numeric_limits<float>::infinity();
 	}
 
-	std::stable_sort( g_remixMapLightCandidates.begin( ), g_remixMapLightCandidates.end( ),
-		[]( const remix_map_light_candidate_t &a, const remix_map_light_candidate_t &b )
-		{
-			if( a.directional != b.directional )
-				return a.directional;
-			if( a.distanceSquared != b.distanceSquared )
-				return a.distanceSquared < b.distanceSquared;
-			return a.lightIndex < b.lightIndex;
-		} );
+	const auto priority = []( const auto &a, const auto &b )
+	{
+		if( a.active != b.active )
+			return a.active;
+		if( !a.active )
+			return false;
+		if( a.directional != b.directional )
+			return a.directional;
+		if( a.distanceSquared != b.distanceSquared )
+			return a.distanceSquared < b.distanceSquared;
+		return a.lightIndex < b.lightIndex;
+	};
+	// Keep last frame's order when camera or parent movement leaves priorities intact.
+	auto &candidates = g_remixMapLightCandidates;
+	if( !std::is_sorted( candidates.begin(), candidates.end(), priority ) )
+		std::sort( candidates.begin(), candidates.end(), priority );
 
-	int emitted = 0;
 	int apiEmitted = 0;
+	auto &legacy = g_pendingLegacyMapLights;
+	legacy.clear();
 	const bool useMapLightApi = dx_remix_map_light_api.value != 0.f;
 	const float level = R_MapLightLevel();
+	const float rangeScale = R_RemixMapLightRangeScale();
+	const float intensityScale = std::max( 0.0f, std::min( 16.0f, dx_remix_map_light_intensity.value ) );
 	const float outputScale = (std::isfinite( dx_remix_map_light_output_scale.value )
 		? std::clamp( dx_remix_map_light_output_scale.value, 0.f, 4.f ) : .75f) * level;
 	for( const remix_map_light_candidate_t &candidate : g_remixMapLightCandidates )
 	{
+		if( !candidate.active )
+			break;
 		remix_map_light_t &source = g_remixMapLights[candidate.lightIndex];
-		D3DLIGHT9 light{};
-		const float style = R_RemixMapLightStyleScale( source );
-		R_FillRemixMapD3DLight( source, captureAll && style <= 0.001f ? 1.0f : style, light );
-		const float radius = R_FinalMapLightRadius(source);
+		const float style = captureAll && candidate.style <= 0.001f ? 1.0f : candidate.style;
+		D3DLIGHT9 light = R_FillRemixMapD3DLight( source, style, rangeScale, intensityScale );
 		// Attached lights use per-frame D3D submission. The map API bridge
 		// throttles moving definitions and can recreate them on x86, which
 		// leaves a fast train's light behind between updates.
@@ -1875,7 +2029,7 @@ static void R_ApplyRemixMapLights( void )
 		{
 			const uint64_t sourceId = g_mapEmitterIdentity ^
 				(uint64_t( source.entityIndex + 1 ) * 0x9e3779b97f4a7c15ull);
-			const bool handled = g_mapEmitterBridge.emit( source.instance, light, radius, sourceId, outputScale );
+			const bool handled = g_mapEmitterBridge.emit( source.instance, light, R_FinalMapLightRadius( source ), sourceId, outputScale );
 			const auto result = dx_map_light::apiResult( handled, source.instance.handle != nullptr );
 			if( result != dx_map_light::ApiResult::Unavailable )
 			{
@@ -1890,9 +2044,37 @@ static void R_ApplyRemixMapLights( void )
 		light.Diffuse.r *= level;
 		light.Diffuse.g *= level;
 		light.Diffuse.b *= level;
+		legacy.push_back( { candidate.lightIndex, light } );
+	}
+
+	// If the same set still fits, keep the old slots even if distance ranking
+	// changed. When capacity can affect selection, use the original ranking.
+	bool retainSlots = legacy.size() == static_cast<size_t>( g_remixMapLightSlotCount ) &&
+		( g_remixEnabledLightLimit < 0 ||
+			g_remixMapLightFirstSlot + g_remixMapLightSlotCount <= g_remixEnabledLightLimit );
+	for( size_t i = 0; retainSlots && i < legacy.size(); ++i )
+	{
+		const int slot = g_remixMapLights[legacy[i].lightIndex].legacySlot;
+		retainSlots = slot >= 0 && slot < g_remixMapLightSlotCount &&
+			g_remixMapLightSlots[slot].lightIndex == legacy[i].lightIndex;
+		if( retainSlots )
+			g_legacyMapLightOrder[slot] = i;
+	}
+
+	int emitted = 0;
+	bool legacyLightsChanged = false;
+	for( size_t i = 0; i < legacy.size(); ++i )
+	{
+		const auto &pending = legacy[retainSlots ? g_legacyMapLightOrder[i] : i];
+		auto &source = g_remixMapLights[pending.lightIndex];
+		const auto &light = pending.descriptor;
 		if( !captureAll && g_remixEnabledLightLimit >= 0 && g_remixMapLightFirstSlot + emitted >= g_remixEnabledLightLimit ) continue;
 		const DWORD slot = static_cast<DWORD>( g_remixMapLightFirstSlot + emitted );
-		HRESULT result = device->SetLight( slot, &light );
+		const bool wasEnabled = emitted < g_remixMapLightSlotCount;
+		auto &previous = g_remixMapLightSlots[emitted];
+		const bool sameLight = wasEnabled &&
+			memcmp( &previous.descriptor, &light, sizeof( light ) ) == 0;
+		HRESULT result = sameLight ? D3D_OK : device->SetLight( slot, &light );
 		if( FAILED( result ) )
 		{
 			g_remixEnabledLightLimit = g_remixMapLightFirstSlot + emitted;
@@ -1902,13 +2084,13 @@ static void R_ApplyRemixMapLights( void )
 					"D3D9: RTX Remix accepted %d BSP lights; SetLight(%u) failed (0x%08X). "
 					"Set d3d9.maxEnabledLights to at least %d in dxvk.conf to allow every active map light.\n",
 					emitted, slot, static_cast<unsigned int>( result ),
-					g_remixMapLightFirstSlot + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+					g_remixMapLightFirstSlot + static_cast<int>( activeCount ) );
 				g_remixMapLightCapacityWarned = true;
 			}
 			continue;
 		}
 
-		result = device->LightEnable( slot, TRUE );
+		result = wasEnabled ? D3D_OK : device->LightEnable( slot, TRUE );
 		if( FAILED( result ) )
 		{
 			g_remixEnabledLightLimit = g_remixMapLightFirstSlot + emitted;
@@ -1918,18 +2100,25 @@ static void R_ApplyRemixMapLights( void )
 					"D3D9: RTX Remix accepted %d BSP lights; LightEnable(%u) failed (0x%08X). "
 					"Set d3d9.maxEnabledLights to at least %d in dxvk.conf to allow every active map light.\n",
 					emitted, slot, static_cast<unsigned int>( result ),
-					g_remixMapLightFirstSlot + static_cast<int>( g_remixMapLightCandidates.size( ) ) );
+					g_remixMapLightFirstSlot + static_cast<int>( activeCount ) );
 				g_remixMapLightCapacityWarned = true;
 			}
 			device->LightEnable( slot, FALSE );
 			continue;
 		}
+		legacyLightsChanged |= !sameLight;
+		previous = pending;
+		source.legacySlot = emitted;
 		source.submissionRoute = source.parentModel[0] ? "D3D9 moving source submitted" : "D3D9 submitted";
 		++emitted;
 	}
 
 	for( int i = emitted; i < g_remixMapLightSlotCount; ++i )
-		device->LightEnable( g_remixMapLightFirstSlot + i, FALSE );
+		legacyLightsChanged |= SUCCEEDED( device->LightEnable( g_remixMapLightFirstSlot + i, FALSE ) );
+	// RTX Remix replays the entire enabled D3D9 light list on a dirty-light
+	// event. Keep one write on quiet frames so legacy lights stay touched.
+	if( emitted > 0 && !legacyLightsChanged )
+		device->SetLight( g_remixMapLightFirstSlot, &g_remixMapLightSlots.front().descriptor );
 	g_remixMapLightSlotCount = emitted;
 	static uint64_t previousMap=0;
 	static int previousApi=-1, previousD3D=-1;
@@ -2029,7 +2218,7 @@ static void R_PrintMapLight( const map_light_debug_t &light,
             gEngfuncs.Con_Printf(" radius=%.3f radiusSource=%s route=%s reason=%s",R_FinalMapLightRadius(*remixLight),remixLight->manualRadius>0?"manual":(remixLight->fixture>=0?"verified-profile":"default"),remixLight->submissionRoute,dx_remix_map_light_centering.value==0?"centering disabled":(remixLight->manualPosition?"manual override":remixLight->positionReason));
             if(remixLight->bulb>=0){const auto& bulb=g_studioBulbs[size_t(remixLight->bulb)];gEngfuncs.Con_Printf(" fixture=%s body=%d skin=%d entity=%d",bulb.model.c_str(),bulb.body,bulb.skin,bulb.entity);}
 			gEngfuncs.Con_Printf( " range=%.1f attenuation=%s",
-				R_RemixMapLightRange( *remixLight ),
+				R_RemixMapLightRange( *remixLight, R_RemixMapLightRangeScale() ),
 				remixLight->falloff == 1 ? "linear" : "inverse-square" );
 			if( remixLight->type == REMIX_MAP_LIGHT_SPOT )
 				gEngfuncs.Con_Printf( " cone=(%.1f %.1f)",
@@ -2801,7 +2990,7 @@ void DX_TriBatchBarrier(int reason) {
     if(reason>=0 && reason<DX_TRI_FLUSH_COUNT) ++g_triBatchStats.flushes[reason];
     if(device) {
         D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
-        device->SetTransform(D3DTS_WORLD,&identity); device->SetFVF(BRUSH_FVF);
+        DX_SetTransformCached(D3DTS_WORLD,&identity); DX_SetFVFCached(BRUSH_FVF);
         const UINT count=static_cast<UINT>(g_triangleBatch.vertices.size());
         if(R_DrawScratch(D3DPT_TRIANGLELIST,count/3,count,g_triangleBatch.vertices.data(),sizeof(brush_vertex_t))) {
             ++g_triBatchStats.outputDraws;
@@ -3027,7 +3216,7 @@ static void R_TriEnd( void )
         DX_ProfileEvent(DX_PROFILE_EVENT_TRI_SOURCE_DRAW,1);
         if(dx_triapi_batch.value!=0.f && !g_triApi.screenSpace && supported) {
             D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
-            device->SetTransform(D3DTS_WORLD,&identity);
+            DX_SetTransformCached(D3DTS_WORLD,&identity);
             g_triangleBatch.append(g_triApi.primitiveMode,g_triApi.vertices.data(),vertexCount,
                 DX_BatchVertexLimit(dx_triapi_batch_max_vertices.value),[]{DX_TriBatchBarrier(DX_TRI_FLUSH_CAPACITY);});
             return;
@@ -3039,7 +3228,7 @@ static void R_TriEnd( void )
 	if( g_triApi.screenSpace )
 	{
 
-		device->SetFVF( D3DFVF_VERTEX2D );
+		DX_SetFVFCached( D3DFVF_VERTEX2D );
 		const vertex2d_t *vertices = g_triApi.screenVertices.data( );
 
 		switch( g_triApi.primitiveMode )
@@ -3106,8 +3295,8 @@ static void R_TriEnd( void )
 
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );
-	device->SetTransform( D3DTS_WORLD, &identity );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
+	DX_SetFVFCached( BRUSH_FVF );
 
 	switch( g_triApi.primitiveMode )
 	{
@@ -3354,9 +3543,9 @@ static void R_TriScreenToWorld( const float *screen, float *world )
 	D3DVIEWPORT9 viewport{};
 	D3DXMATRIX worldMatrix{}, viewMatrix{}, projectionMatrix{};
 	device->GetViewport( &viewport );
-	device->GetTransform( D3DTS_WORLD, &worldMatrix );
-	device->GetTransform( D3DTS_VIEW, &viewMatrix );
-	device->GetTransform( D3DTS_PROJECTION, &projectionMatrix );
+	DX_GetTransformCached( D3DTS_WORLD, &worldMatrix );
+	DX_GetTransformCached( D3DTS_VIEW, &viewMatrix );
+	DX_GetTransformCached( D3DTS_PROJECTION, &projectionMatrix );
 
 	D3DXVECTOR3 input( screen[0], screen[1], screen[2] );
 	D3DXVECTOR3 output;
@@ -3391,16 +3580,16 @@ static void R_TriGetMatrix( const int pname, float *matrix )
 	switch( pname )
 	{
 	case GL_MODELVIEW_MATRIX:
-		device->GetTransform( D3DTS_WORLD, &world );
-		device->GetTransform( D3DTS_VIEW, &view );
+		DX_GetTransformCached( D3DTS_WORLD, &world );
+		DX_GetTransformCached( D3DTS_VIEW, &view );
 		R_TriCopyGLMatrix( world * view, matrix );
 		break;
 	case GL_PROJECTION_MATRIX:
-		device->GetTransform( D3DTS_PROJECTION, &projection );
+		DX_GetTransformCached( D3DTS_PROJECTION, &projection );
 		R_TriCopyGLMatrix( projection, matrix );
 		break;
 	case GL_TEXTURE_MATRIX:
-		device->GetTransform( D3DTS_TEXTURE0, &world );
+		DX_GetTransformCached( D3DTS_TEXTURE0, &world );
 		R_TriCopyGLMatrix( world, matrix );
 		break;
 	default:
@@ -3887,6 +4076,7 @@ static bool DX_ResetDevice( bool rebuildPresentParams, const char *reason )
 	if( g_dxLine ) g_dxLine->OnLostDevice( );
 	R_FreeScratchBuffers( );
 	R_ModelsLostDevice( );
+	R_DisableLegacyMapLightSlots();
 	DX_InvalidateTextureBindCache( );
 
 	DX_RagdollDeviceReset(reason);
@@ -4835,7 +5025,7 @@ static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r
 	v[2] = { x,     y + h, 0.0f, 1.0f, color, 0.0f, 1.0f };
 	v[3] = { x + w, y + h, 0.0f, 1.0f, color, 1.0f, 1.0f };
 
-	device->SetFVF( D3DFVF_VERTEX2D );
+	DX_SetFVFCached( D3DFVF_VERTEX2D );
 	R_DrawScratch( D3DPT_TRIANGLESTRIP, 2, 4,
 		v, sizeof( vertex2d_t ) );
 }
@@ -5230,9 +5420,9 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 			break;
 		}
 
-		hr = device->GetTransform( D3DTS_WORLD, &oldWorld );
-		if( SUCCEEDED( hr ) ) hr = device->GetTransform( D3DTS_VIEW, &oldView );
-		if( SUCCEEDED( hr ) ) hr = device->GetTransform( D3DTS_PROJECTION, &oldProjection );
+		hr = DX_GetTransformCached( D3DTS_WORLD, &oldWorld );
+		if( SUCCEEDED( hr ) ) hr = DX_GetTransformCached( D3DTS_VIEW, &oldView );
+		if( SUCCEEDED( hr ) ) hr = DX_GetTransformCached( D3DTS_PROJECTION, &oldProjection );
 		if( FAILED( hr ) )
 		{
 			gEngfuncs.Con_Printf(
@@ -5370,14 +5560,17 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 	if( oldDepth ) device->SetDepthStencilSurface( oldDepth );
 
 	if( savedStateBlock )
+	{
 		savedStateBlock->Apply( );
+		DX_InvalidateD3DStateCache();
+	}
 
 	if( oldTarget )
 	{
 		device->SetViewport( &oldViewport );
-		device->SetTransform( D3DTS_WORLD, &oldWorld );
-		device->SetTransform( D3DTS_VIEW, &oldView );
-		device->SetTransform( D3DTS_PROJECTION, &oldProjection );
+		DX_SetTransformCached( D3DTS_WORLD, &oldWorld );
+		DX_SetTransformCached( D3DTS_VIEW, &oldView );
+		DX_SetTransformCached( D3DTS_PROJECTION, &oldProjection );
 	}
 
 	g_sceneViewport = savedSceneViewport;
@@ -5744,8 +5937,8 @@ static void R_DrawSkybox( void )
 	// Keep the sky mesh camera-independent; only its instance follows the eye.
 	D3DXMATRIX skyWorld;
 	D3DXMatrixTranslation( &skyWorld, g_vOrigin[0], g_vOrigin[1], g_vOrigin[2] );
-	device->SetTransform( D3DTS_WORLD, &skyWorld );
-	device->SetFVF( D3DFVF_SKY_VERTEX );
+	DX_SetTransformCached( D3DTS_WORLD, &skyWorld );
+	DX_SetFVFCached( D3DFVF_SKY_VERTEX );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
 	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
@@ -5763,8 +5956,8 @@ static void R_DrawSkybox( void )
 	if( manageFog && !fogSkybox )
 		DX_PopFogOff( );
 
-	device->SetTransform( D3DTS_WORLD, &identity );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
@@ -5935,7 +6128,7 @@ static void R_DrawCofPickupOutline() {
   const vertex2d_t c={span.x-.5f,span.y+span.height-.5f,0,1,color,0,0},d={span.x+span.width-.5f,span.y+span.height-.5f,0,1,color,0,0};
   vertices.insert(vertices.end(),{a,b,c,b,d,c});
  }
- device->SetFVF(D3DFVF_VERTEX2D);
+ DX_SetFVFCached(D3DFVF_VERTEX2D);
  R_DrawScratch(D3DPT_TRIANGLELIST,UINT(vertices.size()/3),UINT(vertices.size()),vertices.data(),sizeof(vertex2d_t));
  R_Set2DMode(false);DX_InvalidateD3DStateCache();DX_InvalidateTextureBindCache();
 }
@@ -5978,7 +6171,7 @@ static void R_DrawCofScopeOverlay() {
   const float tick=radius*float(i)*.2f;
   rect(cx+tick-line*.5f,cy-4*line,line,8*line);rect(cx-4*line,cy+tick-line*.5f,8*line,line);
  }
- device->SetFVF(D3DFVF_VERTEX2D);
+ DX_SetFVFCached(D3DFVF_VERTEX2D);
  R_DrawScratch(D3DPT_TRIANGLELIST,static_cast<UINT>(vertices.size()/3),static_cast<UINT>(vertices.size()),vertices.data(),sizeof(vertex2d_t));
  R_Set2DMode(false);DX_InvalidateD3DStateCache();DX_InvalidateTextureBindCache();
 }
@@ -6016,7 +6209,7 @@ static void R_DrawViewModel( void )
 	D3DXMATRIX projection;
 	D3DXMatrixPerspectiveFovLH( &projection, D3DXToRadian( fov ), aspect,
 		zNear, 8192.0f );
-	device->SetTransform( D3DTS_PROJECTION, &projection );
+	DX_SetTransformCached( D3DTS_PROJECTION, &projection );
 
 	D3DVIEWPORT9 viewModelViewport = oldViewport;
 
@@ -6061,8 +6254,8 @@ static void R_DrawViewModel( void )
 	D3DXMATRIX identity;
 	D3DXMatrixIdentity( &identity );
 	device->SetViewport( &oldViewport );
-	device->SetTransform( D3DTS_WORLD, &identity );
-	device->SetTransform( D3DTS_PROJECTION, &g_sceneProjection );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
+	DX_SetTransformCached( D3DTS_PROJECTION, &g_sceneProjection );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
@@ -6222,7 +6415,7 @@ static void R_SetWorldIdentity( const D3DXMATRIX &identity, bool &isIdentity )
 {
 	if( isIdentity )
 		return;
-	device->SetTransform( D3DTS_WORLD, &identity );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
 	isIdentity = true;
 }
 
@@ -6381,14 +6574,10 @@ static void R_SetupSceneDLights( )
 	R_AddCofPickupLight( );
 	static bool previousCaptureAll = false;
 	const bool captureAll = R_RemixCaptureAll();
-	if( device && (captureAll || previousCaptureAll) )
-	{
-		// Dynamic lights can cross the normal eight-slot boundary. Release the
-		// old legacy map slots before rebuilding the contiguous light ranges.
-		for( int i = 0; i < g_remixMapLightSlotCount; ++i )
-			device->LightEnable( g_remixMapLightFirstSlot + i, FALSE );
-		g_remixMapLightSlotCount = 0;
-	}
+	// Capture-all dynamic lights can cross the normal eight-slot boundary.
+	// Release old map slots before rebuilding the contiguous light ranges.
+	if( captureAll || previousCaptureAll )
+		R_DisableLegacyMapLightSlots();
 	if( captureAll != previousCaptureAll )
 	{
 		g_remixEnabledLightLimit = -1;
@@ -6398,7 +6587,6 @@ static void R_SetupSceneDLights( )
 	R_ApplyDLights( );
 	g_remixMapLightFirstSlot = captureAll ? g_dxFixedLightCount : DX_REMIX_DYNAMIC_LIGHT_SLOTS;
 	R_ApplyRemixMapLights( );
-	R_UpdateDLightOverlay( );
 }
 
 static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdentity )
@@ -6622,7 +6810,7 @@ void R_DrawEnts( const vec3_t view_origin )
 	D3DXMatrixIdentity( &identity );
 	bool worldIsIdentity = false;
 
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_CCW );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
@@ -6666,11 +6854,15 @@ void R_DrawEnts( const vec3_t view_origin )
 	}
 
 	if( dx_client_efx.value != 0.0f && gEngfuncs.CL_DrawEFX )
+	{
 		gEngfuncs.CL_DrawEFX( std::max( 0.0f, g_frametime ), false );
+		DX_InvalidateTextureBindCache();
+	}
 	if( gEngfuncs.pfnDrawNormalTriangles )
 	{
 		g_triApi.lakeGrass=false;
 		gEngfuncs.pfnDrawNormalTriangles( );
+		DX_InvalidateTextureBindCache();
 		g_triApi.lakeGrass=false;
 	}
 	R_MarkWorldTransformDirty( worldIsIdentity );
@@ -6693,6 +6885,7 @@ void R_DrawEnts( const vec3_t view_origin )
         g_triBatchStats=tri_batch_stats_t{}; g_triangleBatchScope=true; g_triApi.gunSmoke=false; g_triApi.lakeGrass=false;
         gEngfuncs.pfnDrawTransparentTriangles( );
         DX_TriBatchBarrier(DX_TRI_FLUSH_PASS); g_triangleBatchScope=false; g_triApi.gunSmoke=false; g_triApi.lakeGrass=false;
+		DX_InvalidateTextureBindCache();
 		R_MarkWorldTransformDirty( worldIsIdentity );
 		R_SetWorldIdentity( identity, worldIsIdentity );
 	}
@@ -6708,6 +6901,7 @@ void R_DrawEnts( const vec3_t view_origin )
 	{
 		DX_PushFogOff( );
 		gEngfuncs.CL_DrawEFX( std::max( 0.0f, g_frametime ), true );
+		DX_InvalidateTextureBindCache();
 		DX_PopFogOff( );
 	}
 
@@ -6783,7 +6977,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		D3DXMatrixIdentity( &coordFix );
 		coordFix._33 = -1.0f;
 		view = view * coordFix;
-		device->SetTransform( D3DTS_VIEW, &view );
+		DX_SetTransformCached( D3DTS_VIEW, &view );
 		g_sceneView = view;
 
 		const float aspect = viewport.Height
@@ -6851,7 +7045,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 				aspect, 4.0f, R_RemixCaptureAll() ? 131072.0f : 8192.0f );
 		}
 
-		device->SetTransform( D3DTS_PROJECTION, &projection );
+		DX_SetTransformCached( D3DTS_PROJECTION, &projection );
 		g_sceneProjection = projection;
 	}
 
@@ -7114,7 +7308,7 @@ static void R_Flush2DBatch( void )
 			// glyphs; repair the state once per submitted font batch.
 			DX_TriBatchBarrier( DX_TRI_FLUSH_INCOMPATIBLE );
 			DX_InvalidateTextureBindCache();
-			device->SetVertexShader( nullptr );
+			DX_SetVertexShaderCached( nullptr );
 			device->SetPixelShader( nullptr );
 		}
 
@@ -7125,7 +7319,7 @@ static void R_Flush2DBatch( void )
 		R_Apply2DNeutralState( );
 		R_Apply2DBlendMode( g_2dBatchRenderMode );
 		DX_Bind( 0, g_2dBatchTexture );
-		device->SetFVF( D3DFVF_VERTEX2D );
+		DX_SetFVFCached( D3DFVF_VERTEX2D );
 
 		const UINT vertexCount = static_cast<UINT>( g_2dBatchVertices.size( ) );
 		const UINT primitiveCount = vertexCount / 3u;
@@ -7230,7 +7424,7 @@ static void R_DrawRawTexture2D( float x, float y, float w, float h,
 	v[1] = { x + w, y,     0.0f, 1.0f, color, s2, t1 };
 	v[2] = { x,     y + h, 0.0f, 1.0f, color, s1, t2 };
 	v[3] = { x + w, y + h, 0.0f, 1.0f, color, s2, t2 };
-	device->SetFVF( D3DFVF_VERTEX2D );
+	DX_SetFVFCached( D3DFVF_VERTEX2D );
 	R_DrawScratch( D3DPT_TRIANGLESTRIP, 2, 4,
 		v, sizeof( vertex2d_t ) );
 }
@@ -7248,7 +7442,6 @@ struct show_texture_entry_t
 	int width = 0;
 	int height = 0;
 	bool dynamic = false;
-	bool dynamicOverlay = false;
 	const char *materialName = nullptr;
 	int allocationCount = 0;
 	float occupancy = 0.0f;
@@ -7358,8 +7551,6 @@ static void R_ShowTextures( void )
 		entry.width = R_GetLightmapAtlasSize( atlasIndex );
 		entry.height = entry.width;
 		entry.dynamic = R_LightmapAtlasDynamic( atlasIndex ) != 0;
-		entry.dynamicOverlay =
-			R_LightmapAtlasOverlay( atlasIndex ) != 0;
 		entry.materialName =
 			R_GetLightmapAtlasMaterial( atlasIndex );
 		entry.allocationCount =
@@ -7445,11 +7636,6 @@ static void R_ShowTextures( void )
 			COM_FileBase( texture.name, name, sizeof( name ) );
 			if( !name[0] )
 				Q_snprintf( name, sizeof( name ), "#%d", entry.index );
-		}
-		else if( entry.dynamicOverlay )
-		{
-			Q_snprintf( name, sizeof( name ),
-				"LM[%d] dyn-overlay", entry.index );
 		}
 		else if( entry.materialName && entry.materialName[0] )
 		{

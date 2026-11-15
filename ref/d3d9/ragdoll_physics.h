@@ -108,6 +108,7 @@ public:
     std::vector<std::unique_ptr<Mesh>> meshes;
     std::vector<std::unique_ptr<Doll>> dolls;
     Mesh *addMesh(const std::vector<btVector3> &vertices, bool moving);
+    void removeMesh(Mesh *mesh);
     void moveMesh(Mesh &mesh, const btTransform &transform);
     void updateVisibility(Doll &doll,const std::array<bool,MaxBones> &visible);
     Doll *create(const std::vector<Bone> &bones, const btVector3 &velocity,

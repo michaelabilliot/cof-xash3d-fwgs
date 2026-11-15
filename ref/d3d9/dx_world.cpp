@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -212,8 +213,6 @@ convar_t dx_separate_style_lightmaps =
 convar_t dx_lightmap_dynamic_page =
 { (char *)"dx_lightmap_dynamic_page", (char *)"256", 0 };
 
-convar_t dx_lightmap_overlay_page =
-{ (char *)"dx_lightmap_overlay_page", (char *)"256", 0 };
 
 convar_t dx_lightmap_update_budget =
 { (char *)"dx_lightmap_update_budget", (char *)"262144", 0 };
@@ -406,22 +405,12 @@ convar_t dx_dlight_engine =
 convar_t dx_dlight_elights =
 { (char *)"dx_dlight_elights", (char *)"1", 0 };
 
-convar_t dx_dlight_world =
-{ (char *)"dx_dlight_world", (char *)"1", 0 };
 
-convar_t dx_dlight_lightmaps =
-{ (char *)"dx_dlight_lightmaps", (char *)"1", 0 };
 
 convar_t dx_dlight_beams =
 { (char *)"dx_dlight_beams", (char *)"1", 0 };
 convar_t dx_dlight_beam_intensity =
 { (char *)"dx_dlight_beam_intensity", (char *)"1", 0 };
-convar_t dx_dlight_geometry =
-{ (char *)"dx_dlight_geometry", (char *)"0", 0 };
-convar_t dx_dlight_subdivide =
-{ (char *)"dx_dlight_subdivide", (char *)"0", 0 };
-convar_t dx_dlight_min_light =
-{ (char *)"dx_dlight_min_light", (char *)"2", 0 };
 convar_t dx_dlight_studio =
 { (char *)"dx_dlight_studio", (char *)"1", 0 };
 convar_t dx_dlight_entities =
@@ -486,7 +475,6 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_ao_contrast_style_updates );
 	gEngfuncs.Cvar_RegisterVariable( &dx_separate_style_lightmaps );
 	gEngfuncs.Cvar_RegisterVariable( &dx_lightmap_dynamic_page );
-	gEngfuncs.Cvar_RegisterVariable( &dx_lightmap_overlay_page );
 	gEngfuncs.Cvar_RegisterVariable( &dx_lightmap_update_budget );
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_ripple );
 	gEngfuncs.Cvar_RegisterVariable( &dx_water_ripple_resolution );
@@ -553,13 +541,8 @@ void R_RegisterModelCvars( )
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_fixed );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_engine );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_elights );
-	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_world );
-	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_lightmaps );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_beams );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_beam_intensity );
-	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_geometry );
-	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_subdivide );
-	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_min_light );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_studio );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_entities );
 	gEngfuncs.Cvar_RegisterVariable( &dx_dlight_muzzleflash );
@@ -895,9 +878,6 @@ std::array<world_model_slot_t, DX_WORLD_MODEL_FRONT_CACHE_SIZE>
 g_worldModelFrontCache{};
 
 world_lightmap_store_t g_mapLightmaps;
-std::vector<size_t> g_dlightTouchedAllocs;
-std::vector<unsigned char> g_dlightOverlayActive;
-unsigned int g_dynamicLightmapSignature = 0;
 
 struct entity_cache_slot_t
 {
@@ -1062,11 +1042,13 @@ void R_FreeModelScratchBuffers( )
 {
 	if( g_scratchVertexBuffer )
 	{
+		DX_ForgetGeometryResource( g_scratchVertexBuffer );
 		g_scratchVertexBuffer->Release( );
 		g_scratchVertexBuffer = nullptr;
 	}
 	if( g_scratchIndexBuffer )
 	{
+		DX_ForgetGeometryResource( g_scratchIndexBuffer );
 		g_scratchIndexBuffer->Release( );
 		g_scratchIndexBuffer = nullptr;
 	}
@@ -1085,6 +1067,7 @@ static bool R_EnsureScratchVertexBuffer( UINT neededBytes )
 		return true;
 	if( g_scratchVertexBuffer )
 	{
+		DX_ForgetGeometryResource( g_scratchVertexBuffer );
 		g_scratchVertexBuffer->Release( );
 		g_scratchVertexBuffer = nullptr;
 	}
@@ -1114,6 +1097,7 @@ static bool R_EnsureScratchIndexBuffer( UINT neededBytes, D3DFORMAT format )
 	}
 	if( g_scratchIndexBuffer )
 	{
+		DX_ForgetGeometryResource( g_scratchIndexBuffer );
 		g_scratchIndexBuffer->Release( );
 		g_scratchIndexBuffer = nullptr;
 	}
@@ -1198,7 +1182,7 @@ bool R_DrawScratchPrimitive( D3DPRIMITIVETYPE type, UINT primitiveCount,
 	UINT vertexOffset = 0;
 	if( !R_UploadScratchVertices( vertices, vertexBytes, stride, vertexOffset ) )
 		return false;
-	device->SetStreamSource( 0, g_scratchVertexBuffer, vertexOffset, stride );
+	DX_SetStreamSourceCached( 0, g_scratchVertexBuffer, vertexOffset, stride );
 	DX_ProfileDraw( false, primitiveCount );
 	device->DrawPrimitive( type, 0, primitiveCount );
 	return true;
@@ -1223,8 +1207,8 @@ bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount,
 		return false;
 	if( !R_UploadScratchIndices( indices, indexBytes, indexFormat, startIndex ) )
 		return false;
-	device->SetStreamSource( 0, g_scratchVertexBuffer, vertexOffset, stride );
-	device->SetIndices( g_scratchIndexBuffer );
+	DX_SetStreamSourceCached( 0, g_scratchVertexBuffer, vertexOffset, stride );
+	DX_SetIndicesCached( g_scratchIndexBuffer );
 	DX_ProfileDraw( true, primitiveCount );
 	device->DrawIndexedPrimitive( type, 0, 0, vertexCount, startIndex, primitiveCount );
 	return true;
@@ -1309,25 +1293,6 @@ int R_GetSurfaceEdge( const model_t *mod,
 		absoluteEdge : -1;
 }
 
-void R_BuildSurfaceBounds( const model_t *mod, const msurface_t *surf,
-	float mins[3], float maxs[3], bool &valid )
-{
-	valid = false;
-	if( !mod || !surf || surf->numedges < 3 )
-		return;
-
-	mins[0] = mins[1] = mins[2] = FLT_MAX;
-	maxs[0] = maxs[1] = maxs[2] = -FLT_MAX;
-	for( int i = 0; i < surf->numedges; ++i )
-	{
-		const mvertex_t *vertex = R_GetBrushSurfaceVertex( mod, surf, i );
-		if( !vertex )
-			continue;
-		AddPointToBounds( vertex->position, mins, maxs );
-		valid = true;
-	}
-}
-
 static D3DCOLOR R_DecalSurfaceLightColor( const msurface_t *surface,
 	const vec3_t point )
 {
@@ -1400,6 +1365,88 @@ static void R_ApplyDecalLight( dx_decal_t &decal, D3DCOLOR color )
 }
 
 static std::vector<dx_decal_t> g_dxDecals;
+
+struct decal_draw_batch_t
+{
+	int textureIndex;
+	bool cofCustom;
+	std::vector<dx_decal_vertex_t> vertices;
+};
+
+struct decal_owner_t
+{
+	std::vector<size_t> indices, sortedIndices;
+	std::vector<std::pair<int, bool>> textures;
+	std::vector<decal_draw_batch_t> batches;
+	bool dirty = true;
+	bool dynamicLightStyles = false;
+	bool sorted = false;
+	bool remix = false;
+	float offset = 0.0f;
+	D3DCOLOR factor = 0;
+	int lightStyleRevision = -1;
+	unsigned int drawCount = 0;
+};
+
+static std::unordered_map<int, decal_owner_t> g_decalOwners;
+static bool g_decalIndicesDirty = false;
+
+static void R_AppendDecal( dx_decal_t &&decal )
+{
+	auto &owner = g_decalOwners[decal.entityIndex];
+	if( !g_decalIndicesDirty )
+		owner.indices.push_back( g_dxDecals.size( ) );
+	owner.dirty = true;
+	owner.sortedIndices.clear( );
+	g_dxDecals.push_back( std::move( decal ) );
+}
+
+template<class Predicate>
+static void R_RemoveActiveDecals( Predicate remove )
+{
+	const auto end = std::remove_if( g_dxDecals.begin( ), g_dxDecals.end( ),
+		[&]( const dx_decal_t &decal )
+		{
+			if( !remove( decal ) )
+				return false;
+			g_decalOwners[decal.entityIndex].dirty = true;
+			return true;
+		} );
+	if( end != g_dxDecals.end( ) )
+	{
+		g_dxDecals.erase( end, g_dxDecals.end( ) );
+		g_decalIndicesDirty = true;
+	}
+}
+
+static void R_ClearActiveDecals( )
+{
+	g_dxDecals.clear( );
+	g_decalOwners.clear( );
+	g_decalIndicesDirty = false;
+}
+
+static void R_ReindexDecalOwners( )
+{
+	if( !g_decalIndicesDirty )
+		return;
+
+	for( auto &entry : g_decalOwners )
+	{
+		entry.second.indices.clear( );
+		entry.second.sortedIndices.clear( );
+	}
+	for( size_t i = 0; i < g_dxDecals.size( ); ++i )
+		g_decalOwners[g_dxDecals[i].entityIndex].indices.push_back( i );
+	for( auto it = g_decalOwners.begin( ); it != g_decalOwners.end( ); )
+	{
+		if( it->second.indices.empty( ) )
+			it = g_decalOwners.erase( it );
+		else
+			++it;
+	}
+	g_decalIndicesDirty = false;
+}
 
 struct remix_decal_texture_t
 {
@@ -1954,35 +2001,25 @@ static bool R_BuildDecalOnSurface( const model_t *mod, const msurface_t *surface
 
 static void R_PruneDecalLimit( )
 {
-	int limit = static_cast<int>( dx_decal_limit.value );
-	limit = std::max( 0, std::min( 8192, limit ) );
+	const int limit = std::max( 0, std::min( 8192, static_cast<int>( dx_decal_limit.value ) ) );
 	if( limit == 0 )
 	{
-		g_dxDecals.clear( );
+		R_ClearActiveDecals( );
 		return;
 	}
 
 	if( g_dxDecals.size( ) > static_cast<size_t>( limit ) )
 	{
-		size_t removeCount =
-			g_dxDecals.size( ) - static_cast<size_t>( limit );
-
-		for( auto it = g_dxDecals.begin( );
-			it != g_dxDecals.end( ) && removeCount > 0; )
+		size_t removeCount = g_dxDecals.size( ) - static_cast<size_t>( limit );
+		R_RemoveActiveDecals( [&]( const dx_decal_t &decal )
 		{
-			if( !FBitSet( it->flags, FDECAL_PERMANENT ) )
-			{
-				it = g_dxDecals.erase( it );
-				--removeCount;
-			}
-			else
-			{
-				++it;
-			}
-		}
+			if( !removeCount || FBitSet( decal.flags, FDECAL_PERMANENT ) )
+				return false;
+			--removeCount;
+			return true;
+		} );
 	}
 }
-
 
 static std::vector<cof_decal::Message> g_cofPendingDecals, g_cofStaticDecals;
 static std::vector<cof_decal::Group> g_cofDecalGroups;
@@ -2026,10 +2063,10 @@ static int R_AddCofDecal( const cof_decal::Message &message )
  const float radius = sqrtf( variant.halfWidth * variant.halfWidth + variant.halfHeight * variant.halfHeight );
  if( !message.flags ) {
   const float distance = radius * variant.overlap * 2.0f;
-  g_dxDecals.erase( std::remove_if( g_dxDecals.begin( ), g_dxDecals.end( ), [&]( const dx_decal_t &d ) {
+  R_RemoveActiveDecals( [&]( const dx_decal_t &d ) {
    const cof_decal::Vec delta{d.position[0]-message.origin[0],d.position[1]-message.origin[1],d.position[2]-message.origin[2]};
    return d.cofCustom && !(d.flags & FDECAL_PERMANENT) && d.textureIndex == texture && cof_decal::dot(delta,delta)<distance*distance;
-  }),g_dxDecals.end( ) );
+  } );
  }
  int firstSurface = 0, surfaceCount = 0;
  if( !R_GetBrushSurfaceRange(g_worldmodel,firstSurface,surfaceCount) ) return 0;
@@ -2059,7 +2096,7 @@ static int R_AddCofDecal( const cof_decal::Message &message )
   for(int j=0;j<3;++j){decal.position[j]=message.origin[j];decal.normal[j]=normal[j];}
   const auto vertex=[&](const dx_decal_clip_vertex_t &v){return dx_decal_vertex_t{v.position[0],v.position[1],v.position[2],D3DCOLOR_ARGB(255,255,255,255),0.5f+v.s/(2*variant.halfWidth),0.5f+v.t/(2*variant.halfHeight)};};
   for(size_t j=2;j<polygon.size();++j){decal.vertices.push_back(vertex(polygon[0]));decal.vertices.push_back(vertex(polygon[j-1]));decal.vertices.push_back(vertex(polygon[j]));}
-  g_dxDecals.push_back(std::move(decal));
+  R_AppendDecal( std::move( decal ) );
  }
  const bool produced=g_dxDecals.size()>before;
  if(produced&&message.flags&&g_cofStaticDecals.size()<4096)g_cofStaticDecals.push_back(message);
@@ -2216,7 +2253,7 @@ void R_AddDecal( int textureIndex, int entityIndex, int modelIndex,
 				R_ApplyDecalLight( decal,
 					R_DecalSurfaceLightColor( surface, decalPosition ) );
 			}
-			g_dxDecals.push_back( std::move( decal ) );
+			R_AppendDecal( std::move( decal ) );
 		}
 	}
 
@@ -2272,7 +2309,7 @@ void R_AddDecal( int textureIndex, int entityIndex, int modelIndex,
 					R_ApplyDecalLight( decal,
 						R_DecalSurfaceLightColor( bestSurface, projectedPosition ) );
 				}
-				g_dxDecals.push_back( std::move( decal ) );
+				R_AppendDecal( std::move( decal ) );
 			}
 		}
 	}
@@ -2333,7 +2370,7 @@ void R_ClearDecals( )
 {
  g_cofPendingDecals.clear();g_cofStaticDecals.clear();g_cofDecalGroups.clear();
  g_cofDefinitionsLoaded=false;g_cofVariantSerial=0;
-	g_dxDecals.clear( );
+	R_ClearActiveDecals( );
 	g_dxPendingDecals.clear( );
 	R_ClearRemixDecalTextures( );
 	R_ResetAttachments( );
@@ -2347,15 +2384,11 @@ void R_RemoveDecalsByTexture( int textureIndex )
 	const size_t activeBefore = g_dxDecals.size( );
 	const size_t pendingBefore = g_dxPendingDecals.size( );
 
-	g_dxDecals.erase(
-		std::remove_if( g_dxDecals.begin( ), g_dxDecals.end( ),
-			[textureIndex]( const dx_decal_t &decal )
-			{
-				if( FBitSet( decal.flags, FDECAL_PERMANENT ) )
-					return false;
-				return textureIndex == 0 || decal.textureIndex == textureIndex;
-			} ),
-		g_dxDecals.end( ) );
+	R_RemoveActiveDecals( [textureIndex]( const dx_decal_t &decal )
+	{
+		return !FBitSet( decal.flags, FDECAL_PERMANENT ) &&
+			( textureIndex == 0 || decal.textureIndex == textureIndex );
+	} );
 
 	g_dxPendingDecals.erase(
 		std::remove_if( g_dxPendingDecals.begin( ), g_dxPendingDecals.end( ),
@@ -2483,6 +2516,111 @@ static D3DCOLOR R_ModulateDecal( D3DCOLOR diffuse, D3DCOLOR factor )
 		( db * fb + 127 ) / 255 );
 }
 
+static bool R_DecalTextureReady( int index )
+{
+	return index > 0 && index <= g_texcount && g_Textures[index].tex;
+}
+
+static void R_UpdateDecalBatches( decal_owner_t &owner, bool sorted,
+	bool remix, float offset, D3DCOLOR factor )
+{
+	if( owner.dirty )
+	{
+		owner.textures.clear( );
+		owner.dynamicLightStyles = false;
+		for( size_t index : owner.indices )
+		{
+			const auto &decal = g_dxDecals[index];
+			owner.dynamicLightStyles |= !decal.cofCustom && decal.dynamicLightStyles;
+			owner.textures.emplace_back( decal.textureIndex, false );
+		}
+		std::sort( owner.textures.begin( ), owner.textures.end( ) );
+		owner.textures.erase( std::unique( owner.textures.begin( ), owner.textures.end( ) ),
+			owner.textures.end( ) );
+	}
+
+	bool rebuild = owner.dirty || owner.sorted != sorted ||
+		owner.remix != remix || owner.offset != offset || owner.factor != factor ||
+		( !remix && owner.dynamicLightStyles && owner.lightStyleRevision != g_lightStyleRevision );
+	for( auto &texture : owner.textures )
+	{
+		const bool ready = R_DecalTextureReady( texture.first );
+		rebuild |= ready != texture.second;
+		texture.second = ready;
+	}
+	if( !rebuild )
+		return;
+
+	owner.dirty = false;
+	owner.sorted = sorted;
+	owner.remix = remix;
+	owner.offset = offset;
+	owner.factor = factor;
+	owner.lightStyleRevision = g_lightStyleRevision;
+	owner.drawCount = 0;
+	size_t batchCount = 0;
+	const D3DCOLOR white = D3DCOLOR_ARGB( 255, 255, 255, 255 );
+
+	auto append = [&]( size_t index )
+	{
+		auto &decal = g_dxDecals[index];
+		if( decal.vertices.empty( ) || !R_DecalTextureReady( decal.textureIndex ) )
+			return;
+
+		if( batchCount == 0 || owner.batches[batchCount - 1].textureIndex != decal.textureIndex ||
+			owner.batches[batchCount - 1].cofCustom != decal.cofCustom )
+		{
+			if( batchCount == owner.batches.size( ) )
+				owner.batches.emplace_back( );
+			auto &batch = owner.batches[batchCount++];
+			batch.textureIndex = decal.textureIndex;
+			batch.cofCustom = decal.cofCustom;
+			batch.vertices.clear( );
+		}
+
+		if( !remix && !decal.cofCustom )
+			R_RefreshDecalLight( decal );
+		auto &vertices = owner.batches[batchCount - 1].vertices;
+		if( !remix && factor == white )
+		{
+			vertices.insert( vertices.end( ), decal.vertices.begin( ), decal.vertices.end( ) );
+		}
+		else
+		{
+			const float x = decal.normal[0] * offset;
+			const float y = decal.normal[1] * offset;
+			const float z = decal.normal[2] * offset;
+			for( auto vertex : decal.vertices )
+			{
+				if( remix )
+				{
+					vertex.x += x;
+					vertex.y += y;
+					vertex.z += z;
+					vertex.diffuse = white;
+				}
+				if( factor != white )
+					vertex.diffuse = R_ModulateDecal( vertex.diffuse, factor );
+				vertices.push_back( vertex );
+			}
+		}
+		++owner.drawCount;
+	};
+
+	if( sorted && owner.sortedIndices.empty( ) )
+	{
+		owner.sortedIndices = owner.indices;
+		std::stable_sort( owner.sortedIndices.begin( ), owner.sortedIndices.end( ),
+			[]( size_t a, size_t b )
+			{
+				return g_dxDecals[a].textureIndex < g_dxDecals[b].textureIndex;
+			} );
+	}
+	for( size_t index : sorted ? owner.sortedIndices : owner.indices )
+		append( index );
+	owner.batches.resize( batchCount );
+}
+
 static void R_DrawEntityDecals( const cl_entity_s *ent )
 {
 	DX_MODEL_PROFILE_SCOPE( decalProfileScope, DX_PROFILE_PHASE_DECALS );
@@ -2490,24 +2628,19 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 		return;
 
 	const int entityIndex = ent ? ent->curstate.number : 0;
-	static std::vector<dx_decal_t *> decalDrawList;
-	static std::vector<dx_decal_vertex_t> decalVertexScratch;
-	decalDrawList.clear( );
+	R_ReindexDecalOwners( );
+	const auto found = g_decalOwners.find( entityIndex );
+	if( found == g_decalOwners.end( ) )
+		return;
 
-	for( dx_decal_t &decal : g_dxDecals )
-	{
-		if( decal.entityIndex != entityIndex || decal.vertices.empty( ) ||
-			decal.textureIndex <= 0 || decal.textureIndex > g_texcount ||
-			!g_Textures[decal.textureIndex].tex )
-		{
-			continue;
-		}
-
-		if( !decal.cofCustom ) R_RefreshDecalLight( decal );
-		decalDrawList.push_back( &decal );
-	}
-
-	if( decalDrawList.empty( ) )
+	auto &owner = found->second;
+	const float decalBiasStrength = std::max( 0.0f,
+		std::min( 4.0f, dx_decal_offset.value ) );
+	const bool remixDecal = dx_remix.value != 0.0f;
+	const float remixOffset = remixDecal ? 0.05f + 0.025f * decalBiasStrength : 0.0f;
+	R_UpdateDecalBatches( owner, dx_remix_perf.value != 0.0f, remixDecal,
+		remixOffset, R_DecalEntityFactor( ent ) );
+	if( owner.batches.empty( ) )
 		return;
 
 	if( dx_decal_debug.value != 0.0f && ent &&
@@ -2525,31 +2658,20 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 				"decal fragments with parent transparency\n",
 				entityIndex, ent->curstate.rendermode,
 				static_cast<int>( ent->curstate.renderamt ),
-				static_cast<unsigned int>( decalDrawList.size( ) ) );
+				owner.drawCount );
 			lastDebugEntity = entityIndex;
 			lastDebugMode = ent->curstate.rendermode;
 			lastDebugAmount = ent->curstate.renderamt;
 		}
 	}
 
-	if( dx_remix_perf.value != 0.0f )
-	{
-		std::stable_sort( decalDrawList.begin( ), decalDrawList.end( ),
-			[]( const dx_decal_t *a, const dx_decal_t *b )
-			{
-				return a->textureIndex < b->textureIndex;
-			} );
-	}
-
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_NONE );
 	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
 	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
 	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
 
-	const float decalBiasStrength = std::max( 0.0f,
-		std::min( 4.0f, dx_decal_offset.value ) );
 	const float decalDepthBias = dx_remix.value != 0.0f
 		? 0.0f : -0.0004f * decalBiasStrength;
 	DX_SetRenderStateCached( D3DRS_DEPTHBIAS,
@@ -2564,61 +2686,11 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
 	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
 
-	const D3DCOLOR entityDecalFactor = R_DecalEntityFactor( ent );
-	const bool modulateEntityDecal =
-		entityDecalFactor != D3DCOLOR_ARGB( 255, 255, 255, 255 );
-	const bool remixDecal = dx_remix.value != 0.0f;
 	const bool remixDecalCutout = remixDecal && dx_remix_decal_cutout.value != 0.0f;
-	const float remixOffset = 0.05f + 0.025f * decalBiasStrength;
-
-	for( size_t first = 0; first < decalDrawList.size( ); )
+	for( const auto &batch : owner.batches )
 	{
-		const int textureIndex = decalDrawList[first]->textureIndex;
-		const bool cofCustom = decalDrawList[first]->cofCustom;
-		size_t last = first + 1;
-		while( last < decalDrawList.size( ) &&
-			decalDrawList[last]->textureIndex == textureIndex &&
-			decalDrawList[last]->cofCustom == cofCustom )
-		{
-			++last;
-		}
-
-		decalVertexScratch.clear( );
-		size_t vertexReserve = 0;
-		for( size_t i = first; i < last; ++i )
-			vertexReserve += decalDrawList[i]->vertices.size( );
-		decalVertexScratch.reserve( vertexReserve );
-
-		for( size_t i = first; i < last; ++i )
-		{
-			const dx_decal_t &decal = *decalDrawList[i];
-			const std::vector<dx_decal_vertex_t> &vertices = decal.vertices;
-
-			if( !modulateEntityDecal && !remixDecal )
-			{
-				decalVertexScratch.insert( decalVertexScratch.end( ),
-					vertices.begin( ), vertices.end( ) );
-				continue;
-			}
-
-			for( const dx_decal_vertex_t &source : vertices )
-			{
-				dx_decal_vertex_t vertex = source;
-				if( remixDecal )
-				{
-					// Depth bias is raster-only, so offset Remix decals geometrically.
-					vertex.x += decal.normal[0] * remixOffset;
-					vertex.y += decal.normal[1] * remixOffset;
-					vertex.z += decal.normal[2] * remixOffset;
-					vertex.diffuse = D3DCOLOR_ARGB( 255, 255, 255, 255 );
-				}
-				if( modulateEntityDecal )
-					vertex.diffuse = R_ModulateDecal(
-						vertex.diffuse, entityDecalFactor );
-				decalVertexScratch.push_back( vertex );
-			}
-		}
-
+		const int textureIndex = batch.textureIndex;
+		const bool cofCustom = batch.cofCustom;
 		const dxtexture_t &decalTexture = g_Textures[textureIndex];
 
 		const bool hasAlpha = ( decalTexture.flags & TF_HAS_ALPHA ) != 0;
@@ -2628,7 +2700,7 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 		const bool remixCutout = ( remixDecalCutout || ( remixDecal && cofCustom ) ) &&
 			( ( hasAlpha && !cofCustom ) || remixLegacyCutout != nullptr );
 		// An unconverted gray card must never enter a ray-traced capture.
-		if( remixDecal && cofCustom && !remixLegacyCutout ) { first = last; continue; }
+		if( remixDecal && cofCustom && !remixLegacyCutout ) continue;
 		if( remixCutout )
 		{
 			const DWORD alphaRef = static_cast<DWORD>( std::max( 0.0f,
@@ -2680,11 +2752,10 @@ static void R_DrawEntityDecals( const cl_entity_s *ent )
 		}
 		DX_ProfileEvent( DX_PROFILE_EVENT_DECAL_BATCH_DRAWN, 1 );
 		R_DrawScratchPrimitive( D3DPT_TRIANGLELIST,
-			static_cast<UINT>( decalVertexScratch.size( ) / 3 ),
-			static_cast<UINT>( decalVertexScratch.size( ) ),
-			decalVertexScratch.data( ), sizeof( dx_decal_vertex_t ) );
+			static_cast<UINT>( batch.vertices.size( ) / 3 ),
+			static_cast<UINT>( batch.vertices.size( ) ),
+			batch.vertices.data( ), sizeof( dx_decal_vertex_t ) );
 
-		first = last;
 	}
 
 	DX_SetRenderStateCached( D3DRS_DEPTHBIAS,
@@ -2771,15 +2842,6 @@ static void R_ExpandBatchBounds( float mins[3], float maxs[3], bool &valid,
 }
 
 void R_ExpandWorldBatchBounds( world_material_batch_t &batch,
-	const lightmap_vertex_t *vertices, int count )
-{
-	for( int i = 0; vertices && i < count; ++i )
-		R_ExpandBatchBounds( batch.mins, batch.maxs, batch.boundsValid,
-			vertices[i].x, vertices[i].y, vertices[i].z );
-}
-
-void R_ExpandOverlayBounds(
-	world_dynamic_overlay_batch_t &batch,
 	const lightmap_vertex_t *vertices, int count )
 {
 	for( int i = 0; vertices && i < count; ++i )
@@ -2911,6 +2973,11 @@ bool R_BoundsVisibleInCurrentView( const float mins[3], const float maxs[3], boo
 }
 
 static std::vector<byte> g_currentWorldPVS;
+static std::vector<byte> g_waterPVSMergedLeaf;
+static std::vector<byte> g_waterPVSScratch;
+static const byte *g_currentWorldVisData = nullptr;
+static const byte *g_currentWorldCompressedVis = nullptr;
+static uint64_t g_currentWorldPVSRevision = 0;
 
 static std::vector<byte> g_allVisibleWorldPVS;
 static const model_t *g_currentWorldPVSModel = nullptr;
@@ -2921,7 +2988,10 @@ static bool g_currentWorldPVSTransparentWater = false;
 
 static void R_InvalidateCurrentWorldPVS( )
 {
+	++g_currentWorldPVSRevision;
 	g_currentWorldPVS.clear( );
+	g_currentWorldVisData = nullptr;
+	g_currentWorldCompressedVis = nullptr;
 	g_currentWorldPVSModel = nullptr;
 	g_currentWorldPVSLeaf = -999999;
 	g_currentWorldPVSLeafCount = 0;
@@ -3077,6 +3147,8 @@ static bool R_UpdateCurrentWorldPVS( const world_model_draw_t &drawModel )
 	const bool transparentWater = R_UseTransparentWaterPVS( );
 
 	if( g_currentWorldPVSModel == world &&
+		g_currentWorldVisData == world->visdata &&
+		g_currentWorldCompressedVis == leaf->compressed_vis &&
 		g_currentWorldPVSLeaf == leafBit &&
 		g_currentWorldPVSLeafCount == world->numleafs &&
 		g_currentWorldPVSTransparentWater == transparentWater &&
@@ -3086,6 +3158,9 @@ static bool R_UpdateCurrentWorldPVS( const world_model_draw_t &drawModel )
 		return true;
 	}
 
+	++g_currentWorldPVSRevision;
+	g_currentWorldVisData = world->visdata;
+	g_currentWorldCompressedVis = leaf->compressed_vis;
 	g_currentWorldPVS.assign( static_cast<size_t>( rowBytes ), 0 );
 	R_DecompressVis(
 		leaf->compressed_vis, g_currentWorldPVS.data( ), rowBytes );
@@ -3094,9 +3169,10 @@ static bool R_UpdateCurrentWorldPVS( const world_model_draw_t &drawModel )
 
 	if( transparentWater && !drawModel.waterPvsPortals.empty( ) )
 	{
-		std::vector<byte> mergedLeaf(
-			static_cast<size_t>( world->numleafs ), 0 );
-		std::vector<byte> scratch( static_cast<size_t>( rowBytes ), 0 );
+		auto &mergedLeaf = g_waterPVSMergedLeaf;
+		auto &scratch = g_waterPVSScratch;
+		mergedLeaf.assign( static_cast<size_t>( world->numleafs ), 0 );
+		scratch.resize( static_cast<size_t>( rowBytes ) );
 		mergedLeaf[static_cast<size_t>( leafBit )] = 1;
 
 		bool changed = true;
@@ -3287,12 +3363,10 @@ void R_FinalizePVSLeafs( std::vector<int> &batchLeafs, bool alwaysVisible )
 		batchLeafs.end( ) );
 }
 
-bool R_PVSLeafsVisible( const world_model_draw_t &model,
-	const std::vector<int> &batchLeafs, bool alwaysVisible )
+static bool R_LeafsVisibleInPVS( const std::vector<int> &batchLeafs,
+	bool allVisible )
 {
-	if( R_RemixCaptureAll() || !model.pvsApplicable || alwaysVisible || batchLeafs.empty( ) )
-		return true;
-	if( !R_UpdateCurrentWorldPVS( model ) || g_currentWorldPVSAllVisible )
+	if( allVisible || batchLeafs.empty() )
 		return true;
 
 	for( const int leafBit : batchLeafs )
@@ -3305,16 +3379,23 @@ bool R_PVSLeafsVisible( const world_model_draw_t &model,
 	return false;
 }
 
+bool R_PVSLeafsVisible( const world_model_draw_t &model,
+	const std::vector<int> &batchLeafs, bool alwaysVisible )
+{
+	return R_LeafsVisibleInPVS( batchLeafs, R_RemixCaptureAll() ||
+		!model.pvsApplicable || alwaysVisible || batchLeafs.empty() ||
+		!R_UpdateCurrentWorldPVS( model ) || g_currentWorldPVSAllVisible );
+}
+
 struct static_world_visibility_cache_t
 {
 	bool valid = false;
 	const model_t *sourceModel = nullptr;
 	size_t batchCount = 0;
-	int pvsLeaf = -999999;
+	uint64_t pvsRevision = 0;
+	bool viewValid = false;
 	bool pvsAllVisible = true;
-	bool viewCullValid = false;
 	float rNovis = -1.0f;
-	float rNocull = -1.0f;
 	vec3_t origin{};
 	vec3_t cullOrigin{};
 	vec3_t forward{};
@@ -3324,6 +3405,7 @@ struct static_world_visibility_cache_t
 	float tanY = 0.0f;
 	float nearPlane = 0.0f;
 	float farPlane = 0.0f;
+	std::vector<size_t> pvsBatchIndices;
 	std::vector<size_t> visibleBatchIndices;
 };
 
@@ -3349,57 +3431,9 @@ static bool R_CloseVec3( const vec3_t a, const vec3_t b )
 		R_CloseFloat( a[2], b[2] );
 }
 
-static int R_CurrentPVSLeaf( const world_model_draw_t &model,
-	bool &allVisible )
+static bool R_WorldVisCacheMatches( const static_world_visibility_cache_t &cache )
 {
-	allVisible = true;
-	if( !R_WorldPVSEnabledForModel( model.sourceModel ) )
-		return -1;
-	if( !R_UpdateCurrentWorldPVS( model ) || g_currentWorldPVSAllVisible )
-		return -1;
-	allVisible = false;
-
-	const unsigned int primary =
-		static_cast<unsigned int>( g_currentWorldPVSLeaf + 1 ) & 0x00FFFFFFu;
-	const unsigned int transparentBit =
-		g_currentWorldPVSTransparentWater ? 0x40000000u : 0u;
-	return static_cast<int>( primary | transparentBit );
-}
-
-static bool R_UsePVSCache(
-	const world_model_draw_t &model )
-{
-	// A PVS-only cache does not depend on camera direction. Frustum culling
-	// requires the full view cache key and per-batch bounds even for megabatches.
-	return dx_world_megabatch.value != 0.0f &&
-		model.sourceModel == g_worldmodel && r_nocull.value != 0.0f;
-}
-
-static bool R_WorldVisCacheMatches( const world_model_draw_t &model,
-	int pvsLeaf, bool pvsAllVisible )
-{
-	const static_world_visibility_cache_t &cache = g_staticWorldVisibilityCache;
-
-	const bool commonMatch =
-		cache.valid &&
-		cache.sourceModel == model.sourceModel &&
-		cache.batchCount == model.batches.size( ) &&
-		cache.pvsLeaf == pvsLeaf &&
-		cache.pvsAllVisible == pvsAllVisible &&
-		R_CloseFloat( cache.rNovis, r_novis.value ) &&
-		R_CloseFloat( cache.rNocull, r_nocull.value );
-
-	if( !commonMatch )
-		return false;
-
-	if( R_UsePVSCache( model ) )
-	{
-
-		return true;
-	}
-
-	return cache.viewCullValid == g_dxCullValid &&
-		R_CloseFloat( cache.rNocull, r_nocull.value ) &&
+	return cache.viewValid &&
 		R_CloseVec3( cache.origin, g_vOrigin ) &&
 		R_CloseVec3( cache.cullOrigin, g_dxCullOrigin ) &&
 		R_CloseVec3( cache.forward, g_dxCullForward ) &&
@@ -3420,24 +3454,48 @@ const std::vector<size_t> *R_GetVisibleWorldBatches(
 		return nullptr;
 	}
 
-	bool pvsAllVisible = true;
-	const int pvsLeaf = R_CurrentPVSLeaf( model, pvsAllVisible );
-	if( R_WorldVisCacheMatches( model, pvsLeaf, pvsAllVisible ) )
+	const bool pvsAllVisible = !model.pvsApplicable ||
+		!R_UpdateCurrentWorldPVS( model ) || g_currentWorldPVSAllVisible;
+	auto &cache = g_staticWorldVisibilityCache;
+	if( !cache.valid || cache.sourceModel != model.sourceModel ||
+		cache.batchCount != model.batches.size() ||
+		cache.pvsRevision != g_currentWorldPVSRevision ||
+		cache.pvsAllVisible != pvsAllVisible || cache.rNovis != r_novis.value )
+	{
+		cache.valid = true;
+		cache.viewValid = false;
+		cache.sourceModel = model.sourceModel;
+		cache.batchCount = model.batches.size();
+		cache.pvsRevision = g_currentWorldPVSRevision;
+		cache.pvsAllVisible = pvsAllVisible;
+		cache.rNovis = r_novis.value;
+		cache.pvsBatchIndices.clear();
+		cache.pvsBatchIndices.reserve( cache.batchCount );
+		cache.visibleBatchIndices.reserve( cache.batchCount );
+
+		for( size_t i = 0; i < cache.batchCount; ++i )
+		{
+			const auto &batch = model.batches[i];
+			if( batch.primitiveCount == 0 )
+				continue;
+			if( R_LeafsVisibleInPVS( batch.pvsLeafs, pvsAllVisible || batch.pvsAlwaysVisible ) )
+				cache.pvsBatchIndices.push_back( i );
+			else
+				DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_CULLED_PVS, 1 );
+		}
+	}
+
+	if( r_nocull.value != 0.0f || !g_dxCullValid )
+		return &cache.pvsBatchIndices;
+
+	if( R_WorldVisCacheMatches( cache ) )
 	{
 		DX_ProfileEvent( DX_PROFILE_EVENT_VIS_CACHE_HIT, 1 );
-		return &g_staticWorldVisibilityCache.visibleBatchIndices;
+		return &cache.visibleBatchIndices;
 	}
 	DX_ProfileEvent( DX_PROFILE_EVENT_VIS_CACHE_MISS, 1 );
 
-	static_world_visibility_cache_t &cache = g_staticWorldVisibilityCache;
-	cache.valid = true;
-	cache.sourceModel = model.sourceModel;
-	cache.batchCount = model.batches.size( );
-	cache.pvsLeaf = pvsLeaf;
-	cache.pvsAllVisible = pvsAllVisible;
-	cache.viewCullValid = g_dxCullValid;
-	cache.rNovis = r_novis.value;
-	cache.rNocull = r_nocull.value;
+	cache.viewValid = true;
 	VectorCopy( g_vOrigin, cache.origin );
 	VectorCopy( g_dxCullOrigin, cache.cullOrigin );
 	VectorCopy( g_dxCullForward, cache.forward );
@@ -3449,25 +3507,11 @@ const std::vector<size_t> *R_GetVisibleWorldBatches(
 	cache.farPlane = g_dxCullFar;
 
 	cache.visibleBatchIndices.clear( );
-	cache.visibleBatchIndices.reserve( model.batches.size( ) );
 
-	const bool pvsOnlyMegabatch =
-		R_UsePVSCache( model );
-
-	for( size_t i = 0; i < model.batches.size( ); ++i )
+	for( const size_t i : cache.pvsBatchIndices )
 	{
-		const world_material_batch_t &batch = model.batches[i];
-		if( batch.primitiveCount == 0 )
-			continue;
-
-		if( !R_PVSLeafsVisible( model, batch.pvsLeafs, batch.pvsAlwaysVisible ) )
-		{
-			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_CULLED_PVS, 1 );
-			continue;
-		}
-
-		if( !pvsOnlyMegabatch &&
-			!R_BoundsVisibleInCurrentView(
+		const auto &batch = model.batches[i];
+		if( !R_BoundsVisibleInCurrentView(
 				batch.mins, batch.maxs, batch.boundsValid ) )
 		{
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_CULLED_FRUSTUM, 1 );
@@ -3510,32 +3554,6 @@ world_material_batch_t &R_FindWorldBatch( world_model_draw_t &model,
 	return model.batches.back( );
 }
 
-world_dynamic_overlay_batch_t &R_FindDynamicOverlayBatch(
-	world_model_draw_t &model, texture_t *baseTexture, int overlayAtlasIndex,
-	bool conveyor, int cellX, int cellY, int cellZ )
-{
-	for( auto &batch : model.dynamicOverlayBatches )
-	{
-		if( batch.baseTexture == baseTexture &&
-			batch.overlayAtlasIndex == overlayAtlasIndex &&
-			batch.conveyor == conveyor &&
-			batch.cellX == cellX && batch.cellY == cellY && batch.cellZ == cellZ )
-		{
-			return batch;
-		}
-	}
-
-	world_dynamic_overlay_batch_t batch;
-	batch.baseTexture = baseTexture;
-	batch.overlayAtlasIndex = overlayAtlasIndex;
-	batch.conveyor = conveyor;
-	batch.cellX = cellX;
-	batch.cellY = cellY;
-	batch.cellZ = cellZ;
-	model.dynamicOverlayBatches.push_back( std::move( batch ) );
-	return model.dynamicOverlayBatches.back( );
-}
-
 bool R_UploadWorldBatch( world_material_batch_t &batch )
 {
 	batch.vertexCount = static_cast<UINT>( batch.vertices.size( ) );
@@ -3555,6 +3573,7 @@ bool R_UploadWorldBatch( world_material_batch_t &batch )
 	result = batch.vertexBuffer->Lock( 0, 0, &vertexMemory, 0 );
 	if( FAILED( result ) || !vertexMemory )
 	{
+		DX_ForgetGeometryResource( batch.vertexBuffer );
 		batch.vertexBuffer->Release( );
 		batch.vertexBuffer = nullptr;
 		return false;
@@ -3569,6 +3588,7 @@ bool R_UploadWorldBatch( world_material_batch_t &batch )
 		&batch.indexBuffer, nullptr );
 	if( FAILED( result ) || !batch.indexBuffer )
 	{
+		DX_ForgetGeometryResource( batch.vertexBuffer );
 		batch.vertexBuffer->Release( );
 		batch.vertexBuffer = nullptr;
 		return false;
@@ -3578,8 +3598,10 @@ bool R_UploadWorldBatch( world_material_batch_t &batch )
 	result = batch.indexBuffer->Lock( 0, 0, &indexMemory, 0 );
 	if( FAILED( result ) || !indexMemory )
 	{
+		DX_ForgetGeometryResource( batch.indexBuffer );
 		batch.indexBuffer->Release( );
 		batch.indexBuffer = nullptr;
+		DX_ForgetGeometryResource( batch.vertexBuffer );
 		batch.vertexBuffer->Release( );
 		batch.vertexBuffer = nullptr;
 		return false;
@@ -3587,11 +3609,9 @@ bool R_UploadWorldBatch( world_material_batch_t &batch )
 	memcpy( indexMemory, batch.indices.data( ), batch.indices.size( ) * sizeof( DWORD ) );
 	batch.indexBuffer->Unlock( );
 
-	if( dx_dlight_world.value == 0.0f )
-	{
-		std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
-		if(batch.surfaceRanges.empty()) std::vector<DWORD>( ).swap( batch.indices );
-	}
+	std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
+	if( batch.surfaceRanges.empty( ) )
+		std::vector<DWORD>( ).swap( batch.indices );
 	return true;
 }
 
@@ -3700,119 +3720,14 @@ bool R_UploadWorldBatches( world_model_draw_t &model )
 	model.sharedVertexBuffer = sharedVB;
 	model.sharedIndexBuffer = sharedIB;
 
-	const bool keepCpuTriangles = dx_dlight_world.value != 0.0f &&
-		dx_dlight_geometry.value != 0.0f &&
-		( model.sourceModel != g_worldmodel );
-	if( !keepCpuTriangles )
-	{
-		for( auto &batch : model.batches )
-		{
-			std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
-			if(batch.surfaceRanges.empty()) std::vector<DWORD>( ).swap( batch.indices );
-		}
-	}
 
-	return true;
-}
-
-bool R_UploadOverlayBatches( world_model_draw_t &model )
-{
-	if( !device || model.dynamicOverlayBatches.empty( ) )
-		return false;
-
-	size_t totalVertices = 0;
-	size_t totalIndices = 0;
-	for( auto &batch : model.dynamicOverlayBatches )
-	{
-		batch.vertexCount = static_cast<UINT>( batch.vertices.size( ) );
-		batch.primitiveCount = static_cast<UINT>( batch.indices.size( ) / 3 );
-
-		const UINT batchIndexCount = static_cast<UINT>( batch.indices.size( ) );
-		for( world_dynamic_overlay_range_t &range : batch.ranges )
-		{
-			if( range.firstIndex >= batchIndexCount )
-			{
-				range.indexCount = 0;
-				continue;
-			}
-			range.indexCount = std::min(
-				range.indexCount, batchIndexCount - range.firstIndex );
-			range.indexCount -= range.indexCount % 3;
-		}
-
-		totalVertices += batch.vertices.size( );
-		totalIndices += batch.indices.size( );
-	}
-	if( totalVertices == 0 || totalIndices == 0 ||
-		totalVertices > static_cast<size_t>( INT_MAX ) ||
-		totalIndices > static_cast<size_t>( UINT_MAX ) )
-	{
-		return false;
-	}
-
-	const size_t vertexBytes = totalVertices * sizeof( lightmap_vertex_t );
-	const size_t indexBytes = totalIndices * sizeof( DWORD );
-	if( vertexBytes > static_cast<size_t>( UINT_MAX ) ||
-		indexBytes > static_cast<size_t>( UINT_MAX ) )
-		return false;
-
-	IDirect3DVertexBuffer9 *vb = nullptr;
-	IDirect3DIndexBuffer9 *ib = nullptr;
-	HRESULT result = device->CreateVertexBuffer( static_cast<UINT>( vertexBytes ),
-		D3DUSAGE_WRITEONLY, LIGHTMAP_FVF, D3DPOOL_MANAGED, &vb, nullptr );
-	if( FAILED( result ) || !vb )
-		return false;
-	result = device->CreateIndexBuffer( static_cast<UINT>( indexBytes ),
-		D3DUSAGE_WRITEONLY, D3DFMT_INDEX32, D3DPOOL_MANAGED, &ib, nullptr );
-	if( FAILED( result ) || !ib )
-	{
-		vb->Release( );
-		return false;
-	}
-
-	void *vertexMemory = nullptr;
-	void *indexMemory = nullptr;
-	if( FAILED( vb->Lock( 0, 0, &vertexMemory, 0 ) ) || !vertexMemory )
-	{
-		ib->Release( ); vb->Release( ); return false;
-	}
-	if( FAILED( ib->Lock( 0, 0, &indexMemory, 0 ) ) || !indexMemory )
-	{
-		vb->Unlock( ); ib->Release( ); vb->Release( ); return false;
-	}
-
-	UINT vertexCursor = 0;
-	UINT indexCursor = 0;
-	byte *vertexDst = static_cast<byte *>( vertexMemory );
-	byte *indexDst = static_cast<byte *>( indexMemory );
-	for( auto &batch : model.dynamicOverlayBatches )
-	{
-		batch.sharedBaseVertex = vertexCursor;
-		batch.sharedStartIndex = indexCursor;
-		if( !batch.vertices.empty( ) )
-		{
-			memcpy( vertexDst + static_cast<size_t>( vertexCursor ) *
-				sizeof( lightmap_vertex_t ), batch.vertices.data( ),
-				batch.vertices.size( ) * sizeof( lightmap_vertex_t ) );
-			vertexCursor += static_cast<UINT>( batch.vertices.size( ) );
-		}
-		if( !batch.indices.empty( ) )
-		{
-			memcpy( indexDst + static_cast<size_t>( indexCursor ) * sizeof( DWORD ),
-				batch.indices.data( ), batch.indices.size( ) * sizeof( DWORD ) );
-			indexCursor += static_cast<UINT>( batch.indices.size( ) );
-		}
-	}
-	ib->Unlock( );
-	vb->Unlock( );
-	model.overlaySharedVertexBuffer = vb;
-	model.overlaySharedIndexBuffer = ib;
-
-	for( auto &batch : model.dynamicOverlayBatches )
+	for( auto &batch : model.batches )
 	{
 		std::vector<lightmap_vertex_t>( ).swap( batch.vertices );
-		std::vector<DWORD>( ).swap( batch.indices );
+		if( batch.surfaceRanges.empty( ) )
+			std::vector<DWORD>( ).swap( batch.indices );
 	}
+
 	return true;
 }
 
@@ -4706,6 +4621,7 @@ bool R_UploadWaterBatch( world_water_batch_t &batch )
 		result = batch.indexBuffer->Lock( 0, 0, &indexMemory, 0 );
 		if( FAILED( result ) || !indexMemory )
 		{
+			DX_ForgetGeometryResource( batch.indexBuffer );
 			batch.indexBuffer->Release( );
 			batch.indexBuffer = nullptr;
 			return false;
@@ -4858,7 +4774,26 @@ void R_LoadMap( const model_t *mod )
 	R_BuildMapLightmaps( mod );
 
 	if( mod )
-		R_GetLightmappedBrushModel( mod );
+	{
+		const auto *draw = R_GetLightmappedBrushModel( mod );
+		if( draw )
+		{
+			auto &cache = g_staticWorldVisibilityCache;
+			cache.pvsBatchIndices.reserve( draw->batches.size() );
+			cache.visibleBatchIndices.reserve( draw->batches.size() );
+			if( draw->pvsApplicable )
+			{
+				const size_t leafCount = static_cast<size_t>( mod->numleafs );
+				const size_t rowBytes = ( leafCount + 7 ) / 8;
+				g_currentWorldPVS.reserve( rowBytes );
+				if( !draw->waterPvsPortals.empty() )
+				{
+					g_waterPVSMergedLeaf.reserve( leafCount );
+					g_waterPVSScratch.reserve( rowBytes );
+				}
+			}
+		}
+	}
 }
 
 std::array<player_gait_state_t, MAX_CLIENTS> g_playerGaitStates{};
@@ -4897,10 +4832,6 @@ std::vector<dx_line_light_t> g_dxLineLights;
 int g_dxFixedLightCount = 0;
 
 std::vector<beam_light_segment_t> g_dxBeamLights;
-std::vector<size_t> g_dlightSelected;
-std::vector<size_t> g_dlightRestore;
-std::vector<unsigned char> g_dynamicOverlaySelectedMask;
-std::vector<lightmap_dirty_atlas_t> g_dynamicOverlayDirtyScratch;
 #ifndef MAXSTUDIOBONES
 #define MAXSTUDIOBONES 128
 #endif
@@ -4918,7 +4849,6 @@ studio_light_probe_cache_t g_viewModelLightProbeCache;
 
 uint32_t g_studioRenderFxRandomState = 0xA341316Cu;
 
-#define DYNAMIC_LIGHT_FVF ( D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1 )
 
 void R_SaveEntityRenderState( dx_entity_state_t *state )
 {
@@ -5291,7 +5221,7 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 	if( R_WaterEntityAlpha( ent, rippleMode ) <= 0.0f )
 		return;
 
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	R_SetLightmapStageEnabled( false );
 	DX_SetTextureStageStateCached( 0, D3DTSS_TEXCOORDINDEX, 0 );
 	DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE );
@@ -5412,7 +5342,7 @@ static void R_DrawBrushWaterPass( cl_entity_s *ent, model_t *mod,
 	{
 		D3DMATRIX entityWorld;
 		R_SetEntityWorldTransform( ent, gp_cl->time, &entityWorld );
-		device->SetTransform( D3DTS_WORLD, &entityWorld );
+		DX_SetTransformCached( D3DTS_WORLD, &entityWorld );
 	}
 
 	world_model_draw_t *model = R_GetLightmappedBrushModel( mod );
@@ -5490,7 +5420,7 @@ bool R_DrawBrushEntity( cl_entity_s *ent )
 
 	D3DMATRIX entityWorld;
 	R_SetEntityWorldTransform( ent, gp_cl->time, &entityWorld );
-	device->SetTransform( D3DTS_WORLD, &entityWorld );
+	DX_SetTransformCached( D3DTS_WORLD, &entityWorld );
 
 	world_model_draw_t *model = R_GetLightmappedBrushModel( ent->model );
 	if( !model )

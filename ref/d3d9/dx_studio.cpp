@@ -1356,8 +1356,49 @@ float R_CurrentRenderTime( float fallback )
 	return gp_cl ? static_cast<float>( gp_cl->time ) : fallback;
 }
 
+static std::array<uint8_t, 1u << 12> g_studioLocalLightAttachments{};
+
+static uint64_t R_StudioLocalLightRevision()
+{
+	static std::array<dx_dlight_t, 128> previous{};
+	static int previousCount = 0;
+	static uint64_t collection = 0;
+	static uint64_t revision = 0;
+	if( collection == g_dxStudioLocalLightCollection )
+		return revision;
+
+	collection = g_dxStudioLocalLightCollection;
+	bool changed = previousCount != g_dxStudioLocalLightCount;
+	for( int i = 0; i < g_dxStudioLocalLightCount; ++i )
+	{
+		auto light = g_dxDLights[g_dxStudioLocalLightIndices[i]];
+		// Expiration is already accounted for by light collection.
+		light.dieTime = 0.0f;
+		if( memcmp( &previous[i], &light, sizeof( light ) ) != 0 )
+		{
+			previous[i] = light;
+			changed = true;
+		}
+	}
+	previousCount = g_dxStudioLocalLightCount;
+	if( changed )
+	{
+		++revision;
+		g_studioLocalLightAttachments.fill( 0 );
+		for( int i = 0; i < previousCount; ++i )
+		{
+			const int key = previous[i].key;
+			const int attachment = ( key >> 12 ) & 0xF;
+			if( attachment > 0 && attachment < MAXSTUDIOATTACHMENTS )
+				g_studioLocalLightAttachments[key & 0xFFF] |= 1u << attachment;
+		}
+	}
+	return revision;
+}
+
 static int R_StudioLocalLights( const cl_entity_s *ent,
-	const D3DMATRIX *currentWorldMatrix, studio_local_light_t out[DX_STUDIO_MAX_LOCAL_LIGHTS] )
+	const D3DMATRIX *currentWorldMatrix, studio_local_light_t out[DX_STUDIO_MAX_LOCAL_LIGHTS],
+	studio_local_light_cache_t *cache = nullptr )
 {
 	if( !out )
 		return 0;
@@ -1382,20 +1423,43 @@ static int R_StudioLocalLights( const cl_entity_s *ent,
 		VectorCopy( ent->origin, entityOrigin );
 	}
 
-	D3DXMATRIX inverseWorld;
-	bool useInverseWorld = false;
-	if( currentWorldMatrix )
+	const float intensityScale = R_DynamicLightIntensityScale();
+	const uint64_t revision = cache ? R_StudioLocalLightRevision() : 0;
+	const unsigned int attachmentMask = ent->index >= 0 &&
+		static_cast<size_t>( ent->index ) < g_studioLocalLightAttachments.size()
+		? g_studioLocalLightAttachments[ent->index] : 0;
+	const bool sameWorld = cache && currentWorldMatrix && cache->inverseValid &&
+		memcmp( &cache->world, currentWorldMatrix, sizeof( cache->world ) ) == 0;
+	if( cache && cache->entity == ent && cache->entityIndex == ent->index &&
+		cache->revision == revision && cache->intensity == intensityScale &&
+		cache->usesWorld == ( currentWorldMatrix != nullptr ) &&
+		( currentWorldMatrix ? sameWorld :
+			memcmp( cache->origin, entityOrigin, sizeof( entityOrigin ) ) == 0 ) &&
+		( !attachmentMask ||
+			memcmp( cache->attachments, ent->attachment, sizeof( cache->attachments ) ) == 0 ) )
 	{
-		D3DXMATRIX source;
-		memcpy( &source, currentWorldMatrix, sizeof( source ) );
+		std::copy_n( cache->lights, cache->count, out );
+		return cache->count;
+	}
+
+	D3DXMATRIX inverseWorld;
+	if( sameWorld )
+		inverseWorld = cache->inverseWorld;
+	else if( currentWorldMatrix )
+	{
+		D3DXMATRIX source( *currentWorldMatrix );
 		if( !D3DXMatrixInverse( &inverseWorld, nullptr, &source ) )
 			return 0;
-		useInverseWorld = true;
+		if( cache )
+		{
+			cache->world = *currentWorldMatrix;
+			cache->inverseWorld = inverseWorld;
+			cache->inverseValid = true;
+		}
 	}
 
 	float strengths[DX_STUDIO_MAX_LOCAL_LIGHTS];
 	int count = 0;
-	const float intensityScale = R_DynamicLightIntensityScale( );
 
 	DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_LOCAL_LIGHT_CANDIDATE,
 		static_cast<unsigned int>( g_dxStudioLocalLightCount ) );
@@ -1447,7 +1511,7 @@ static int R_StudioLocalLights( const cl_entity_s *ent,
 			continue;
 
 		vec3_t localOrigin;
-		if( useInverseWorld )
+		if( currentWorldMatrix )
 		{
 			D3DXVECTOR3 input( effectiveOrigin[0], effectiveOrigin[1], effectiveOrigin[2] );
 			D3DXVECTOR3 local;
@@ -1469,6 +1533,20 @@ static int R_StudioLocalLights( const cl_entity_s *ent,
 		out[slot].intensity = intensityScale;
 		strengths[slot] = strength;
 	}
+	if( cache )
+	{
+		cache->entity = ent;
+		cache->entityIndex = ent->index;
+		cache->revision = revision;
+		cache->intensity = intensityScale;
+		cache->usesWorld = currentWorldMatrix != nullptr;
+		VectorCopy( entityOrigin, cache->origin );
+		if( attachmentMask )
+			memcpy( cache->attachments, ent->attachment, sizeof( cache->attachments ) );
+		std::copy_n( out, count, cache->lights );
+		cache->count = count;
+	}
+
 	return count;
 }
 
@@ -1817,10 +1895,10 @@ static void R_DrawMuzzleFlashes( const cl_entity_s *ent )
 
 	const float now = R_CurrentRenderTime( 0.0f );
 	D3DMATRIX savedWorld{};
-	device->GetTransform( D3DTS_WORLD, &savedWorld );
+	DX_GetTransformCached( D3DTS_WORLD, &savedWorld );
 	D3DMATRIX identity;
 	DX_MatrixIdentity( identity );
-	device->SetTransform( D3DTS_WORLD, &identity );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
 
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_NONE );
 	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
@@ -1834,7 +1912,7 @@ static void R_DrawMuzzleFlashes( const cl_entity_s *ent )
 	R_SetLightmapStageEnabled( false );
 	R_SetTextureStage( D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE,
 		D3DTOP_SELECTARG1, D3DTA_TEXTURE, D3DTA_DIFFUSE );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 
 	for( size_t i = 0; i < g_rendererMuzzleFlashes.size( ); )
 	{
@@ -1916,7 +1994,7 @@ static void R_DrawMuzzleFlashes( const cl_entity_s *ent )
 
 	DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_CCW );
 	DX_SetRenderStateCached( D3DRS_TEXTUREFACTOR, 0xFFFFFFFF );
-	device->SetTransform( D3DTS_WORLD, &savedWorld );
+	DX_SetTransformCached( D3DTS_WORLD, &savedWorld );
 	R_SetOpaqueEntityBaseline( );
 }
 
@@ -2362,7 +2440,7 @@ static void StudioSkinModelInternal( model_t *mod, studiohdr_t *hdr, int seq, fl
 						R_StudioFlatshadeFactor( directLightScale ) );
 				if( chrome && !haveChromeWorld )
 				{
-					device->GetTransform( D3DTS_WORLD, &chromeWorld );
+					DX_GetTransformCached( D3DTS_WORLD, &chromeWorld );
 					haveChromeWorld = true;
 				}
 				auto &batch = getBatch( texId, materialFlags );
@@ -2592,6 +2670,7 @@ static void R_FreeStudioRemixBlendBuffer( const studio_cache_t &cache )
 {
 	if( cache.remixBlendVertexBuffer )
 	{
+		DX_ForgetGeometryResource( cache.remixBlendVertexBuffer );
 		cache.remixBlendVertexBuffer->Release( );
 		cache.remixBlendVertexBuffer = nullptr;
 	}
@@ -2601,13 +2680,16 @@ static void R_FreeStudioRemixBlendBuffer( const studio_cache_t &cache )
 
 static void R_FreeStudioBuffers( studio_cache_t &cache )
 {
+	cache.buffersValid = false;
 	if( cache.combinedVertexBuffer )
 	{
+		DX_ForgetGeometryResource( cache.combinedVertexBuffer );
 		cache.combinedVertexBuffer->Release( );
 		cache.combinedVertexBuffer = nullptr;
 	}
 	if( cache.gpuSkinSourceVertexBuffer )
 	{
+		DX_ForgetGeometryResource( cache.gpuSkinSourceVertexBuffer );
 		cache.gpuSkinSourceVertexBuffer->Release( );
 		cache.gpuSkinSourceVertexBuffer = nullptr;
 	}
@@ -2622,11 +2704,13 @@ static void R_FreeStudioBuffers( studio_cache_t &cache )
 	{
 		if( batch.vertexBuffer )
 		{
+			DX_ForgetGeometryResource( batch.vertexBuffer );
 			batch.vertexBuffer->Release( );
 			batch.vertexBuffer = nullptr;
 		}
 		if( batch.indexBuffer )
 		{
+			DX_ForgetGeometryResource( batch.indexBuffer );
 			batch.indexBuffer->Release( );
 			batch.indexBuffer = nullptr;
 		}
@@ -2640,6 +2724,8 @@ static void R_DestroyStudioGpuCache( studio_cache_t &cache )
 	R_FreeStudioBuffers( cache );
 	cache.batches.clear( );
 	cache.model = nullptr;
+	cache.topologyHeader = nullptr;
+	cache.localLightSelection.entity = nullptr;
 	cache.physicsPoseUploaded = false;
 	cache.body = 0;
 	cache.skin = 0;
@@ -2694,25 +2780,34 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 	const bool uploadNormals = R_StudioUploadNormals( );
 	const bool gpuSkinning = R_StudioGpuSkinningForCache( cache );
 	const bool combinedVB = !gpuSkinning;
-	if( cache.buffersUploadNormals != uploadNormals ||
-		cache.combinedVertexBufferMode != combinedVB ||
-		cache.gpuSkinningBufferMode != gpuSkinning )
+	const bool sameLayout = cache.buffersStudioNormals == studioNormals &&
+		cache.buffersUploadNormals == uploadNormals &&
+		cache.combinedVertexBufferMode == combinedVB &&
+		cache.gpuSkinningBufferMode == gpuSkinning;
+	// Topology replacement, allocation failures and device loss all clear this flag.
+	if( cache.buffersValid && sameLayout )
+		return true;
+	cache.buffersValid = false;
+	if( !sameLayout )
 	{
 		for( auto &batch : cache.batches )
 		{
 			if( batch.vertexBuffer )
 			{
+				DX_ForgetGeometryResource( batch.vertexBuffer );
 				batch.vertexBuffer->Release( );
 				batch.vertexBuffer = nullptr;
 			}
 		}
 		if( cache.combinedVertexBuffer )
 		{
+			DX_ForgetGeometryResource( cache.combinedVertexBuffer );
 			cache.combinedVertexBuffer->Release( );
 			cache.combinedVertexBuffer = nullptr;
 		}
 		if( cache.gpuSkinSourceVertexBuffer )
 		{
+			DX_ForgetGeometryResource( cache.gpuSkinSourceVertexBuffer );
 			cache.gpuSkinSourceVertexBuffer->Release( );
 			cache.gpuSkinSourceVertexBuffer = nullptr;
 		}
@@ -2749,12 +2844,14 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 		{
 			if( batch.vertexBuffer )
 			{
+				DX_ForgetGeometryResource( batch.vertexBuffer );
 				batch.vertexBuffer->Release( );
 				batch.vertexBuffer = nullptr;
 			}
 		}
 		if( cache.combinedVertexBuffer )
 		{
+			DX_ForgetGeometryResource( cache.combinedVertexBuffer );
 			cache.combinedVertexBuffer->Release( );
 			cache.combinedVertexBuffer = nullptr;
 			cache.combinedVertexCount = 0;
@@ -2768,6 +2865,7 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 		{
 			if( cache.gpuSkinSourceVertexBuffer )
 			{
+				DX_ForgetGeometryResource( cache.gpuSkinSourceVertexBuffer );
 				cache.gpuSkinSourceVertexBuffer->Release( );
 				cache.gpuSkinSourceVertexBuffer = nullptr;
 			}
@@ -2829,6 +2927,7 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 		{
 			if( batch.vertexBuffer )
 			{
+				DX_ForgetGeometryResource( batch.vertexBuffer );
 				batch.vertexBuffer->Release( );
 				batch.vertexBuffer = nullptr;
 			}
@@ -2841,6 +2940,7 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 		{
 			if( cache.combinedVertexBuffer )
 			{
+				DX_ForgetGeometryResource( cache.combinedVertexBuffer );
 				cache.combinedVertexBuffer->Release( );
 				cache.combinedVertexBuffer = nullptr;
 			}
@@ -2910,6 +3010,8 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 	cache.buffersUploadNormals = uploadNormals;
 	cache.combinedVertexBufferMode = combinedVB;
 	cache.gpuSkinningBufferMode = gpuSkinning;
+	cache.buffersStudioNormals = studioNormals;
+	cache.buffersValid = true;
 	return true;
 }
 
@@ -2938,6 +3040,7 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 		return false;
 
 	cache.model = mod;
+	cache.topologyHeader = hdr;
 	cache.body = entityBody;
 	cache.skin = entitySkin;
     cache.hiddenArm = hiddenArm;
@@ -3595,7 +3698,7 @@ static bool R_UpdateStudioVertices( studio_cache_t &cache,
 	R_StudioLightToEntity( worldLightDir, worldMatrix, localLightDir );
 
 	studio_local_light_t localLights[DX_STUDIO_MAX_LOCAL_LIGHTS];
-	const int localLightCount = R_StudioLocalLights( ent, worldMatrix, localLights );
+	const int localLightCount = R_StudioLocalLights( ent, worldMatrix, localLights, &cache.localLightSelection );
 	const bool localLightsChanged = !R_StudioLocalLightsEqual(
 		cache.localLights, cache.localLightCount, localLights, localLightCount );
 
@@ -3887,9 +3990,9 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 
 	D3DMATRIX d3dWorld{}, d3dView{}, d3dProjection{};
 	D3DXMATRIX world, view, projection, worldViewProjection, transposed;
-	device->GetTransform( D3DTS_WORLD, &d3dWorld );
-	device->GetTransform( D3DTS_VIEW, &d3dView );
-	device->GetTransform( D3DTS_PROJECTION, &d3dProjection );
+	DX_GetTransformCached( D3DTS_WORLD, &d3dWorld );
+	DX_GetTransformCached( D3DTS_VIEW, &d3dView );
+	DX_GetTransformCached( D3DTS_PROJECTION, &d3dProjection );
 	DX_ToD3DXMatrix( d3dWorld, world );
 	DX_ToD3DXMatrix( d3dView, view );
 	DX_ToD3DXMatrix( d3dProjection, projection );
@@ -3941,7 +4044,7 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 
 	const bool useLocalLightShader = !glowShellPass && cache.localLightCount > 0;
 	DX_BindStudioGpuSkinningShader( useLocalLightShader );
-	device->SetStreamSource( 0, cache.gpuSkinSourceVertexBuffer, 0,
+	DX_SetStreamSourceCached( 0, cache.gpuSkinSourceVertexBuffer, 0,
 		sizeof( studio_skin_vertex_t ) );
 	device->SetVertexShaderConstantF( DX_STUDIO_GPU_SKIN_CONST_ZERO, constants0, 1 );
 	device->SetVertexShaderConstantF( DX_STUDIO_GPU_SKIN_CONST_DIFFUSE, diffuse, 1 );
@@ -4073,7 +4176,7 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 				DX_STUDIO_GPU_SKIN_CONST_CHROMESCALE, chromeScale, 1 );
 		}
 
-		device->SetIndices( batch.indexBuffer );
+		DX_SetIndicesCached( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
@@ -4081,9 +4184,8 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 			0, batch.primitiveCount );
 	}
 
-	device->SetVertexShader( nullptr );
-	device->SetVertexDeclaration( nullptr );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetVertexShaderCached( nullptr );
+	DX_SetFVFCached( BRUSH_FVF );
 	return true;
 }
 
@@ -4168,7 +4270,7 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 	// Bone matrices are 3x4 rows applied to column vectors. D3D applies its matrices to row vectors,
 	// so each bone goes in transposed, followed by the entity's world matrix.
 	D3DMATRIX d3dWorld{};
-	device->GetTransform( D3DTS_WORLD, &d3dWorld );
+	DX_GetTransformCached( D3DTS_WORLD, &d3dWorld );
 	D3DXMATRIX world;
 	DX_ToD3DXMatrix( d3dWorld, world );
 	for( int bone = 0; bone < cache.gpuSkinningBoneCount; ++bone )
@@ -4180,14 +4282,14 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 			m[0][2], m[1][2], m[2][2], 0.0f,
 			m[0][3], m[1][3], m[2][3], 1.0f );
 		const D3DXMATRIX blend = boneMatrix * world;
-		device->SetTransform( D3DTS_WORLDMATRIX( bone ), &blend );
+		DX_SetTransformCached( D3DTS_WORLDMATRIX( bone ), &blend );
 	}
 	DX_RagdollSubmitted( ent, cache, cache.gpuSkinningBoneMatrices, cache.gpuSkinningBoneCount, &d3dWorld,
 		"remix-vertex-blend" );
 
 	DX_SetRenderStateCached( D3DRS_VERTEXBLEND, D3DVBF_1WEIGHTS );
 	DX_SetRenderStateCached( D3DRS_INDEXEDVERTEXBLENDENABLE, TRUE );
-	device->SetStreamSource( 0, cache.remixBlendVertexBuffer, 0, sizeof( studio_blend_vertex_t ) );
+	DX_SetStreamSourceCached( 0, cache.remixBlendVertexBuffer, 0, sizeof( studio_blend_vertex_t ) );
 
 	int boundTexture = -1;
 	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
@@ -4203,7 +4305,7 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 			boundTexture = batch.textureId;
 		}
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
-		device->SetIndices( batch.indexBuffer );
+		DX_SetIndicesCached( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
@@ -4214,9 +4316,8 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 	// D3DTS_WORLDMATRIX( 0 ) is D3DTS_WORLD.
 	DX_SetRenderStateCached( D3DRS_VERTEXBLEND, D3DVBF_DISABLE );
 	DX_SetRenderStateCached( D3DRS_INDEXEDVERTEXBLENDENABLE, FALSE );
-	device->SetTransform( D3DTS_WORLD, &d3dWorld );
-	device->SetVertexDeclaration( nullptr );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetTransformCached( D3DTS_WORLD, &d3dWorld );
+	DX_SetFVFCached( BRUSH_FVF );
 	return true;
 }
 
@@ -4243,7 +4344,7 @@ static void R_DrawStudioGlowShellCPU( const studio_cache_t &cache,
 		return;
 
 	D3DMATRIX world{};
-	device->GetTransform( D3DTS_WORLD, &world );
+	DX_GetTransformCached( D3DTS_WORLD, &world );
 
 	const float chromeWidth = chromeTexture <= g_texcount
 		? static_cast<float>( std::max( 1, g_Textures[chromeTexture].width ) ) : 64.0f;
@@ -4255,7 +4356,7 @@ static void R_DrawStudioGlowShellCPU( const studio_cache_t &cache,
 	R_StudioGlowShellChromeOrigin( gp_cl ? gp_cl->time : 0.0f, chromeOrigin );
 
 	R_BeginStudioGlowShellPass( shellColor );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_Bind( 0, chromeTexture );
 
 	static std::vector<brush_vertex_t> shellVertices;
@@ -4344,7 +4445,7 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 		}
 	}
 
-	device->SetFVF( uploadNormals ? STUDIO_NORMAL_LIT_FVF :
+	DX_SetFVFCached( uploadNormals ? STUDIO_NORMAL_LIT_FVF :
 		( studioNormals ? STUDIO_FAST_LIT_FVF : BRUSH_FVF ) );
 
 	static std::vector<byte> vertexScratch;
@@ -4433,7 +4534,7 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 
 	const bool studioNormals = R_StudioNormalsEnabled( );
 	const bool uploadNormals = cache.buffersUploadNormals;
-	device->SetFVF( uploadNormals ? STUDIO_NORMAL_LIT_FVF :
+	DX_SetFVFCached( uploadNormals ? STUDIO_NORMAL_LIT_FVF :
 		( studioNormals ? STUDIO_FAST_LIT_FVF : BRUSH_FVF ) );
 	const UINT vertexStride = uploadNormals
 		? sizeof( studio_normal_lit_vertex_t )
@@ -4441,7 +4542,7 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 
 	const bool combinedVB = cache.combinedVertexBufferMode && cache.combinedVertexBuffer;
 	if( combinedVB )
-		device->SetStreamSource( 0, cache.combinedVertexBuffer, 0, vertexStride );
+		DX_SetStreamSourceCached( 0, cache.combinedVertexBuffer, 0, vertexStride );
 
 	int boundTexture = -1;
 	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
@@ -4461,8 +4562,8 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
 
 		if( !combinedVB )
-			device->SetStreamSource( 0, batch.vertexBuffer, 0, vertexStride );
-		device->SetIndices( batch.indexBuffer );
+			DX_SetStreamSourceCached( 0, batch.vertexBuffer, 0, vertexStride );
+		DX_SetIndicesCached( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
@@ -5853,7 +5954,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 
 	studio_cache_t &cache = R_GetStudioEntityGpuCache( ent );
 
-	const bool topologyMatches = cache.topologyValid && cache.model == mod &&
+	const bool topologyMatches = cache.topologyValid && cache.model == mod && cache.topologyHeader == hdr &&
 		cache.body == ent->curstate.body && cache.skin == ent->curstate.skin && cache.hiddenArm == hiddenArm;
 
 	BoneMat34 precomputedMuzzleBones[MAXSTUDIOBONES];
@@ -6229,7 +6330,7 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 		R_SetPlayerGaitWorldTransform( ent, gait.worldYaw, &entityWorld );
 	else
 		R_SetStudioWorld( ent, gp_cl->time, &entityWorld );
-	device->SetTransform( D3DTS_WORLD, &entityWorld );
+	DX_SetTransformCached( D3DTS_WORLD, &entityWorld );
 
 	const float renderFrame = StudioFrameAdvance( hdr, ent, studioPoseTime );
 	const int gaitSeq = gait.active ? gait.sequence : -1;
@@ -6867,7 +6968,7 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 
 	D3DMATRIX viewModelWorld;
     R_BuildViewModelWorld(ent,viewOrigin,viewAngles,viewForward,viewRight,viewUp,forwardOffset,rightOffset,upOffset,viewModelWorld,mirror);
-	device->SetTransform( D3DTS_WORLD, &viewModelWorld );
+	DX_SetTransformCached( D3DTS_WORLD, &viewModelWorld );
 
 	studiohdr_t *hdr = static_cast<studiohdr_t *>(
 		gEngfuncs.Mod_Extradata( mod_studio, ent->model ) );
@@ -6892,5 +6993,5 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 
 	D3DMATRIX identity;
 	DX_MatrixIdentity( identity );
-	device->SetTransform( D3DTS_WORLD, &identity );
+	DX_SetTransformCached( D3DTS_WORLD, &identity );
 }

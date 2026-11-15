@@ -122,7 +122,6 @@ struct world_lightmap_atlas_t
 
 	bool dynamic = false;
 
-	bool dynamicOverlay = false;
 	texture_t *materialGroup = nullptr;
 };
 
@@ -132,6 +131,17 @@ struct world_surface_draw_range_t
 	UINT indexCount = 0;
 	float normal[3] = { 0.0f, 0.0f, 0.0f };
 	float planeDist = 0.0f;
+};
+
+struct world_glass_group_t
+{
+	size_t firstSurface;
+	size_t endSurface;
+	UINT firstIndex;
+	UINT indexCount;
+	bool twoSided;
+	mutable vec3_t worldNormal{};
+	mutable vec3_t worldPoint{};
 };
 
 struct world_material_batch_t;
@@ -147,6 +157,8 @@ struct world_material_batch_t
 	std::vector<lightmap_vertex_t> vertices;
 	std::vector<DWORD> indices;
 	std::vector<world_surface_draw_range_t> surfaceRanges;
+	std::vector<world_glass_group_t> glassGroups;
+	mutable uint64_t glassPlaneRevision = 0;
 
 	IDirect3DVertexBuffer9 *vertexBuffer = nullptr;
 	IDirect3DIndexBuffer9 *indexBuffer = nullptr;
@@ -165,39 +177,6 @@ struct world_material_batch_t
 
 	UINT vertexCount = 0;
 	UINT primitiveCount = 0;
-};
-
-struct world_dynamic_overlay_range_t
-{
-
-	size_t allocationIndex = static_cast<size_t>( -1 );
-	UINT firstIndex = 0;
-	UINT indexCount = 0;
-};
-
-struct world_dynamic_overlay_batch_t
-{
-	texture_t *baseTexture = nullptr;
-	int overlayAtlasIndex = -1;
-	bool conveyor = false;
-
-	std::vector<world_dynamic_overlay_range_t> ranges;
-
-	std::vector<lightmap_vertex_t> vertices;
-	std::vector<DWORD> indices;
-	UINT sharedBaseVertex = 0;
-	UINT sharedStartIndex = 0;
-	UINT vertexCount = 0;
-	UINT primitiveCount = 0;
-
-	int cellX = 0;
-	int cellY = 0;
-	int cellZ = 0;
-	float mins[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
-	float maxs[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	bool boundsValid = false;
-	std::vector<int> pvsLeafs;
-	bool pvsAlwaysVisible = false;
 };
 
 struct water_source_vertex_t
@@ -256,14 +235,6 @@ struct world_lightmap_allocation_t
 	int width = 0;
 	int height = 0;
 
-	int overlayAtlasIndex = -1;
-	int overlayX = 0;
-	int overlayY = 0;
-
-	float mins[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
-	float maxs[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	bool boundsValid = false;
-
 	std::array<byte, DX_LIGHTMAP_STYLE_SLOTS> styles{};
 	std::array<int, DX_LIGHTMAP_STYLE_SLOTS> lastStyleValues{};
 
@@ -288,7 +259,6 @@ struct world_lightmap_store_t
 
 	std::vector<world_lightmap_atlas_t> atlases;
 
-	std::vector<world_lightmap_atlas_t> dynamicOverlayAtlases;
 	std::vector<world_lightmap_allocation_t> allocations;
 	dxfast::HashMap<const msurface_t *, size_t> allocationBySurface;
 
@@ -306,12 +276,12 @@ struct world_model_draw_t
 	IDirect3DVertexBuffer9 *sharedVertexBuffer = nullptr;
 	IDirect3DIndexBuffer9 *sharedIndexBuffer = nullptr;
 
-	IDirect3DVertexBuffer9 *overlaySharedVertexBuffer = nullptr;
-	IDirect3DIndexBuffer9 *overlaySharedIndexBuffer = nullptr;
 
 	std::vector<world_material_batch_t> batches;
-	std::vector<world_dynamic_overlay_batch_t> dynamicOverlayBatches;
 	std::vector<world_water_batch_t> waterBatches;
+
+	mutable D3DMATRIX glassWorld{};
+	mutable uint64_t glassWorldRevision = 0;
 
 	std::vector<std::vector<int>> waterPvsPortals;
 };
@@ -544,12 +514,29 @@ struct studio_batch_t
 	UINT primitiveCount = 0;
 };
 
+struct studio_local_light_cache_t
+{
+	const cl_entity_s *entity = nullptr;
+	int entityIndex = 0;
+	uint64_t revision = 0;
+	float intensity = 0.0f;
+	vec3_t origin{};
+	vec3_t attachments[MAXSTUDIOATTACHMENTS]{};
+	D3DMATRIX world{};
+	D3DXMATRIX inverseWorld{};
+	bool inverseValid = false;
+	bool usesWorld = false;
+	studio_local_light_t lights[DX_STUDIO_MAX_LOCAL_LIGHTS]{};
+	int count = 0;
+};
+
 struct studio_cache_t
 {
 	model_t *model = nullptr;
 	int body = 0;
 	int skin = 0;
 	int hiddenArm = 0;
+	const studiohdr_t *topologyHeader = nullptr;
 	std::vector<studio_batch_t> batches;
 	IDirect3DVertexBuffer9 *combinedVertexBuffer = nullptr;
 	UINT combinedVertexCount = 0;
@@ -581,6 +568,9 @@ struct studio_cache_t
 	bool lastNormalLightingEnabled = true;
 	bool lastUploadNormalsEnabled = false;
 	bool buffersUploadNormals = false;
+	bool buffersStudioNormals = false;
+	bool buffersValid = false;
+	studio_local_light_cache_t localLightSelection;
 	float lastNormalLightScale = -1.0f;
 	vec3_t currentWorldLightDir = { 0.0f, 0.0f, -1.0f };
 	vec3_t lastCpuLocalLightDir = { 0.0f, 0.0f, -1.0f };
@@ -644,13 +634,6 @@ struct beam_light_segment_t
 	int b;
 	int key;
 	int maxSamples;
-};
-
-struct dynamic_light_vertex_t
-{
-	float x, y, z;
-	D3DCOLOR diffuse;
-	float u, v;
 };
 
 enum dx_profile_state_kind_t
@@ -801,9 +784,6 @@ enum dx_profile_event_t
 #ifndef STUDIO_NORMAL_LIT_FVF
 #define STUDIO_NORMAL_LIT_FVF ( D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX1 )
 #endif
-#ifndef DYNAMIC_LIGHT_FVF
-#define DYNAMIC_LIGHT_FVF ( D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1 )
-#endif
 #ifndef DEG2RAD
 #define DEG2RAD( x ) ( (x) * ( (float)M_PI / 180.0f ) )
 #endif
@@ -817,6 +797,14 @@ extern convar_t dx_remix_glass_batch;
 void DX_BindRawTexture( int tmu, IDirect3DBaseTexture9 *texture );
 int DX_FindTexture( const char *name );
 void DX_InvalidateD3DStateCache( void );
+void DX_ForgetGeometryResource( const void *resource );
+HRESULT DX_SetFVFCached( DWORD fvf );
+HRESULT DX_SetStreamSourceCached( UINT stream, IDirect3DVertexBuffer9 *buffer, UINT offset, UINT stride );
+HRESULT DX_SetIndicesCached( IDirect3DIndexBuffer9 *buffer );
+HRESULT DX_SetVertexShaderCached( IDirect3DVertexShader9 *shader );
+HRESULT DX_SetVertexDeclarationCached( IDirect3DVertexDeclaration9 *declaration );
+HRESULT DX_SetTransformCached( D3DTRANSFORMSTATETYPE state, const D3DMATRIX *matrix );
+HRESULT DX_GetTransformCached( D3DTRANSFORMSTATETYPE state, D3DMATRIX *matrix );
 void DX_InvalidateTextureBindCache( void );
 void DX_InvalidateTextureUnit( int tmu );
 void DX_ShutdownWorkers( void );
@@ -848,7 +836,6 @@ void R_BeginModelsFrame( void );
 bool R_BoundsVisibleInCurrentView( const float mins[3], const float maxs[3], bool valid );
 bool R_BrushTextureNeedsAlphaTest( const texture_t *texture );
 void R_BuildMapLightmaps( const model_t *mod );
-void R_BuildSurfaceBounds( const model_t *mod, const msurface_t *surf, float mins[3], float maxs[3], bool &valid );
 void R_BuildSurfacePVSLeafMap( const model_t *world, surface_pvs_leafs_t &surfaceLeafs );
 void R_RegisterStudioModelDrawData( model_t *mod, model_drawdata_t *value );
 void R_FreeModelScratchBuffers( void );
@@ -901,10 +888,7 @@ bool R_DrawWorldBrushes( model_t *mod );
 void R_DrawWorldWater( model_t *mod );
 void R_DrawWorldWaterDepth( model_t *mod );
 float R_DynamicLightIntensityScale( );
-bool R_DynamicLightTouchesBounds( const vec3_t mins, const vec3_t maxs );
-void R_ExpandOverlayBounds( world_dynamic_overlay_batch_t &batch, const lightmap_vertex_t *vertices, int count );
 void R_ExpandWorldBatchBounds( world_material_batch_t &batch, const lightmap_vertex_t *vertices, int count );
-world_dynamic_overlay_batch_t &R_FindDynamicOverlayBatch( world_model_draw_t &model, texture_t *baseTexture, int overlayAtlasIndex, bool conveyor, int cellX, int cellY, int cellZ );
 entity_cache_t *R_FindEntityCache( const cl_entity_s *ent );
 int R_FindMuzzleFlashTexture( int spriteType );
 model_drawdata_t *R_FindStudioModelDrawData( model_t *mod );
@@ -932,7 +916,6 @@ byte *R_GetWorldVis( void );
 void R_InvalidateWorldVis( );
 D3DCOLOR R_LightColorAlongSegment( const vec3_t start, const vec3_t end, float *lightspot, float *lightvec );
 qboolean R_LightmapAtlasDynamic( int atlasIndex );
-qboolean R_LightmapAtlasOverlay( int atlasIndex );
 bool R_LightmapTexelWorldPoint( const msurface_t *surface, int sampleX, int sampleY, float sampleSize, vec3_t outPoint );
 void R_LoadMap( const model_t *mod );
 void R_LoadStudioModel( model_t *mod );
@@ -971,9 +954,7 @@ float R_SurfaceSampleSize( const msurface_t *surface );
 void R_TransformBounds( const float mins[3], const float maxs[3], const D3DMATRIX &matrix, vec3_t outMins, vec3_t outMaxs );
 void R_TransformPoint( const D3DMATRIX &matrix, float x, float y, float z, vec3_t out );
 bool R_UIntMul( UINT a, UINT b, UINT &out );
-void R_UpdateDLightOverlay( void );
 void R_UpdateLightmaps( );
-bool R_UploadOverlayBatches( world_model_draw_t &model );
 bool R_UploadWaterBatch( world_water_batch_t &batch );
 bool R_UploadWorldBatch( world_material_batch_t &batch );
 bool R_UploadWorldBatches( world_model_draw_t &model );
@@ -989,10 +970,6 @@ extern float g_aoEdgeCacheNeighbour;
 extern cl_entity_s *g_beamEntities[DX_MAX_BEAM_ENTITIES];
 extern int g_beamEntityCount;
 extern unsigned int g_currentViewFlags;
-extern std::vector<unsigned char> g_dlightOverlayActive;
-extern std::vector<size_t> g_dlightRestore;
-extern std::vector<size_t> g_dlightSelected;
-extern std::vector<size_t> g_dlightTouchedAllocs;
 extern std::vector<beam_light_segment_t> g_dxBeamLights;
 extern std::vector<dx_dlight_t> g_dxDLights;
 extern int g_dxFixedLightCount;
@@ -1000,10 +977,8 @@ extern std::vector<dx_line_light_t> g_dxLineLights;
 extern int g_dxStudioGlobalLightCount;
 extern std::array<uint16_t, 128> g_dxStudioGlobalLightIndices;
 extern int g_dxStudioLocalLightCount;
+extern uint64_t g_dxStudioLocalLightCollection;
 extern std::array<uint16_t, 128> g_dxStudioLocalLightIndices;
-extern unsigned int g_dynamicLightmapSignature;
-extern std::vector<lightmap_dirty_atlas_t> g_dynamicOverlayDirtyScratch;
-extern std::vector<unsigned char> g_dynamicOverlaySelectedMask;
 extern int g_glowQueriesIssuedThisFrame;
 extern float g_glowQueryBudgetTime;
 extern float g_lastLightmapUpdateClock;
@@ -1071,16 +1046,11 @@ extern convar_t dx_dlight_elights;
 extern convar_t dx_dlight_engine;
 extern convar_t dx_dlight_entities;
 extern convar_t dx_dlight_fixed;
-extern convar_t dx_dlight_geometry;
 extern convar_t dx_dlight_intensity;
-extern convar_t dx_dlight_lightmaps;
 extern convar_t dx_dlight_max;
-extern convar_t dx_dlight_min_light;
 extern convar_t dx_dlight_muzzleflash;
 extern convar_t dx_dlight_radius_scale;
 extern convar_t dx_dlight_studio;
-extern convar_t dx_dlight_subdivide;
-extern convar_t dx_dlight_world;
 extern convar_t dx_dlights;
 extern convar_t dx_egon_beam_light;
 extern convar_t dx_egon_beam_light_max_samples;
@@ -1096,7 +1066,6 @@ extern convar_t dx_lightmap_dynamic_page;
 extern convar_t dx_lightmap_max_scale;
 extern convar_t dx_lightmap_merge_uploads;
 extern convar_t dx_lightmap_min_alloc_budget;
-extern convar_t dx_lightmap_overlay_page;
 extern convar_t dx_lightmap_rebind;
 extern convar_t dx_lightmap_ref_fps;
 extern convar_t dx_lightmap_update_budget;

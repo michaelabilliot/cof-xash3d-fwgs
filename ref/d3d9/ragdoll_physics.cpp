@@ -77,8 +77,16 @@ Mesh *World::addMesh(const std::vector<btVector3> &vertices, bool moving) {
     triangleCount+=static_cast<size_t>(mesh->triangles->getNumTriangles());
     Mesh *result=mesh.get(); meshes.push_back(std::move(mesh)); return result;
 }
+void World::removeMesh(Mesh *mesh) {
+    const auto found=std::find_if(meshes.begin(),meshes.end(),
+        [mesh](const auto &entry){return entry.get()==mesh;});
+    if(found==meshes.end()) return;
+    dynamics.removeRigidBody(mesh->body.get());
+    triangleCount-=static_cast<size_t>(mesh->triangles->getNumTriangles());
+    meshes.erase(found);
+}
 void World::moveMesh(Mesh &mesh,const btTransform &transform) {
-    if (!valid(transform)) return;
+    if (!valid(transform) || (mesh.initialized && mesh.target==transform)) return;
     mesh.target=transform;
     if(!mesh.initialized || (transform.getOrigin()-mesh.body->getWorldTransform().getOrigin()).length2()>100) {
         mesh.body->setWorldTransform(transform);
@@ -788,11 +796,15 @@ void World::step(double elapsed,float gravity) {
     int steps=0;
     while(accumulator+1e-10>=fixed && steps++<8) {
         const int remaining=std::max(1,std::min(9-steps,static_cast<int>((accumulator+1e-10)/fixed)));
-        for(auto &m:meshes) if(m->moving && m->initialized) {
-            const btTransform before=m->body->getWorldTransform();
-            btTransform after;
-            after.setOrigin(before.getOrigin().lerp(m->target.getOrigin(),1.f/remaining));
-            after.setRotation(before.getRotation().slerp(m->target.getRotation(),1.f/remaining));
+        for(auto &m:meshes) if(m->moving && m->initialized &&
+            !(m->body->getCollisionFlags()&btCollisionObject::CF_NO_CONTACT_RESPONSE)) {
+            const btTransform &before=m->body->getWorldTransform();
+            if(before==m->target) continue;
+            btTransform after=m->target;
+            if(remaining>1) {
+                after.setOrigin(before.getOrigin().lerp(m->target.getOrigin(),1.f/remaining));
+                after.setRotation(before.getRotation().slerp(m->target.getRotation(),1.f/remaining));
+            }
             m->body->setWorldTransform(after);
             dynamics.updateSingleAabb(m->body.get());
         }

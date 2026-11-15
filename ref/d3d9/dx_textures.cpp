@@ -115,8 +115,126 @@ static DWORD g_dxStageStateValue[DX_MAX_TEXTURE_STAGES][DX_STAGE_STATE_CACHE_SIZ
 static bool g_dxSamplerStateValid[DX_MAX_TEXTURE_STAGES][DX_SAMPLER_STATE_CACHE_SIZE] = {};
 static DWORD g_dxSamplerStateValue[DX_MAX_TEXTURE_STAGES][DX_SAMPLER_STATE_CACHE_SIZE] = {};
 
+// Successful renderer writes are authoritative until a reset, state block,
+// or unmanaged rendering path invalidates them.
+template<class T> struct dx_cached_state_t
+{
+	bool valid = false;
+	T value{};
+};
+
+struct dx_stream_binding_t
+{
+	IDirect3DVertexBuffer9 *buffer;
+	UINT offset;
+	UINT stride;
+};
+
+static dx_cached_state_t<DWORD> g_dxFVF;
+static dx_cached_state_t<IDirect3DVertexDeclaration9 *> g_dxDeclaration;
+static dx_cached_state_t<IDirect3DVertexShader9 *> g_dxVertexShader;
+static dx_cached_state_t<dx_stream_binding_t> g_dxStream0;
+static dx_cached_state_t<IDirect3DIndexBuffer9 *> g_dxIndices;
+static dx_cached_state_t<D3DMATRIX> g_dxWorldMatrix, g_dxViewMatrix, g_dxProjectionMatrix, g_dxTextureMatrix;
+
+template<class T, class Set>
+static HRESULT DX_SetCached( dx_cached_state_t<T> &cache, const T &value, Set set )
+{
+	if( cache.valid && memcmp( &cache.value, &value, sizeof( value ) ) == 0 )
+		return D3D_OK;
+
+	const HRESULT result = set();
+	cache.valid = SUCCEEDED( result );
+	if( cache.valid )
+		cache.value = value;
+	return result;
+}
+
+void DX_ForgetGeometryResource( const void *resource )
+{
+	if( g_dxStream0.value.buffer == resource )
+		g_dxStream0.valid = false;
+	if( g_dxIndices.value == resource )
+		g_dxIndices.valid = false;
+	if( g_dxVertexShader.value == resource )
+		g_dxVertexShader.valid = false;
+	if( g_dxDeclaration.value == resource )
+		g_dxDeclaration.valid = false;
+}
+
+HRESULT DX_SetFVFCached( DWORD fvf )
+{
+	if( !g_dxFVF.valid || g_dxFVF.value != fvf )
+		g_dxDeclaration.valid = false;
+	return DX_SetCached( g_dxFVF, fvf, [&] { return device->SetFVF( fvf ); } );
+}
+
+HRESULT DX_SetVertexDeclarationCached( IDirect3DVertexDeclaration9 *declaration )
+{
+	if( !g_dxDeclaration.valid || g_dxDeclaration.value != declaration )
+		g_dxFVF.valid = false;
+	return DX_SetCached( g_dxDeclaration, declaration,
+		[&] { return device->SetVertexDeclaration( declaration ); } );
+}
+
+HRESULT DX_SetVertexShaderCached( IDirect3DVertexShader9 *shader )
+{
+	return DX_SetCached( g_dxVertexShader, shader, [&] { return device->SetVertexShader( shader ); } );
+}
+
+HRESULT DX_SetStreamSourceCached( UINT stream, IDirect3DVertexBuffer9 *buffer, UINT offset, UINT stride )
+{
+	if( stream != 0 )
+		return device->SetStreamSource( stream, buffer, offset, stride );
+	return DX_SetCached( g_dxStream0, { buffer, offset, stride },
+		[&] { return device->SetStreamSource( stream, buffer, offset, stride ); } );
+}
+
+HRESULT DX_SetIndicesCached( IDirect3DIndexBuffer9 *buffer )
+{
+	return DX_SetCached( g_dxIndices, buffer, [&] { return device->SetIndices( buffer ); } );
+}
+
+static dx_cached_state_t<D3DMATRIX> *DX_TransformState( D3DTRANSFORMSTATETYPE state )
+{
+	switch( state )
+	{
+	case D3DTS_WORLD: return &g_dxWorldMatrix;
+	case D3DTS_VIEW: return &g_dxViewMatrix;
+	case D3DTS_PROJECTION: return &g_dxProjectionMatrix;
+	case D3DTS_TEXTURE0: return &g_dxTextureMatrix;
+	default: return nullptr;
+	}
+}
+
+HRESULT DX_SetTransformCached( D3DTRANSFORMSTATETYPE state, const D3DMATRIX *matrix )
+{
+	auto *cache = DX_TransformState( state );
+	if( !cache )
+		return device->SetTransform( state, matrix );
+	return DX_SetCached( *cache, *matrix, [&] { return device->SetTransform( state, matrix ); } );
+}
+
+HRESULT DX_GetTransformCached( D3DTRANSFORMSTATETYPE state, D3DMATRIX *matrix )
+{
+	auto *cache = DX_TransformState( state );
+	if( cache && cache->valid )
+	{
+		*matrix = cache->value;
+		return D3D_OK;
+	}
+
+	const HRESULT result = device->GetTransform( state, matrix );
+	if( cache && SUCCEEDED( result ) )
+		*cache = { true, *matrix };
+	return result;
+}
+
 void DX_InvalidateD3DStateCache( void )
 {
+	g_dxFVF.valid = g_dxDeclaration.valid = g_dxVertexShader.valid = false;
+	g_dxStream0.valid = g_dxIndices.valid = false;
+	g_dxWorldMatrix.valid = g_dxViewMatrix.valid = g_dxProjectionMatrix.valid = g_dxTextureMatrix.valid = false;
 	memset( g_dxRenderStateValid, 0, sizeof( g_dxRenderStateValid ) );
 	memset( g_dxStageStateValid, 0, sizeof( g_dxStageStateValid ) );
 	memset( g_dxSamplerStateValid, 0, sizeof( g_dxSamplerStateValid ) );

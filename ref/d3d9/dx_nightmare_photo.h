@@ -194,6 +194,6 @@ static void R_DrawNightmarePhoto(){
   const vertex2d_t a={s.x-.5f,s.y-.5f,0,1,color,0,0},b={s.x+s.width-.5f,s.y-.5f,0,1,color,0,0};
   const vertex2d_t c={s.x-.5f,s.y+s.height-.5f,0,1,color,0,0},d={s.x+s.width-.5f,s.y+s.height-.5f,0,1,color,0,0};vertices.insert(vertices.end(),{a,b,c,b,d,c});
  }
- device->SetFVF(D3DFVF_VERTEX2D);R_DrawScratch(D3DPT_TRIANGLELIST,UINT(vertices.size()/3),UINT(vertices.size()),vertices.data(),sizeof(vertex2d_t));
+ DX_SetFVFCached(D3DFVF_VERTEX2D);R_DrawScratch(D3DPT_TRIANGLELIST,UINT(vertices.size()/3),UINT(vertices.size()),vertices.data(),sizeof(vertex2d_t));
  R_Set2DMode(false);DX_InvalidateD3DStateCache();DX_InvalidateTextureBindCache();
 }

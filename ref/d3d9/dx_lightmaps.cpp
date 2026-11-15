@@ -170,29 +170,13 @@ static void R_UpdateLightmapGammaLut( )
 
 int R_GetLightmapAtlasCount( void )
 {
-	return static_cast<int>( g_mapLightmaps.atlases.size( ) +
-		g_mapLightmaps.dynamicOverlayAtlases.size( ) );
+	return static_cast<int>( g_mapLightmaps.atlases.size( ) );
 }
 
-static const world_lightmap_atlas_t *R_GetDebugLightmapAtlas( int atlasIndex,
-	bool *outOverlay = nullptr )
+static const world_lightmap_atlas_t *R_GetDebugLightmapAtlas( int atlasIndex )
 {
-	if( outOverlay ) *outOverlay = false;
-	if( atlasIndex < 0 )
-		return nullptr;
-
-	const int baseCount = static_cast<int>( g_mapLightmaps.atlases.size( ) );
-	if( atlasIndex < baseCount )
-		return &g_mapLightmaps.atlases[atlasIndex];
-
-	const int overlayIndex = atlasIndex - baseCount;
-	if( overlayIndex < 0 || overlayIndex >=
-		static_cast<int>( g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-	{
-		return nullptr;
-	}
-	if( outOverlay ) *outOverlay = true;
-	return &g_mapLightmaps.dynamicOverlayAtlases[overlayIndex];
+	return atlasIndex >= 0 && atlasIndex < R_GetLightmapAtlasCount( )
+		? &g_mapLightmaps.atlases[atlasIndex] : nullptr;
 }
 
 IDirect3DTexture9 *R_GetLightmapAtlasTexture( int atlasIndex )
@@ -211,14 +195,6 @@ qboolean R_LightmapAtlasDynamic( int atlasIndex )
 {
 	const world_lightmap_atlas_t *atlas = R_GetDebugLightmapAtlas( atlasIndex );
 	return atlas && atlas->dynamic ? true : false;
-}
-
-qboolean R_LightmapAtlasOverlay( int atlasIndex )
-{
-	bool overlay = false;
-	const world_lightmap_atlas_t *atlas =
-		R_GetDebugLightmapAtlas( atlasIndex, &overlay );
-	return atlas && overlay && atlas->dynamicOverlay ? true : false;
 }
 
 const char *R_GetLightmapAtlasMaterial( int atlasIndex )
@@ -361,7 +337,6 @@ static void R_DestroyWorldLightmapStore( world_lightmap_store_t &store )
 		};
 
 	ReleaseAtlases( store.atlases );
-	ReleaseAtlases( store.dynamicOverlayAtlases );
 	store.allocations.clear( );
 	store.allocationBySurface.clear( );
 	store.dynamicPageSizeByMaterial.clear( );
@@ -373,12 +348,14 @@ void R_FreeWaterBatches( world_water_batch_t &batch, bool releaseManagedIndex )
 {
 	if( batch.vertexBuffer )
 	{
+		DX_ForgetGeometryResource( batch.vertexBuffer );
 		batch.vertexBuffer->Release( );
 		batch.vertexBuffer = nullptr;
 	}
 	batch.vertexCacheValid = false;
 	if( releaseManagedIndex && batch.indexBuffer )
 	{
+		DX_ForgetGeometryResource( batch.indexBuffer );
 		batch.indexBuffer->Release( );
 		batch.indexBuffer = nullptr;
 	}
@@ -388,34 +365,28 @@ void R_FreeWorldModel( world_model_draw_t &model )
 {
 	if( model.sharedVertexBuffer )
 	{
+		DX_ForgetGeometryResource( model.sharedVertexBuffer );
 		model.sharedVertexBuffer->Release( );
 		model.sharedVertexBuffer = nullptr;
 	}
 	if( model.sharedIndexBuffer )
 	{
+		DX_ForgetGeometryResource( model.sharedIndexBuffer );
 		model.sharedIndexBuffer->Release( );
 		model.sharedIndexBuffer = nullptr;
-	}
-	if( model.overlaySharedVertexBuffer )
-	{
-		model.overlaySharedVertexBuffer->Release( );
-		model.overlaySharedVertexBuffer = nullptr;
-	}
-	if( model.overlaySharedIndexBuffer )
-	{
-		model.overlaySharedIndexBuffer->Release( );
-		model.overlaySharedIndexBuffer = nullptr;
 	}
 
 	for( auto &batch : model.batches )
 	{
 		if( batch.vertexBuffer )
 		{
+			DX_ForgetGeometryResource( batch.vertexBuffer );
 			batch.vertexBuffer->Release( );
 			batch.vertexBuffer = nullptr;
 		}
 		if( batch.indexBuffer )
 		{
+			DX_ForgetGeometryResource( batch.indexBuffer );
 			batch.indexBuffer->Release( );
 			batch.indexBuffer = nullptr;
 		}
@@ -424,11 +395,11 @@ void R_FreeWorldModel( world_model_draw_t &model )
 		R_FreeWaterBatches( batch, true );
 
 	model.batches.clear( );
-	model.dynamicOverlayBatches.clear( );
 	model.waterBatches.clear( );
 	model.waterPvsPortals.clear( );
 	model.sourceModel = nullptr;
 	model.pvsApplicable = false;
+	model.glassWorldRevision = 0;
 }
 
 static int R_NextPowerOfTwo( int value )
@@ -683,17 +654,17 @@ static bool R_AllocateAtlasRect( world_lightmap_store_t &store, int width, int h
 }
 
 static bool R_ValidateLightmapAtlases(
-	const world_lightmap_store_t &store, bool overlay )
+	const world_lightmap_store_t &store )
 {
-	const auto &atlases = overlay ? store.dynamicOverlayAtlases : store.atlases;
+	const auto &atlases = store.atlases;
 	bool valid = true;
 
 	for( size_t a = 0; a < store.allocations.size( ); ++a )
 	{
 		const world_lightmap_allocation_t &lhs = store.allocations[a];
-		const int lhsAtlas = overlay ? lhs.overlayAtlasIndex : lhs.atlasIndex;
-		const int lhsX = overlay ? lhs.overlayX : lhs.x;
-		const int lhsY = overlay ? lhs.overlayY : lhs.y;
+		const int lhsAtlas = lhs.atlasIndex;
+		const int lhsX = lhs.x;
+		const int lhsY = lhs.y;
 		if( lhsAtlas < 0 || lhsAtlas >= static_cast<int>( atlases.size( ) ) )
 			continue;
 
@@ -707,9 +678,8 @@ static bool R_ValidateLightmapAtlases(
 			lhsRight > atlas.size || lhsBottom > atlas.size )
 		{
 			gEngfuncs.Con_Printf(
-				"DX9 ERROR: %s lightmap allocation %u is outside atlas %d "
+				"DX9 ERROR: base lightmap allocation %u is outside atlas %d "
 				"(%d,%d)-(%d,%d) / %d\n",
-				overlay ? "overlay" : "base",
 				static_cast<unsigned int>( a ), lhsAtlas,
 				lhsLeft, lhsTop, lhsRight, lhsBottom, atlas.size );
 			valid = false;
@@ -718,12 +688,12 @@ static bool R_ValidateLightmapAtlases(
 		for( size_t b = a + 1; b < store.allocations.size( ); ++b )
 		{
 			const world_lightmap_allocation_t &rhs = store.allocations[b];
-			const int rhsAtlas = overlay ? rhs.overlayAtlasIndex : rhs.atlasIndex;
+			const int rhsAtlas = rhs.atlasIndex;
 			if( rhsAtlas != lhsAtlas )
 				continue;
 
-			const int rhsX = overlay ? rhs.overlayX : rhs.x;
-			const int rhsY = overlay ? rhs.overlayY : rhs.y;
+			const int rhsX = rhs.x;
+			const int rhsY = rhs.y;
 			const int rhsLeft = rhsX - LIGHTMAP_GUTTER;
 			const int rhsTop = rhsY - LIGHTMAP_GUTTER;
 			const int rhsRight = rhsX + rhs.width + LIGHTMAP_GUTTER;
@@ -736,9 +706,8 @@ static bool R_ValidateLightmapAtlases(
 				continue;
 
 			gEngfuncs.Con_Printf(
-				"DX9 ERROR: %s lightmap allocations %u and %u overlap "
+				"DX9 ERROR: base lightmap allocations %u and %u overlap "
 				"in atlas %d\n",
-				overlay ? "overlay" : "base",
 				static_cast<unsigned int>( a ),
 				static_cast<unsigned int>( b ), lhsAtlas );
 			valid = false;
@@ -746,73 +715,6 @@ static bool R_ValidateLightmapAtlases(
 	}
 
 	return valid;
-}
-
-static int R_DynamicOverlayPageSize( int minimumSize )
-{
-	int preferred = static_cast<int>( dx_lightmap_overlay_page.value );
-	preferred = std::max( 64, std::min( LIGHTMAP_DYNAMIC_PAGE_MAX, preferred ) );
-	preferred = R_NextPowerOfTwo( preferred );
-	return std::max( preferred, R_NextPowerOfTwo( minimumSize ) );
-}
-
-static bool R_AllocateDynamicOverlayRect( world_lightmap_store_t &store,
-	int width, int height, int &outAtlasIndex, int &outX, int &outY )
-{
-	const int packedWidth = width + LIGHTMAP_GUTTER * 2;
-	const int packedHeight = height + LIGHTMAP_GUTTER * 2;
-	const int minimumSize = std::max( packedWidth, packedHeight );
-	if( width <= 0 || height <= 0 || minimumSize > LIGHTMAP_DYNAMIC_PAGE_MAX )
-		return false;
-
-	for( int atlasIndex = 0; atlasIndex <
-		static_cast<int>( store.dynamicOverlayAtlases.size( ) ); ++atlasIndex )
-	{
-		world_lightmap_atlas_t &atlas = store.dynamicOverlayAtlases[atlasIndex];
-		if( atlas.size < minimumSize )
-			continue;
-
-		int x = atlas.nextX;
-		int y = atlas.nextY;
-		int candidateRowHeight = atlas.rowHeight;
-		if( x + packedWidth > atlas.size )
-		{
-			x = 0;
-			y += atlas.rowHeight;
-			candidateRowHeight = 0;
-		}
-		if( y + packedHeight > atlas.size )
-			continue;
-
-		atlas.nextX = x + packedWidth;
-		atlas.nextY = y;
-		atlas.rowHeight = std::max( candidateRowHeight, packedHeight );
-		atlas.usedTexels += static_cast<size_t>( packedWidth ) * packedHeight;
-		++atlas.allocationCount;
-		outAtlasIndex = atlasIndex;
-		outX = x + LIGHTMAP_GUTTER;
-		outY = y + LIGHTMAP_GUTTER;
-		return true;
-	}
-
-	world_lightmap_atlas_t atlas;
-	atlas.dynamic = true;
-	atlas.dynamicOverlay = true;
-	atlas.size = R_DynamicOverlayPageSize( minimumSize );
-	atlas.pixels.assign( static_cast<size_t>( atlas.size ) * atlas.size,
-		D3DCOLOR_ARGB( 255, 0, 0, 0 ) );
-	store.dynamicOverlayAtlases.push_back( std::move( atlas ) );
-
-	world_lightmap_atlas_t &created = store.dynamicOverlayAtlases.back( );
-	created.nextX = packedWidth;
-	created.nextY = 0;
-	created.rowHeight = packedHeight;
-	created.usedTexels = static_cast<size_t>( packedWidth ) * packedHeight;
-	created.allocationCount = 1;
-	outAtlasIndex = static_cast<int>( store.dynamicOverlayAtlases.size( ) - 1 );
-	outX = LIGHTMAP_GUTTER;
-	outY = LIGHTMAP_GUTTER;
-	return true;
 }
 
 static int R_LightStyleValue( const byte style )
@@ -1467,7 +1369,7 @@ static bool R_RebuildLightmap( world_lightmap_allocation_t &allocation,
 }
 
 static bool R_UploadDirtyLightmapAtlas( world_lightmap_atlas_t &atlas,
-	const lightmap_dirty_atlas_t &dirty, bool allowRectMerge = true )
+	const lightmap_dirty_atlas_t &dirty )
 {
 	if( dirty.rects.empty( ) || !atlas.texture || atlas.pixels.size( ) !=
 		static_cast<size_t>( atlas.size ) * atlas.size )
@@ -1480,7 +1382,7 @@ static bool R_UploadDirtyLightmapAtlas( world_lightmap_atlas_t &atlas,
 		DX_BindRawTexture( 1, nullptr );
 
 	RECT merged{};
-	const bool mergeRects = allowRectMerge &&
+	const bool mergeRects =
 		dx_lightmap_merge_uploads.value != 0.0f && dirty.rects.size( ) > 1;
 	if( mergeRects )
 	{
@@ -1992,7 +1894,7 @@ bool R_GetBrushSurfaceRange( const model_t *mod, int &outFirstSurface,
 }
 
 static int R_GetLightmapAlloc( msurface_t *surface,
-	bool uploadImmediately, bool allowDynamicOverlay )
+	bool uploadImmediately )
 {
 	if( !surface )
 		return -1;
@@ -2026,15 +1928,6 @@ static int R_GetLightmapAlloc( msurface_t *surface,
 	R_CopySurfaceLightmapToAtlas( surface, width, height,
 		g_mapLightmaps.atlases[atlasIndex], atlasX, atlasY );
 
-	int overlayAtlasIndex = -1;
-	int overlayX = 0;
-	int overlayY = 0;
-	if( allowDynamicOverlay )
-	{
-		R_AllocateDynamicOverlayRect( g_mapLightmaps, width, height,
-			overlayAtlasIndex, overlayX, overlayY );
-	}
-
 	world_lightmap_allocation_t allocation;
 	allocation.surface = surface;
 	allocation.atlasIndex = atlasIndex;
@@ -2042,11 +1935,6 @@ static int R_GetLightmapAlloc( msurface_t *surface,
 	allocation.y = atlasY;
 	allocation.width = width;
 	allocation.height = height;
-	allocation.overlayAtlasIndex = overlayAtlasIndex;
-	allocation.overlayX = overlayX;
-	allocation.overlayY = overlayY;
-	R_BuildSurfaceBounds( g_worldmodel ? g_worldmodel : nullptr, surface,
-		allocation.mins, allocation.maxs, allocation.boundsValid );
 	for( int i = 0; i < DX_LIGHTMAP_STYLE_SLOTS; ++i )
 		allocation.styles[i] = surface->styles[i];
 	R_StoreLightStyles( allocation );
@@ -2067,15 +1955,6 @@ static int R_GetLightmapAlloc( msurface_t *surface,
 		g_mapLightmaps.allocations[allocationIndex];
 	if( uploadImmediately )
 	{
-		if( overlayAtlasIndex >= 0 && overlayAtlasIndex < static_cast<int>(
-			g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-		{
-			world_lightmap_atlas_t &overlayAtlas =
-				g_mapLightmaps.dynamicOverlayAtlases[overlayAtlasIndex];
-			if( !overlayAtlas.texture )
-				R_UploadLightmapAtlas( overlayAtlas );
-		}
-
 		world_lightmap_atlas_t &atlas = g_mapLightmaps.atlases[atlasIndex];
 		if( !atlas.texture )
 		{
@@ -2100,9 +1979,6 @@ void R_BuildMapLightmaps( const model_t *mod )
 	g_pendingLightmapCursor = 0;
 	g_nextLightmapUpdateTime = -99999.0f;
 	g_lastLightmapUpdateClock = -1.0f;
-	g_dlightTouchedAllocs.clear( );
-	g_dlightOverlayActive.clear( );
-	g_dynamicLightmapSignature = 0;
 
 	if( !mod || mod->type != mod_brush || !mod->lightdata )
 		return;
@@ -2121,14 +1997,6 @@ void R_BuildMapLightmaps( const model_t *mod )
 
 	std::vector<lightmap_surface_t> buildSurfaces;
 	buildSurfaces.reserve( mod->numsurfaces );
-
-	int overlayFirstSurface = 0;
-	int overlaySurfaceCount = mod->numsurfaces;
-	if( !R_GetBrushSurfaceRange( mod, overlayFirstSurface, overlaySurfaceCount ) )
-	{
-		overlayFirstSurface = 0;
-		overlaySurfaceCount = mod->numsurfaces;
-	}
 
 	for( int surfaceIndex = 0; surfaceIndex < mod->numsurfaces; ++surfaceIndex )
 	{
@@ -2192,19 +2060,11 @@ void R_BuildMapLightmaps( const model_t *mod )
 		} );
 
 	for( const lightmap_surface_t &entry : buildSurfaces )
-	{
-		const int surfaceIndex = static_cast<int>( entry.surface - mod->surfaces );
-		const bool allowOverlay = surfaceIndex >= overlayFirstSurface &&
-			surfaceIndex < overlayFirstSurface + overlaySurfaceCount;
-		R_GetLightmapAlloc( entry.surface, false, allowOverlay );
-	}
+		R_GetLightmapAlloc( entry.surface, false );
 
-	R_ValidateLightmapAtlases( g_mapLightmaps, false );
-	R_ValidateLightmapAtlases( g_mapLightmaps, true );
+	R_ValidateLightmapAtlases( g_mapLightmaps );
 
 	for( auto &atlas : g_mapLightmaps.atlases )
-		R_UploadLightmapAtlas( atlas );
-	for( auto &atlas : g_mapLightmaps.dynamicOverlayAtlases )
 		R_UploadLightmapAtlas( atlas );
 }
 
@@ -2268,13 +2128,8 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 		if( vertexCount < 3 )
 			continue;
 
-		lightmap_vertex_t overlayVertices[64];
-		memcpy( overlayVertices, surfaceVertices,
-			static_cast<size_t>( vertexCount ) * sizeof( lightmap_vertex_t ) );
-
 		int atlasIndex = -1;
-		const int allocationIndex = R_GetLightmapAlloc(
-			surface, true, mod == g_worldmodel );
+		const int allocationIndex = R_GetLightmapAlloc( surface, true );
 		if( allocationIndex >= 0 &&
 			allocationIndex < static_cast<int>( g_mapLightmaps.allocations.size( ) ) )
 		{
@@ -2297,22 +2152,6 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 				}
 			}
 
-			if( allocation.overlayAtlasIndex >= 0 &&
-				allocation.overlayAtlasIndex < static_cast<int>(
-					g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-			{
-				const float overlaySize = static_cast<float>(
-					g_mapLightmaps.dynamicOverlayAtlases[
-						allocation.overlayAtlasIndex].size );
-				for( int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex )
-				{
-					lightmap_vertex_t &vertex = overlayVertices[vertexIndex];
-					vertex.lu = ( static_cast<float>( allocation.overlayX ) +
-						vertex.lu + 0.5f ) / overlaySize;
-					vertex.lv = ( static_cast<float>( allocation.overlayY ) +
-						vertex.lv + 0.5f ) / overlaySize;
-				}
-			}
 		}
 		else
 		{
@@ -2372,44 +2211,6 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 			batch.surfaceRanges.push_back( range );
 		}
 
-		if( mod == g_worldmodel &&
-			allocationIndex >= 0 && allocationIndex < static_cast<int>(
-				g_mapLightmaps.allocations.size( ) ) )
-		{
-			const world_lightmap_allocation_t &allocation =
-				g_mapLightmaps.allocations[allocationIndex];
-			if( allocation.overlayAtlasIndex >= 0 )
-			{
-				world_dynamic_overlay_batch_t &overlayBatch =
-					R_FindDynamicOverlayBatch( out, surface->texinfo->texture,
-						allocation.overlayAtlasIndex, conveyorSurface,
-						cellX, cellY, cellZ );
-				R_AddSurfacePVSLeafs( overlayBatch.pvsLeafs, overlayBatch.pvsAlwaysVisible, surfaceLeafs, surfaceIndex );
-				R_ExpandOverlayBounds( overlayBatch,
-					overlayVertices, vertexCount );
-
-				const DWORD overlayBaseVertex = static_cast<DWORD>(
-					overlayBatch.vertices.size( ) );
-				const UINT overlayFirstIndex = static_cast<UINT>(
-					overlayBatch.indices.size( ) );
-
-				overlayBatch.vertices.insert( overlayBatch.vertices.end( ),
-					overlayVertices, overlayVertices + vertexCount );
-				for( int vertexIndex = 2; vertexIndex < vertexCount; ++vertexIndex )
-				{
-					overlayBatch.indices.push_back( overlayBaseVertex );
-					overlayBatch.indices.push_back( overlayBaseVertex + vertexIndex - 1 );
-					overlayBatch.indices.push_back( overlayBaseVertex + vertexIndex );
-				}
-
-				world_dynamic_overlay_range_t range;
-				range.allocationIndex = static_cast<size_t>( allocationIndex );
-				range.firstIndex = overlayFirstIndex;
-				range.indexCount = static_cast<UINT>(
-					overlayBatch.indices.size( ) ) - overlayFirstIndex;
-				overlayBatch.ranges.push_back( range );
-			}
-		}
 	}
 
 	if( !out.waterPvsPortals.empty( ) )
@@ -2430,9 +2231,21 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 	R_MarkWaterBatchesVisible( out );
 
 	for( auto &batch : out.batches )
+	{
 		R_FinalizePVSLeafs( batch.pvsLeafs, batch.pvsAlwaysVisible );
-	for( auto &batch : out.dynamicOverlayBatches )
-		R_FinalizePVSLeafs( batch.pvsLeafs, batch.pvsAlwaysVisible );
+		DX_ForEachStableGlassSpan( batch.surfaceRanges, batch.indices.size(), true,
+			[&]( const world_surface_draw_range_t &plane, size_t first, size_t count )
+			{
+				const size_t firstSurface = &plane - batch.surfaceRanges.data();
+				size_t endSurface = firstSurface;
+				for( size_t remaining = count; remaining; )
+					remaining -= batch.surfaceRanges[endSurface++].indexCount;
+
+				batch.glassGroups.push_back( { firstSurface, endSurface,
+					static_cast<UINT>( first ), static_cast<UINT>( count ),
+					DotProduct( plane.normal, plane.normal ) <= 1e-12f } );
+			} );
+	}
 
 	if( !R_UploadWorldBatches( out ) )
 	{
@@ -2440,7 +2253,6 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 			R_UploadWorldBatch( batch );
 	}
 
-	R_UploadOverlayBatches( out );
 
 	for( auto &batch : out.waterBatches )
 	{
@@ -2620,12 +2432,15 @@ static float R_DynamicLightRadiusScale( )
 	return std::max( 0.01f, std::min( 8.0f, dx_dlight_radius_scale.value ) );
 }
 
+uint64_t g_dxStudioLocalLightCollection = 0;
+
 void R_BeginDLights( void )
 {
 	g_dxDLights.clear( );
 	g_dxLineLights.clear( );
 	g_dxStudioGlobalLightCount = 0;
 	g_dxStudioLocalLightCount = 0;
+	++g_dxStudioLocalLightCollection;
 }
 
 static void R_AddDLightInternal( const vec3_t origin, float radius,
@@ -2655,7 +2470,10 @@ static void R_AddDLightInternal( const vec3_t origin, float radius,
 	if( studioLocal )
 	{
 		if( g_dxStudioLocalLightCount < static_cast<int>( g_dxStudioLocalLightIndices.size( ) ) )
+			{
 			g_dxStudioLocalLightIndices[g_dxStudioLocalLightCount++] = lightIndex;
+			++g_dxStudioLocalLightCollection;
+		}
 	}
 	else
 	{
@@ -3292,46 +3110,6 @@ void R_ApplyDLights( void )
 	g_dxFixedLightCount = emitted;
 }
 
-static unsigned int R_DynamicLightmapHashFloat( unsigned int hash, float value, float quantize )
-{
-	const int q = static_cast<int>( floorf( value / std::max( 0.001f, quantize ) + 0.5f ) );
-	return ( hash ^ static_cast<unsigned int>( q + 0x9e3779b9u + ( hash << 6 ) + ( hash >> 2 ) ) );
-}
-
-static unsigned int R_BuildDLightSignature( )
-{
-	unsigned int hash = 2166136261u;
-	hash = R_DynamicLightmapHashFloat( hash, dx_dlight_intensity.value, 0.01f );
-	hash = R_DynamicLightmapHashFloat( hash, dx_dlight_beam_intensity.value, 0.01f );
-	hash = R_DynamicLightmapHashFloat( hash, dx_dlight_min_light.value, 0.1f );
-	hash = hash * 16777619u ^ static_cast<unsigned int>( g_dxDLights.size( ) );
-	for( const dx_dlight_t &light : g_dxDLights )
-	{
-		hash = R_DynamicLightmapHashFloat( hash, light.origin[0], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.origin[1], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.origin[2], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.radius, 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.r, 0.01f );
-		hash = R_DynamicLightmapHashFloat( hash, light.g, 0.01f );
-		hash = R_DynamicLightmapHashFloat( hash, light.b, 0.01f );
-	}
-	hash = hash * 16777619u ^ static_cast<unsigned int>( g_dxLineLights.size( ) << 8 );
-	for( const dx_line_light_t &light : g_dxLineLights )
-	{
-		hash = R_DynamicLightmapHashFloat( hash, light.start[0], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.start[1], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.start[2], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.end[0], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.end[1], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.end[2], 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.radius, 2.0f );
-		hash = R_DynamicLightmapHashFloat( hash, light.r, 0.01f );
-		hash = R_DynamicLightmapHashFloat( hash, light.g, 0.01f );
-		hash = R_DynamicLightmapHashFloat( hash, light.b, 0.01f );
-	}
-	return hash;
-}
-
 static void R_CrossProduct3( const float a[3], const float b[3], float out[3] )
 {
 	out[0] = a[1] * b[2] - a[2] * b[1];
@@ -3392,296 +3170,6 @@ bool R_LightmapTexelWorldPoint( const msurface_t *surface, int sampleX, int samp
 	return true;
 }
 
-static bool R_DLightTouchesAlloc( const world_lightmap_allocation_t &allocation )
-{
-	if( !allocation.surface || !allocation.surface->samples || !allocation.boundsValid )
-		return false;
-	return R_DynamicLightTouchesBounds( allocation.mins, allocation.maxs );
-}
-
-static void R_ClearOverlayAlloc(
-	const world_lightmap_allocation_t &allocation,
-	world_lightmap_atlas_t &atlas )
-{
-	if( atlas.pixels.empty( ) )
-		return;
-	for( int y = -LIGHTMAP_GUTTER;
-		y < allocation.height + LIGHTMAP_GUTTER; ++y )
-	{
-		const int dstY = allocation.overlayY + y;
-		if( dstY < 0 || dstY >= atlas.size )
-			continue;
-		for( int x = -LIGHTMAP_GUTTER;
-			x < allocation.width + LIGHTMAP_GUTTER; ++x )
-		{
-			const int dstX = allocation.overlayX + x;
-			if( dstX < 0 || dstX >= atlas.size )
-				continue;
-			atlas.pixels[static_cast<size_t>( dstY ) * atlas.size + dstX] =
-				D3DCOLOR_ARGB( 255, 0, 0, 0 );
-		}
-	}
-}
-
-static bool R_AddDLightsToOverlay(
-	const world_lightmap_allocation_t &allocation,
-	world_lightmap_atlas_t &atlas )
-{
-	const msurface_t *surface = allocation.surface;
-	if( !surface || !surface->samples || atlas.pixels.empty( ) )
-		return false;
-
-	bool anyContribution = false;
-	const float sampleSize = R_SurfaceSampleSize( surface );
-	const float intensity = R_DynamicLightIntensityScale( );
-	const float minLight = std::max( 0.0f,
-		std::min( 64.0f, dx_dlight_min_light.value ) );
-
-	for( int y = -LIGHTMAP_GUTTER;
-		y < allocation.height + LIGHTMAP_GUTTER; ++y )
-	{
-		const int sampleY = std::max( 0,
-			std::min( allocation.height - 1, y ) );
-		for( int x = -LIGHTMAP_GUTTER;
-			x < allocation.width + LIGHTMAP_GUTTER; ++x )
-		{
-			const int sampleX = std::max( 0,
-				std::min( allocation.width - 1, x ) );
-			vec3_t worldPoint;
-			if( !R_LightmapTexelWorldPoint( surface, sampleX, sampleY,
-				sampleSize, worldPoint ) )
-				continue;
-
-			float addR = 0.0f, addG = 0.0f, addB = 0.0f;
-			for( const dx_dlight_t &light : g_dxDLights )
-			{
-				const float dx = worldPoint[0] - light.origin[0];
-				const float dy = worldPoint[1] - light.origin[1];
-				const float dz = worldPoint[2] - light.origin[2];
-				const float distSq = dx * dx + dy * dy + dz * dz;
-				const float radiusSq = light.radius * light.radius;
-				if( distSq >= radiusSq || radiusSq <= 1.0f )
-					continue;
-				const float distance = sqrtf( distSq );
-				const float t = 1.0f - std::max( 0.0f,
-					std::min( 1.0f, distance / light.radius ) );
-				const float add = t * t * intensity * 255.0f;
-				addR += light.r * add;
-				addG += light.g * add;
-				addB += light.b * add;
-			}
-
-			for( const dx_line_light_t &light : g_dxLineLights )
-			{
-				float fraction = 0.0f;
-				const float distSq = R_DistancePointToSegmentSq(
-					worldPoint, light.start, light.end, fraction );
-				const float radiusSq = light.radius * light.radius;
-				if( distSq >= radiusSq || radiusSq <= 1.0f )
-					continue;
-				const float distance = sqrtf( distSq );
-				const float t = 1.0f - std::max( 0.0f,
-					std::min( 1.0f, distance / light.radius ) );
-				const float add = t * t * intensity *
-					std::max( 0.0f, std::min( 8.0f,
-						dx_dlight_beam_intensity.value ) ) * 255.0f;
-				addR += light.r * add;
-				addG += light.g * add;
-				addB += light.b * add;
-			}
-
-			if( addR < minLight && addG < minLight && addB < minLight )
-				continue;
-			const int dstX = allocation.overlayX + x;
-			const int dstY = allocation.overlayY + y;
-			if( dstX < 0 || dstX >= atlas.size ||
-				dstY < 0 || dstY >= atlas.size )
-				continue;
-			atlas.pixels[static_cast<size_t>( dstY ) * atlas.size + dstX] =
-				D3DCOLOR_ARGB( 255,
-					std::min( 255, static_cast<int>( addR + 0.5f ) ),
-					std::min( 255, static_cast<int>( addG + 0.5f ) ),
-					std::min( 255, static_cast<int>( addB + 0.5f ) ) );
-			anyContribution = true;
-		}
-	}
-	return anyContribution;
-}
-
-static void R_PrepareOverlayScratch( )
-{
-	const size_t count = g_mapLightmaps.dynamicOverlayAtlases.size( );
-	if( g_dynamicOverlayDirtyScratch.size( ) != count )
-		g_dynamicOverlayDirtyScratch.resize( count );
-	for( lightmap_dirty_atlas_t &dirty : g_dynamicOverlayDirtyScratch )
-		dirty.rects.clear( );
-}
-
-static void R_MarkOverlayDirty(
-	const world_lightmap_allocation_t &allocation )
-{
-	if( allocation.overlayAtlasIndex < 0 ||
-		allocation.overlayAtlasIndex >= static_cast<int>(
-			g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-		return;
-	world_lightmap_atlas_t &atlas =
-		g_mapLightmaps.dynamicOverlayAtlases[allocation.overlayAtlasIndex];
-	R_MarkLightmapRectDirty(
-		g_dynamicOverlayDirtyScratch[allocation.overlayAtlasIndex],
-		allocation.overlayX, allocation.overlayY,
-		allocation.width, allocation.height, atlas );
-}
-
-static void R_FlushOverlayAtlases( )
-{
-	const size_t count = std::min( g_mapLightmaps.dynamicOverlayAtlases.size( ),
-		g_dynamicOverlayDirtyScratch.size( ) );
-	for( size_t atlasIndex = 0; atlasIndex < count; ++atlasIndex )
-	{
-		if( g_dynamicOverlayDirtyScratch[atlasIndex].rects.empty( ) )
-			continue;
-		if( R_UploadDirtyLightmapAtlas(
-			g_mapLightmaps.dynamicOverlayAtlases[atlasIndex],
-			g_dynamicOverlayDirtyScratch[atlasIndex], false ) )
-		{
-			DX_ProfileEvent( DX_PROFILE_EVENT_LIGHTMAP_ATLAS_UPLOAD, 1 );
-		}
-	}
-}
-
-static void R_ClearStaleOverlays( )
-{
-	if( g_dlightTouchedAllocs.empty( ) )
-		return;
-	R_PrepareOverlayScratch( );
-	for( const size_t allocationIndex : g_dlightTouchedAllocs )
-	{
-		if( allocationIndex >= g_mapLightmaps.allocations.size( ) )
-			continue;
-		world_lightmap_allocation_t &allocation =
-			g_mapLightmaps.allocations[allocationIndex];
-		if( allocation.overlayAtlasIndex < 0 ||
-			allocation.overlayAtlasIndex >= static_cast<int>(
-				g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-			continue;
-		R_ClearOverlayAlloc( allocation,
-			g_mapLightmaps.dynamicOverlayAtlases[allocation.overlayAtlasIndex] );
-		R_MarkOverlayDirty( allocation );
-		if( allocationIndex < g_dlightOverlayActive.size( ) )
-			g_dlightOverlayActive[allocationIndex] = 0;
-	}
-	R_FlushOverlayAtlases( );
-	g_dlightTouchedAllocs.clear( );
-}
-
-void R_UpdateDLightOverlay( void )
-{
-	const bool usable = R_DynamicLightsEnabled( ) &&
-		dx_dlight_world.value != 0.0f &&
-		dx_dlight_lightmaps.value != 0.0f &&
-		r_nolm.value == 0.0f && !g_mapLightmaps.allocations.empty( ) &&
-		!g_mapLightmaps.dynamicOverlayAtlases.empty( );
-	const bool haveLights = !g_dxDLights.empty( ) ||
-		!g_dxLineLights.empty( );
-
-	if( g_dlightOverlayActive.size( ) !=
-		g_mapLightmaps.allocations.size( ) )
-	{
-		g_dlightOverlayActive.assign(
-			g_mapLightmaps.allocations.size( ), 0 );
-	}
-	if( g_dynamicOverlaySelectedMask.size( ) != g_mapLightmaps.allocations.size( ) )
-		g_dynamicOverlaySelectedMask.assign( g_mapLightmaps.allocations.size( ), 0 );
-
-	if( !usable || !haveLights )
-	{
-		R_ClearStaleOverlays( );
-		g_dynamicLightmapSignature = 0;
-		return;
-	}
-
-	const unsigned int signature = R_BuildDLightSignature( );
-	if( signature == g_dynamicLightmapSignature )
-		return;
-
-	g_dlightSelected.clear( );
-	if( g_dlightSelected.capacity( ) < 64 )
-		g_dlightSelected.reserve( 64 );
-	for( size_t i = 0; i < g_mapLightmaps.allocations.size( ); ++i )
-	{
-		const world_lightmap_allocation_t &allocation = g_mapLightmaps.allocations[i];
-		if( allocation.overlayAtlasIndex >= 0 &&
-			R_DLightTouchesAlloc( allocation ) )
-		{
-			g_dlightSelected.push_back( i );
-			g_dynamicOverlaySelectedMask[i] = 1;
-		}
-	}
-
-	g_dlightRestore.clear( );
-	for( const size_t oldIndex : g_dlightTouchedAllocs )
-	{
-		if( oldIndex >= g_dynamicOverlaySelectedMask.size( ) ||
-			!g_dynamicOverlaySelectedMask[oldIndex] )
-		{
-			g_dlightRestore.push_back( oldIndex );
-		}
-	}
-
-	R_PrepareOverlayScratch( );
-	for( const size_t allocationIndex : g_dlightRestore )
-	{
-		if( allocationIndex >= g_mapLightmaps.allocations.size( ) )
-			continue;
-		world_lightmap_allocation_t &allocation =
-			g_mapLightmaps.allocations[allocationIndex];
-		if( allocation.overlayAtlasIndex < 0 ||
-			allocation.overlayAtlasIndex >= static_cast<int>(
-				g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-			continue;
-		R_ClearOverlayAlloc( allocation,
-			g_mapLightmaps.dynamicOverlayAtlases[allocation.overlayAtlasIndex] );
-		R_MarkOverlayDirty( allocation );
-		g_dlightOverlayActive[allocationIndex] = 0;
-	}
-
-	for( const size_t allocationIndex : g_dlightSelected )
-	{
-		if( allocationIndex >= g_mapLightmaps.allocations.size( ) )
-			continue;
-		world_lightmap_allocation_t &allocation =
-			g_mapLightmaps.allocations[allocationIndex];
-		if( allocation.overlayAtlasIndex < 0 ||
-			allocation.overlayAtlasIndex >= static_cast<int>(
-				g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-			continue;
-		world_lightmap_atlas_t &atlas =
-			g_mapLightmaps.dynamicOverlayAtlases[allocation.overlayAtlasIndex];
-		R_ClearOverlayAlloc( allocation, atlas );
-		const bool contributed =
-			R_AddDLightsToOverlay( allocation, atlas );
-		R_MarkOverlayDirty( allocation );
-		g_dlightOverlayActive[allocationIndex] =
-			contributed ? 1 : 0;
-	}
-	R_FlushOverlayAtlases( );
-
-	g_dlightTouchedAllocs.clear( );
-	g_dlightTouchedAllocs.reserve(
-		g_dlightSelected.size( ) );
-	for( const size_t selectedIndex : g_dlightSelected )
-	{
-		if( selectedIndex < g_dlightOverlayActive.size( ) &&
-			g_dlightOverlayActive[selectedIndex] )
-		{
-			g_dlightTouchedAllocs.push_back( selectedIndex );
-		}
-	}
-	for( const size_t selectedIndex : g_dlightSelected )
-		g_dynamicOverlaySelectedMask[selectedIndex] = 0;
-	g_dynamicLightmapSignature = signature;
-}
-
 void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 	const vec3_t origin, int eventOption, bool viewModel, float renderTime )
 {
@@ -3730,258 +3218,6 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 			255, 192, 72, flash.dieTime,
 			ent ? ent->curstate.number : 0 );
 	}
-}
-
-bool R_DynamicLightTouchesBounds( const vec3_t mins, const vec3_t maxs )
-{
-	for( const dx_dlight_t &light : g_dxDLights )
-	{
-		float distSq = 0.0f;
-		for( int axis = 0; axis < 3; ++axis )
-		{
-			float delta = 0.0f;
-			if( light.origin[axis] < mins[axis] )
-				delta = mins[axis] - light.origin[axis];
-			else if( light.origin[axis] > maxs[axis] )
-				delta = light.origin[axis] - maxs[axis];
-			distSq += delta * delta;
-		}
-		if( distSq <= light.radius * light.radius )
-			return true;
-	}
-
-	for( const dx_line_light_t &light : g_dxLineLights )
-	{
-		bool separated = false;
-		for( int axis = 0; axis < 3; ++axis )
-		{
-			const float segMin = std::min( light.start[axis], light.end[axis] ) - light.radius;
-			const float segMax = std::max( light.start[axis], light.end[axis] ) + light.radius;
-			if( segMax < mins[axis] || segMin > maxs[axis] )
-			{
-				separated = true;
-				break;
-			}
-		}
-		if( !separated )
-			return true;
-	}
-	return false;
-}
-
-static D3DCOLOR R_DynamicWorldColorAtPoint( const vec3_t worldPoint )
-{
-	float outR = 0.0f;
-	float outG = 0.0f;
-	float outB = 0.0f;
-	const float intensity = R_DynamicLightIntensityScale( );
-	const float minLight = std::max( 0.0f, std::min( 64.0f, dx_dlight_min_light.value ) );
-
-	for( const dx_dlight_t &light : g_dxDLights )
-	{
-		const float dx = worldPoint[0] - light.origin[0];
-		const float dy = worldPoint[1] - light.origin[1];
-		const float dz = worldPoint[2] - light.origin[2];
-		const float distSq = dx * dx + dy * dy + dz * dz;
-		const float radiusSq = light.radius * light.radius;
-		if( distSq >= radiusSq || radiusSq <= 0.0f )
-			continue;
-
-		const float distance = sqrtf( distSq );
-		const float t = 1.0f - std::max( 0.0f, std::min( 1.0f, distance / light.radius ) );
-		const float add = t * t * intensity * 255.0f;
-		outR += light.r * add;
-		outG += light.g * add;
-		outB += light.b * add;
-	}
-
-	for( const dx_line_light_t &light : g_dxLineLights )
-	{
-		float fraction = 0.0f;
-		const float distSq = R_DistancePointToSegmentSq( worldPoint, light.start, light.end, fraction );
-		const float radiusSq = light.radius * light.radius;
-		if( distSq >= radiusSq || radiusSq <= 0.0f )
-			continue;
-		const float distance = sqrtf( distSq );
-		const float t = 1.0f - std::max( 0.0f, std::min( 1.0f, distance / light.radius ) );
-		const float add = t * t * intensity *
-			std::max( 0.0f, std::min( 8.0f, dx_dlight_beam_intensity.value ) ) * 255.0f;
-		outR += light.r * add;
-		outG += light.g * add;
-		outB += light.b * add;
-	}
-
-	if( outR < minLight && outG < minLight && outB < minLight )
-		return 0;
-
-	return D3DCOLOR_ARGB( 255,
-		static_cast<int>( std::max( 0.0f, std::min( 255.0f, outR ) ) ),
-		static_cast<int>( std::max( 0.0f, std::min( 255.0f, outG ) ) ),
-		static_cast<int>( std::max( 0.0f, std::min( 255.0f, outB ) ) ) );
-}
-
-static dynamic_light_vertex_t R_MakeDynamicLightVertex( const lightmap_vertex_t &source,
-	const D3DMATRIX &worldMatrix )
-{
-	dynamic_light_vertex_t out;
-	out.x = source.x;
-	out.y = source.y;
-	out.z = source.z;
-	out.u = source.u;
-	out.v = source.v;
-	vec3_t worldPoint;
-	R_TransformPoint( worldMatrix, source.x, source.y, source.z, worldPoint );
-	out.diffuse = R_DynamicWorldColorAtPoint( worldPoint );
-	return out;
-}
-
-static dynamic_light_vertex_t R_MidDynamicLightVertex( const dynamic_light_vertex_t &a,
-	const dynamic_light_vertex_t &b, const D3DMATRIX &worldMatrix )
-{
-	dynamic_light_vertex_t out;
-	out.x = 0.5f * ( a.x + b.x );
-	out.y = 0.5f * ( a.y + b.y );
-	out.z = 0.5f * ( a.z + b.z );
-	out.u = 0.5f * ( a.u + b.u );
-	out.v = 0.5f * ( a.v + b.v );
-	vec3_t worldPoint;
-	R_TransformPoint( worldMatrix, out.x, out.y, out.z, worldPoint );
-	out.diffuse = R_DynamicWorldColorAtPoint( worldPoint );
-	return out;
-}
-
-static float R_DynamicLightEdgeLengthSq( const dynamic_light_vertex_t &a,
-	const dynamic_light_vertex_t &b, const D3DMATRIX &worldMatrix )
-{
-	vec3_t aw, bw;
-	R_TransformPoint( worldMatrix, a.x, a.y, a.z, aw );
-	R_TransformPoint( worldMatrix, b.x, b.y, b.z, bw );
-	const float dx = aw[0] - bw[0];
-	const float dy = aw[1] - bw[1];
-	const float dz = aw[2] - bw[2];
-	return dx * dx + dy * dy + dz * dz;
-}
-
-static void R_AppendDynamicLightTriangle( const dynamic_light_vertex_t &a,
-	const dynamic_light_vertex_t &b, const dynamic_light_vertex_t &c,
-	const D3DMATRIX &worldMatrix, int depth,
-	std::vector<dynamic_light_vertex_t> &vertices, std::vector<DWORD> &indices )
-{
-	const float subdivide = std::max( 0.0f, std::min( 512.0f, dx_dlight_subdivide.value ) );
-	if( subdivide > 1.0f && depth < 5 )
-	{
-		const float maxEdgeSq = std::max( R_DynamicLightEdgeLengthSq( a, b, worldMatrix ),
-			std::max( R_DynamicLightEdgeLengthSq( b, c, worldMatrix ),
-				R_DynamicLightEdgeLengthSq( c, a, worldMatrix ) ) );
-		if( maxEdgeSq > subdivide * subdivide )
-		{
-			const dynamic_light_vertex_t ab = R_MidDynamicLightVertex( a, b, worldMatrix );
-			const dynamic_light_vertex_t bc = R_MidDynamicLightVertex( b, c, worldMatrix );
-			const dynamic_light_vertex_t ca = R_MidDynamicLightVertex( c, a, worldMatrix );
-			R_AppendDynamicLightTriangle( a, ab, ca, worldMatrix, depth + 1, vertices, indices );
-			R_AppendDynamicLightTriangle( ab, b, bc, worldMatrix, depth + 1, vertices, indices );
-			R_AppendDynamicLightTriangle( ca, bc, c, worldMatrix, depth + 1, vertices, indices );
-			R_AppendDynamicLightTriangle( ab, bc, ca, worldMatrix, depth + 1, vertices, indices );
-			return;
-		}
-	}
-
-	if( a.diffuse == 0 && b.diffuse == 0 && c.diffuse == 0 )
-		return;
-
-	const DWORD base = static_cast<DWORD>( vertices.size( ) );
-	vertices.push_back( a );
-	vertices.push_back( b );
-	vertices.push_back( c );
-	indices.push_back( base + 0 );
-	indices.push_back( base + 1 );
-	indices.push_back( base + 2 );
-}
-
-static void R_DrawDynamicLightBrushPass( const world_model_draw_t &model,
-	const cl_entity_s *ent, float time )
-{
-	if( dx_dlight_world.value == 0.0f || dx_dlight_geometry.value == 0.0f ||
-		g_dxDLights.empty( ) || model.batches.empty( ) || !ent )
-		return;
-
-	D3DMATRIX worldMatrix;
-	R_SetEntityWorldTransform( ent, time, &worldMatrix );
-
-	device->SetFVF( DYNAMIC_LIGHT_FVF );
-	R_SetLightmapStageEnabled( false );
-	DX_SetTextureStageStateCached( 0, D3DTSS_TEXCOORDINDEX, 0 );
-	DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1 );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE );
-	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
-	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
-	DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
-	DX_SetRenderStateCached( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-	DX_SetRenderStateCached( D3DRS_SRCBLEND, D3DBLEND_ONE );
-	DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_ONE );
-
-	int boundBaseTexture = -1;
-	std::vector<dynamic_light_vertex_t> litVertices;
-	std::vector<DWORD> litIndices;
-	for( size_t batchIndex = 0; batchIndex < model.batches.size( ); ++batchIndex )
-	{
-		const world_material_batch_t &batch = model.batches[batchIndex];
-		if( batch.vertices.empty( ) || batch.indices.empty( ) || !batch.boundsValid )
-			continue;
-
-		vec3_t worldMins, worldMaxs;
-		R_TransformBounds( batch.mins, batch.maxs, worldMatrix, worldMins, worldMaxs );
-		if( !R_DynamicLightTouchesBounds( worldMins, worldMaxs ) )
-			continue;
-
-		texture_t *texture = R_SelectAnimatedTexture( batch.baseTexture, ent, time );
-		if( !texture || texture->gl_texturenum <= 0 )
-			continue;
-
-		litVertices.clear( );
-		litIndices.clear( );
-		litVertices.reserve( std::min<size_t>( batch.indices.size( ) * 2u, 16384u ) );
-		litIndices.reserve( std::min<size_t>( batch.indices.size( ) * 2u, 16384u ) );
-
-		for( size_t index = 0; index + 2 < batch.indices.size( ); index += 3 )
-		{
-			const DWORD ia = batch.indices[index + 0];
-			const DWORD ib = batch.indices[index + 1];
-			const DWORD ic = batch.indices[index + 2];
-			if( ia >= batch.vertices.size( ) || ib >= batch.vertices.size( ) || ic >= batch.vertices.size( ) )
-				continue;
-
-			const dynamic_light_vertex_t a = R_MakeDynamicLightVertex( batch.vertices[ia], worldMatrix );
-			const dynamic_light_vertex_t b = R_MakeDynamicLightVertex( batch.vertices[ib], worldMatrix );
-			const dynamic_light_vertex_t c = R_MakeDynamicLightVertex( batch.vertices[ic], worldMatrix );
-			R_AppendDynamicLightTriangle( a, b, c, worldMatrix, 0, litVertices, litIndices );
-		}
-
-		if( litVertices.empty( ) || litIndices.empty( ) )
-			continue;
-
-		if( texture->gl_texturenum != boundBaseTexture )
-		{
-			DX_Bind( 0, texture->gl_texturenum );
-			boundBaseTexture = texture->gl_texturenum;
-		}
-
-		R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
-			static_cast<UINT>( litVertices.size( ) ),
-			static_cast<UINT>( litIndices.size( ) / 3 ),
-			litIndices.data( ), D3DFMT_INDEX32,
-			litVertices.data( ), sizeof( dynamic_light_vertex_t ) );
-	}
-
-	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
-	device->SetFVF( BRUSH_FVF );
 }
 
 bool R_ReadSurfaceStaticLight( const msurface_t *surface,
@@ -4188,25 +3424,6 @@ void R_CheckLightmapBakeParams( void )
 	lastAoCache = dx_ao_cache.value;
 }
 
-static bool R_DynamicOverlayRangeActive(
-	const world_dynamic_overlay_range_t &range )
-{
-	return range.indexCount >= 3 &&
-		range.allocationIndex < g_dlightOverlayActive.size( ) &&
-		g_dlightOverlayActive[range.allocationIndex] != 0;
-}
-
-static bool R_OverlayBatchActive(
-	const world_dynamic_overlay_batch_t &batch )
-{
-	for( const world_dynamic_overlay_range_t &range : batch.ranges )
-	{
-		if( R_DynamicOverlayRangeActive( range ) )
-			return true;
-	}
-	return false;
-}
-
 static bool R_BuildConveyorTextureMatrix( const cl_entity_s *ent,
 	const texture_t *baseTexture, float time, D3DMATRIX &matrix )
 {
@@ -4262,7 +3479,7 @@ static void R_SetConveyorTextureTransform( bool conveyor,
 		D3DMATRIX textureMatrix;
 		if( R_BuildConveyorTextureMatrix( ent, baseTexture, time, textureMatrix ) )
 		{
-			device->SetTransform( D3DTS_TEXTURE0, &textureMatrix );
+			DX_SetTransformCached( D3DTS_TEXTURE0, &textureMatrix );
 			DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS,
 				D3DTTFF_COUNT2 );
 			transformEnabled = true;
@@ -4276,159 +3493,6 @@ static void R_SetConveyorTextureTransform( bool conveyor,
 			D3DTTFF_DISABLE );
 		transformEnabled = false;
 	}
-}
-
-static void R_DrawDLightOverlay( const world_model_draw_t &model,
-	const cl_entity_s *ent, float time )
-{
-
-	if( ent || g_dlightTouchedAllocs.empty( ) ||
-		model.dynamicOverlayBatches.empty( ) )
-	{
-		return;
-	}
-
-	const bool useSharedGeometry = model.overlaySharedVertexBuffer != nullptr &&
-		model.overlaySharedIndexBuffer != nullptr;
-	device->SetFVF( LIGHTMAP_FVF );
-	if( useSharedGeometry )
-	{
-		device->SetStreamSource( 0, model.overlaySharedVertexBuffer, 0,
-			sizeof( lightmap_vertex_t ) );
-		device->SetIndices( model.overlaySharedIndexBuffer );
-	}
-
-	DX_SetTextureStageStateCached( 0, D3DTSS_TEXCOORDINDEX, 0 );
-	DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAOP, D3DTOP_MODULATE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
-	DX_SetTextureStageStateCached( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
-	R_SetLightmapStageEnabled( true );
-	DX_SetSamplerStateCached( 1, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR );
-	DX_SetSamplerStateCached( 1, D3DSAMP_MINFILTER, D3DTEXF_LINEAR );
-	DX_SetSamplerStateCached( 1, D3DSAMP_MIPFILTER, D3DTEXF_NONE );
-	DX_SetSamplerStateCached( 1, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
-	DX_SetSamplerStateCached( 1, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
-
-	DX_SetRenderStateCached( D3DRS_ZENABLE, TRUE );
-	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
-	DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, TRUE );
-	DX_SetRenderStateCached( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-	DX_SetRenderStateCached( D3DRS_SRCBLEND, D3DBLEND_ONE );
-	DX_SetRenderStateCached( D3DRS_DESTBLEND, D3DBLEND_ONE );
-
-	int boundBaseTexture = -1;
-	IDirect3DTexture9 *boundOverlayTexture = nullptr;
-	bool conveyorTransformEnabled = false;
-	for( const world_dynamic_overlay_batch_t &batch : model.dynamicOverlayBatches )
-	{
-		if( batch.primitiveCount == 0 || !R_OverlayBatchActive( batch ) )
-			continue;
-		if( !R_PVSLeafsVisible( model, batch.pvsLeafs, batch.pvsAlwaysVisible ) )
-			continue;
-		if( !R_BoundsVisibleInCurrentView( batch.mins, batch.maxs,
-			batch.boundsValid ) )
-			continue;
-		if( batch.overlayAtlasIndex < 0 || batch.overlayAtlasIndex >=
-			static_cast<int>( g_mapLightmaps.dynamicOverlayAtlases.size( ) ) )
-			continue;
-
-		texture_t *texture = R_SelectAnimatedTexture( batch.baseTexture, nullptr, time );
-		IDirect3DTexture9 *overlayTexture =
-			g_mapLightmaps.dynamicOverlayAtlases[batch.overlayAtlasIndex].texture;
-		if( !texture || texture->gl_texturenum <= 0 || !overlayTexture )
-			continue;
-
-		R_SetConveyorTextureTransform( batch.conveyor, ent,
-			batch.baseTexture, time, conveyorTransformEnabled );
-
-		if( texture->gl_texturenum != boundBaseTexture )
-		{
-			DX_Bind( 0, texture->gl_texturenum );
-			boundBaseTexture = texture->gl_texturenum;
-		}
-		if( overlayTexture != boundOverlayTexture )
-		{
-			DX_BindRawTexture( 1, overlayTexture );
-			boundOverlayTexture = overlayTexture;
-		}
-
-		UINT runFirstIndex = 0;
-		UINT runIndexCount = 0;
-
-		auto FlushActiveRun = [&]( )
-			{
-				if( runIndexCount < 3 )
-				{
-					runIndexCount = 0;
-					return;
-				}
-
-				const UINT primitiveCount = runIndexCount / 3;
-				DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
-
-				if( useSharedGeometry )
-				{
-					DX_ProfileDraw( true, primitiveCount );
-					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
-						static_cast<INT>( batch.sharedBaseVertex ), 0,
-						batch.vertexCount,
-						batch.sharedStartIndex + runFirstIndex,
-						primitiveCount );
-				}
-				else if( !batch.vertices.empty( ) && !batch.indices.empty( ) &&
-					runFirstIndex + runIndexCount <= batch.indices.size( ) )
-				{
-					R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
-						static_cast<UINT>( batch.vertices.size( ) ),
-						primitiveCount,
-						batch.indices.data( ) + runFirstIndex, D3DFMT_INDEX32,
-						batch.vertices.data( ), sizeof( lightmap_vertex_t ) );
-				}
-
-				runIndexCount = 0;
-			};
-
-		for( const world_dynamic_overlay_range_t &range : batch.ranges )
-		{
-			if( !R_DynamicOverlayRangeActive( range ) )
-			{
-				FlushActiveRun( );
-				continue;
-			}
-
-			if( runIndexCount == 0 )
-			{
-				runFirstIndex = range.firstIndex;
-				runIndexCount = range.indexCount;
-			}
-			else if( runFirstIndex + runIndexCount == range.firstIndex )
-			{
-
-				runIndexCount += range.indexCount;
-			}
-			else
-			{
-				FlushActiveRun( );
-				runFirstIndex = range.firstIndex;
-				runIndexCount = range.indexCount;
-			}
-		}
-		FlushActiveRun( );
-	}
-
-	if( conveyorTransformEnabled )
-		DX_SetTextureStageStateCached( 0, D3DTSS_TEXTURETRANSFORMFLAGS,
-			D3DTTFF_DISABLE );
-	R_SetLightmapStageEnabled( false );
-	DX_SetRenderStateCached( D3DRS_ALPHABLENDENABLE, FALSE );
-	DX_SetRenderStateCached( D3DRS_ZWRITEENABLE, TRUE );
-	DX_SetRenderStateCached( D3DRS_ZFUNC, D3DCMP_LESSEQUAL );
 }
 
 static bool R_BrushEntityUsesLightmap( const world_model_draw_t &model,
@@ -4455,10 +3519,36 @@ static bool R_BrushEntityUsesLightmap( const world_model_draw_t &model,
 	}
 }
 
-static bool R_RemixGlassSurfaceFacesView(
-	const world_surface_draw_range_t &range, const D3DMATRIX &world )
+static bool R_RemixGlassSurfaceFacesView( const world_glass_group_t &group )
 {
-	return DX_GlassFacesView(range.normal,range.planeDist,&world._11,g_vOrigin);
+	if( group.twoSided )
+		return true;
+
+	vec3_t toEye;
+	VectorSubtract( g_vOrigin, group.worldPoint, toEye );
+	return DotProduct( group.worldNormal, toEye ) > .01f;
+}
+
+static void R_UpdateGlassPlanes( const world_material_batch_t &batch,
+	const D3DMATRIX &world, uint64_t revision )
+{
+	if( batch.glassPlaneRevision == revision )
+		return;
+	batch.glassPlaneRevision = revision;
+
+	for( const auto &group : batch.glassGroups )
+	{
+		if( group.twoSided )
+			continue;
+
+		const auto &plane = batch.surfaceRanges[group.firstSurface];
+		for( int i = 0; i < 3; ++i )
+		{
+			group.worldNormal[i] = plane.normal[0] * world.m[0][i] +
+				plane.normal[1] * world.m[1][i] + plane.normal[2] * world.m[2][i];
+			group.worldPoint[i] = plane.planeDist * group.worldNormal[i] + world.m[3][i];
+		}
+	}
 }
 
 void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
@@ -4474,7 +3564,15 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		ent && ent->curstate.rendermode == kRenderTransTexture;
 	D3DMATRIX remixGlassWorld{};
 	if( remixSingleSidedGlass )
+	{
 		R_SetEntityWorldTransform( ent, time, &remixGlassWorld );
+		if( !model.glassWorldRevision ||
+			memcmp( &model.glassWorld, &remixGlassWorld, sizeof( remixGlassWorld ) ) != 0 )
+		{
+			model.glassWorld = remixGlassWorld;
+			++model.glassWorldRevision;
+		}
+	}
 
 	dx_entity_state_t entityState{};
 	if( needsEntityState )
@@ -4482,16 +3580,16 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 	else
 		DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
 
-	device->SetFVF( LIGHTMAP_FVF );
+	DX_SetFVFCached( LIGHTMAP_FVF );
 
 	const bool useSharedGeometry =
 		model.sharedVertexBuffer != nullptr && model.sharedIndexBuffer != nullptr;
-	if( useSharedGeometry )
+	const auto bindGeometry = [&]( const world_material_batch_t &batch )
 	{
-		device->SetStreamSource( 0, model.sharedVertexBuffer, 0,
-			sizeof( lightmap_vertex_t ) );
-		device->SetIndices( model.sharedIndexBuffer );
-	}
+		DX_SetStreamSourceCached( 0, useSharedGeometry ? model.sharedVertexBuffer : batch.vertexBuffer,
+			0, sizeof( lightmap_vertex_t ) );
+		DX_SetIndicesCached( useSharedGeometry ? model.sharedIndexBuffer : batch.indexBuffer );
+	};
 
 	R_SetLightmapStageEnabled( false );
 
@@ -4603,55 +3701,62 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 			boundLightmapTexture = nullptr;
 		}
 
-		const bool filterRemixGlassSurfaces = remixSingleSidedGlass &&
-			!batch.surfaceRanges.empty( );
+		if( remixSingleSidedGlass && !batch.surfaceRanges.empty() )
+		{
+			R_UpdateGlassPlanes( batch, remixGlassWorld, model.glassWorldRevision );
+			const bool batchCoplanar = dx_remix_glass_batch.value != 0.0f;
+			const bool gpu = useSharedGeometry || ( batch.vertexBuffer && batch.indexBuffer );
+			const size_t total = static_cast<size_t>( batch.primitiveCount ) * 3;
+			bool geometryBound = false;
 
-        if( filterRemixGlassSurfaces )
-        {
-            const size_t total=static_cast<size_t>(batch.primitiveCount)*3;
-            std::vector<dx_index_span_t> visible;
-            DX_ForEachStableGlassSpan(batch.surfaceRanges,total,
-                dx_remix_glass_batch.value!=0.f,
-                [&](const world_surface_draw_range_t& plane,size_t first,size_t count) {
-                    DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_SURFACE,1);
-                    if(!R_RemixGlassSurfaceFacesView(plane,remixGlassWorld)) {
-                        DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_CULLED,1); return;
-                    }
-                    visible.push_back({first,count});
-                });
-            const bool gpu=useSharedGeometry || (batch.vertexBuffer && batch.indexBuffer);
-            auto bindOriginal=[&]() {
-                if(gpu) {
-                    device->SetStreamSource(0,useSharedGeometry?model.sharedVertexBuffer:batch.vertexBuffer,
-                        0,sizeof(lightmap_vertex_t));
-                    device->SetIndices(useSharedGeometry?model.sharedIndexBuffer:batch.indexBuffer);
-                }
-            };
-            auto recordDraw=[]() {
-                DX_ProfileEvent(DX_PROFILE_EVENT_WORLD_BATCH_DRAWN,1);
-                DX_ProfileEvent(DX_PROFILE_EVENT_GLASS_DRAW,1);
-            };
-            auto drawRange=[&](const dx_index_span_t& span) {
-                bindOriginal();
-                if(gpu) {
-                    DX_ProfileDraw(true,static_cast<UINT>(span.count/3));
-                    device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
-                        useSharedGeometry?static_cast<INT>(batch.sharedBaseVertex):0,0,batch.vertexCount,
-                        (useSharedGeometry?batch.sharedStartIndex:0)+static_cast<UINT>(span.first),
-                        static_cast<UINT>(span.count/3));
-                    recordDraw();
-                } else if(!batch.vertices.empty() && batch.indices.size()>=total) {
-                    if(R_DrawScratchIndexedPrimitive(D3DPT_TRIANGLELIST,
-                        static_cast<UINT>(batch.vertices.size()),static_cast<UINT>(span.count/3),
-                        batch.indices.data()+span.first,D3DFMT_INDEX32,batch.vertices.data(),sizeof(lightmap_vertex_t)))
-                        recordDraw();
-                }
-            };
-            // Submit original fixed ranges, never a camera-dependent merged IB.
-            for(const auto& span:visible) drawRange(span);
-        }
+			const auto drawRange = [&]( UINT first, UINT count )
+			{
+				if( gpu )
+				{
+					if( !geometryBound )
+					{
+						bindGeometry( batch );
+						geometryBound = true;
+					}
+					DX_ProfileDraw( true, count / 3 );
+					device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
+						useSharedGeometry ? static_cast<INT>( batch.sharedBaseVertex ) : 0,
+						0, batch.vertexCount, ( useSharedGeometry ? batch.sharedStartIndex : 0 ) + first,
+						count / 3 );
+				}
+				else if( batch.vertices.empty() || batch.indices.size() < total ||
+					!R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST,
+						static_cast<UINT>( batch.vertices.size() ), count / 3,
+						batch.indices.data() + first, D3DFMT_INDEX32,
+						batch.vertices.data(), sizeof( lightmap_vertex_t ) ) )
+					return;
+
+				DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
+				DX_ProfileEvent( DX_PROFILE_EVENT_GLASS_DRAW, 1 );
+			};
+
+			// Visibility accepts or rejects whole coplanar groups. The batching
+			// setting still selects the exact same fixed index ranges as before.
+			for( const auto &group : batch.glassGroups )
+			{
+				const auto surfaceCount = batchCoplanar ? 1u :
+					static_cast<unsigned>( group.endSurface - group.firstSurface );
+				DX_ProfileEvent( DX_PROFILE_EVENT_GLASS_SURFACE, surfaceCount );
+				if( !R_RemixGlassSurfaceFacesView( group ) )
+				{
+					DX_ProfileEvent( DX_PROFILE_EVENT_GLASS_CULLED, surfaceCount );
+					continue;
+				}
+				if( batchCoplanar )
+					drawRange( group.firstIndex, group.indexCount );
+				else
+					for( size_t i = group.firstSurface; i < group.endSurface; ++i )
+						drawRange( batch.surfaceRanges[i].firstIndex, batch.surfaceRanges[i].indexCount );
+			}
+		}
 		else if( useSharedGeometry )
 		{
+			bindGeometry( batch );
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
 			DX_ProfileDraw( true, batch.primitiveCount );
 			device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
@@ -4662,9 +3767,7 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		else if( batch.vertexBuffer && batch.indexBuffer )
 		{
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
-			device->SetStreamSource( 0, batch.vertexBuffer, 0,
-				sizeof( lightmap_vertex_t ) );
-			device->SetIndices( batch.indexBuffer );
+			bindGeometry( batch );
 			DX_ProfileDraw( true, batch.primitiveCount );
 			device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0,
 				batch.vertexCount, 0, batch.primitiveCount );
@@ -4688,14 +3791,8 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		conveyorTransformEnabled = false;
 	}
 
-	if( useLightmaps )
-	{
-		R_DrawDLightOverlay( model, ent, time );
-		R_DrawDynamicLightBrushPass( model, ent, time );
-	}
-
 	R_SetLightmapStageEnabled( false );
-	device->SetFVF( BRUSH_FVF );
+	DX_SetFVFCached( BRUSH_FVF );
 	DX_SetRenderStateCached( D3DRS_ALPHATESTENABLE, FALSE );
 
 	if( needsEntityState )
@@ -4710,8 +3807,8 @@ void R_DrawWaterIndexed( world_water_batch_t &batch )
 	if( batch.vertexBuffer && batch.indexBuffer )
 	{
 		DX_ProfileEvent( DX_PROFILE_EVENT_WATER_BATCH_DRAWN, 1 );
-		device->SetStreamSource( 0, batch.vertexBuffer, 0, sizeof( brush_vertex_t ) );
-		device->SetIndices( batch.indexBuffer );
+		DX_SetStreamSourceCached( 0, batch.vertexBuffer, 0, sizeof( brush_vertex_t ) );
+		DX_SetIndicesCached( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0,
