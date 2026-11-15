@@ -80,6 +80,7 @@ static dx_cof_player_visibility_t g_cofPlayerVisibility;
 static cof_features::Pickups g_cofPickups;
 static int g_cofPickupIndex=0,g_cofPickupModel=0;static float g_cofPickupStrength=0;
 static bool g_cofPickupLight=false;
+static float g_cofPickupLightPoint[3]{};
 static void R_CofPickupStatusCmd() {
  if(gEngfuncs.Con_Printf)gEngfuncs.Con_Printf("PICKUP outline index=%d model=%d strength=%.3f spans=%u softLight=%d\n",g_cofPickupIndex,g_cofPickupModel,g_cofPickupStrength,unsigned(g_cofPickupOutline.size()),int(g_cofPickupLight));
 }
@@ -6200,14 +6201,27 @@ static void R_SelectCofPickup() {
   g_cofPickupIndex=ent->index;g_cofPickupModel=ent->curstate.modelindex;g_cofPickupStrength=strength;
   VectorCopy(center,selected);
  }
- // Keep the contour as the primary cue. A much weaker, smaller fill sits
- // above the item, avoiding the old light concentrated against the floor.
+ VectorCopy(selected,g_cofPickupLightPoint);g_cofPickupLightPoint[2]+=4.f;
+}
+
+// Keep the contour as the primary cue. A much weaker, smaller fill sits
+// above the item, avoiding the old light concentrated against the floor.
+// Added after every other dynamic light: Remix folds a new light into any
+// light within about 2 cm of it (LightManager::isSimilar) and keeps only one.
+// Over a burning flare the fill sat about a unit from the flare's own light,
+// so up close the near-black fill replaced it and the flare stopped lighting
+// the room. An item that already carries a light needs no fill.
+static void R_AddCofPickupLight() {
  const int red=int(std::lround(4.f*g_cofPickupStrength));
- if(g_cofPickupIndex&&red>0&&dx_cof_pickup_outline.value!=0.f&&dx_dlights.value!=0.f&&dx_dlight_entities.value!=0.f) {
-  selected[2]+=4.f;const auto previous=g_dxDLights.size();
-  R_AddDLight(selected,18.f,red,0,0,now+.1f,-40);
-  g_cofPickupLight=g_dxDLights.size()>previous;
+ if(!g_cofPickupIndex||red<=0||dx_cof_pickup_outline.value==0.f||dx_dlights.value==0.f||dx_dlight_entities.value==0.f)return;
+ constexpr float kClearance=16.f;
+ for(const auto& light:g_dxDLights) {
+  vec3_t delta;VectorSubtract(light.origin,g_cofPickupLightPoint,delta);
+  if(DotProduct(delta,delta)<kClearance*kClearance)return;
  }
+ const auto previous=g_dxDLights.size();
+ R_AddDLight(g_cofPickupLightPoint,18.f,red,0,0,R_CurrentRenderTime(0.f)+.1f,-40);
+ g_cofPickupLight=g_dxDLights.size()>previous;
 }
 
 static void R_SetupSceneDLights( )
@@ -6221,6 +6235,7 @@ static void R_SetupSceneDLights( )
 	for( int i = 0; i < g_entityLightEmitterCount; ++i )
 		R_CollectEntityDLight( g_entityLightEmitters[i] );
 	R_CollectBeamLights( );
+	R_AddCofPickupLight( );
 	static bool previousCaptureAll = false;
 	const bool captureAll = R_RemixCaptureAll();
 	if( device && (captureAll || previousCaptureAll) )
