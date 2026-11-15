@@ -7433,6 +7433,11 @@ static void R_ShowTextures( void )
 
 void R_BeginFrame( qboolean clear )
 {
+	static std::string submittedOccurrenceMap;
+	const std::string map = g_worldmodel ? g_worldmodel->name : "";
+	if( map != submittedOccurrenceMap && dx_remix.value != 0.0f &&
+		g_mapEmitterBridge.setConfig( "rtx.occurrenceMap", map.c_str() ) )
+		submittedOccurrenceMap = map;
 	DX_RagdollFrame();
 	R_ResetTriangleBatch();
 	if( !device )
@@ -7521,6 +7526,7 @@ void R_BeginFrame( qboolean clear )
 
 void R_RenderFrame( )
 {
+
 
 }
 
