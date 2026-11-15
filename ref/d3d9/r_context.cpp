@@ -5741,8 +5741,15 @@ void R_QueueCofPickupOutline(const studio_cache_t& cache,const D3DMATRIX& world,
   float(g_sceneViewport.Width),float(g_sceneViewport.Height),strength);
 }
 #include "dx_nightmare_photo.h"
+// The outline is screen-space (XYZRHW) geometry, which Remix classifies as UI
+// and answers by injecting the ray-traced frame. Drawn inside the view pass,
+// that split the scene before the frame was complete, and the world dropped
+// out (white screen) whenever an item was highlighted. The view pass only
+// queues it now; it is drawn once the engine switches to 2D for the HUD.
+static bool g_cofPickupOutlinePending=false;
 static void R_DrawCofPickupOutline() {
- if(!device||g_cofPickupOutline.empty()||!g_sceneViewportValid||dx_cof_pickup_outline.value==0.f||
+ const bool pending=std::exchange(g_cofPickupOutlinePending,false);
+ if(!pending||!device||!g_dxSceneActive||g_cofPickupOutline.empty()||!g_sceneViewportValid||dx_cof_pickup_outline.value==0.f||
     FBitSet(g_currentViewFlags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
  R_Set2DMode(true);R_Flush2DBatch();R_Apply2DNeutralState();DX_BindRawTexture(0,nullptr);
  DX_SetTextureStageStateCached(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
@@ -6651,7 +6658,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
  }
 
  R_DrawNightmarePhoto();
- R_DrawCofPickupOutline();
+ if(!g_cofPickupOutline.empty())g_cofPickupOutlinePending=true;
  R_DrawCofScopeOverlay();
 	if( dx_debug_text3d_test.value != 0.0f &&
 		!FBitSet( rvp->flags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW ) )
@@ -7403,6 +7410,15 @@ void R_RenderFrame( )
 
 }
 
+// Engine entry: V_PostRender switches to 2D after every view pass, before the
+// HUD, which is where queued screen-space scene overlays belong.
+static void R_EngineSet2DMode( qboolean enable )
+{
+	if( enable )
+		R_DrawCofPickupOutline( );
+	R_Set2DMode( enable );
+}
+
 void R_EndFrame( void )
 {
 	R_TriTraceFlush("frame-complete");
@@ -7411,6 +7427,7 @@ void R_EndFrame( void )
 		return;
 
 	R_Flush2DBatch( );
+	R_DrawCofPickupOutline( ); // no-op unless the 2D switch never came
 	R_FlushDebugText3D( );
 	R_Flush2DBatch( );
 
@@ -7601,7 +7618,7 @@ const ref_interface_t gReffuncs =
 	.GL_ProcessTexture = DX_ProcessTexture,
 	.R_SetupSky = R_SetupSky,
 
-	.R_Set2DMode = R_Set2DMode,
+	.R_Set2DMode = R_EngineSet2DMode,
 	.R_DrawStretchPic = R_DrawStretchPic,
 	.FillRGBA = FillRGBA,
 	.WorldToScreen = WorldToScreen,
