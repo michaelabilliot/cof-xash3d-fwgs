@@ -2740,6 +2740,22 @@ static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 		? ent->curstate.scale : 1.0f;
 
 	const bool lightmappedSprite = R_SpriteHasLightmap( ent, sprite );
+	// The GL-style lightmap pass multiplies a full quad over the sprite and
+	// relies on D3DCMP_EQUAL against the depth the alpha-tested first pass
+	// wrote. Remix ray traces the submitted geometry and ignores that depth
+	// trick, so the multiply quad shows up as a translucent square (e.g. on
+	// blood sprites when hitting enemies). Under Remix, fold the light into
+	// the sprite's vertex colour instead and skip the second quad.
+	const bool foldSpriteLight = lightmappedSprite && dx_remix.value != 0.0f;
+	D3DCOLOR spriteColor = R_SpriteVertexColor( ent );
+	if( foldSpriteLight )
+	{
+		const D3DCOLOR light = R_SpriteLightColorAtPoint( lightOrigin );
+		const unsigned r = ( ( spriteColor >> 16 ) & 0xFF ) * ( ( light >> 16 ) & 0xFF ) / 255;
+		const unsigned g = ( ( spriteColor >> 8 ) & 0xFF ) * ( ( light >> 8 ) & 0xFF ) / 255;
+		const unsigned b = ( spriteColor & 0xFF ) * ( light & 0xFF ) / 255;
+		spriteColor = D3DCOLOR_ARGB( 255, r, g, b );
+	}
 	dx_entity_state_t renderState{};
 	if( dx_remix_perf.value == 0.0f )
 		R_SaveEntityRenderState( &renderState );
@@ -2769,7 +2785,7 @@ static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 					R_SpriteTextureFactor( ent, ent->curstate.rendermode, alphaScale ) );
 			}
 			R_DrawSpriteQuad( drawFrame, origin, right, up, scale,
-				R_SpriteVertexColor( ent ) );
+				spriteColor );
 		};
 
 	if( oldFrame && oldFrame != frame )
@@ -2783,7 +2799,7 @@ static void R_DrawSpriteEntity( cl_entity_s *ent, model_t *mod )
 		DrawSpriteFrameWeighted( frame, 1.0f );
 	}
 
-	if( lightmappedSprite )
+	if( lightmappedSprite && !foldSpriteLight )
 	{
 
 		const D3DCOLOR localLight = R_SpriteLightColorAtPoint( lightOrigin );
