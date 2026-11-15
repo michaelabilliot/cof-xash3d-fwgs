@@ -502,6 +502,7 @@ convar_t r_viewmodel_offset_z = { (char *)"r_viewmodel_offset_z", (char *)"0", 0
 convar_t dx_viewmodel_attachment_fov =
 { (char *)"dx_viewmodel_attachment_fov", (char *)"1", FCVAR_ARCHIVE };
 convar_t dx_cof_shell_unstick = { (char *)"dx_cof_shell_unstick", (char *)"1", FCVAR_ARCHIVE };
+convar_t dx_cof_lantern_wall_clearance = { (char *)"dx_cof_lantern_wall_clearance", (char *)"8", FCVAR_ARCHIVE };
 convar_t dx_viewmodel_beam_offset =
 { (char *)"dx_viewmodel_beam_offset", (char *)"-3", 0 };
 // The viewmodel is drawn with r_viewmodel_fov, but client effects that read
@@ -2191,6 +2192,7 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_viewmodel_beam_offset );
 	gEngfuncs.Cvar_RegisterVariable( &dx_viewmodel_attachment_fov );
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_shell_unstick );
+	gEngfuncs.Cvar_RegisterVariable( &dx_cof_lantern_wall_clearance );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_stale_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_dead_body_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &cl_fovmultiplier );
@@ -6053,6 +6055,30 @@ static void R_MarkWorldTransformDirty( bool &isIdentity )
 	isIdentity = false;
 }
 
+// The lantern viewmodel is drawn without depth against the world, so its
+// attachment can sit inside a wall the player faces. A light there is
+// occluded, so move it back into the open space between the eye and the wall.
+static void R_CofKeepViewLightOutOfWalls(float* point) {
+ const float clearance=std::clamp(dx_cof_lantern_wall_clearance.value,0.f,32.f);
+ if(clearance<=0.f||!gEngfuncs.CL_TraceLine)return;
+ vec3_t eye,target,delta;VectorCopy(g_vOrigin,eye);VectorCopy(point,target);
+ VectorSubtract(target,eye,delta);
+ const float dist=std::sqrt(DotProduct(delta,delta));
+ if(!std::isfinite(dist)||dist<1e-3f||dist>256.f)return;
+ // Probe past the light too, so a light just short of the wall is kept off it.
+ vec3_t dir,probe;VectorScale(delta,1.f/dist,dir);VectorMA(eye,dist+clearance,dir,probe);
+ const pmtrace_t trace=gEngfuncs.CL_TraceLine(eye,probe,PM_STUDIO_IGNORE);
+ if(trace.startsolid||trace.allsolid||trace.fraction>=1.f)return;
+ const float hit=trace.fraction*(dist+clearance);
+ // Prefer the wall-normal offset: it keeps the light at the same spot on screen.
+ vec3_t candidate;VectorMA(trace.endpos,clearance,trace.plane.normal,candidate);
+ const pmtrace_t check=gEngfuncs.CL_TraceLine(eye,candidate,PM_STUDIO_IGNORE);
+ if(!check.startsolid&&!check.allsolid&&check.fraction>=1.f&&DotProduct(trace.plane.normal,dir)<-.2f) {
+  VectorCopy(candidate,point);return;
+ }
+ VectorMA(eye,std::max(0.f,hit-clearance),dir,point);
+}
+
 // Native lanterns use the client's private light pool, not engine dlights.
 static void R_CollectLanternLights() {
  unsigned active=0;
@@ -6074,7 +6100,7 @@ static void R_CollectLanternLights() {
    for(int hand=0;hand<2;++hand)if((!draw||draw->value!=0.f)&&R_CofLanternModel(hands[hand],true)) {
     float points[6];
     if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(R_CurrentRenderTime(0.f))))
-     submit(-1-hand,points);
+     {R_CofKeepViewLightOutOfWalls(points);submit(-1-hand,points);}
    }
   }
   for(auto ent:g_entityLightEmitters)if(R_CofLanternModel(ent,false)) {
@@ -6113,7 +6139,7 @@ static void R_CollectCofFlareLights() {
    if(!dualBurning&&!cof_features::litFlareSequence(label,frame))continue;
    float points[6],offsets[3]={r_viewmodel_offset_x.value,r_viewmodel_offset_y.value,r_viewmodel_offset_z.value};
    if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(now)))
-    R_AddDLight(points,220.f,255,8,3,now+.1f,-20-hand);
+    {R_CofKeepViewLightOutOfWalls(points);R_AddDLight(points,220.f,255,8,3,now+.1f,-20-hand);}
   }
  }
  for(auto ent:g_entityLightEmitters)if(ent&&ent->model&&cof_features::flareModel(ent->model->name,false)&&
