@@ -58,6 +58,7 @@ extern "C" {
 #include "dx_map_light_api.h"
 #include "dx_map_light_route.h"
 #include "dx_map_sky.h"
+#include "dx_remix_auto_emissive.h"
 #include "dx_light_position.h"
 #include "dx_studio_fixture.h"
 #include "dx_cof_features.h"
@@ -450,6 +451,8 @@ static int g_skyTextures[DX_SKYBOX_SIDES] = {};
 convar_t dx_cof_player_shadow = { (char *)"dx_cof_player_shadow", (char *)"1", FCVAR_ARCHIVE };
 static convar_t dx_cof_pickup_outline = { (char *)"dx_cof_pickup_outline", (char *)"1", FCVAR_ARCHIVE };
 convar_t dx_remix = { (char *)"dx_remix", (char *)"0", 0 };
+static convar_t dx_remix_auto_emissive_cvar = {
+	(char *)"dx_remix_auto_emissive", (char *)dx_remix_auto_emissive::defaultValue, FCVAR_ARCHIVE };
 convar_t dx_remix_decal_cutout =
 { (char *)"dx_remix_decal_cutout", (char *)"1", 0 };
 convar_t dx_remix_decal_alpha_ref =
@@ -1007,6 +1010,7 @@ static void R_TextureZoomOutCmd( void ) { R_ShowTexturesSetZoom( dx_showtextures
 static void R_TextureZoomResetCmd( void ) { R_ShowTexturesSetZoom( 1.0f ); }
 
 static dx_map_light::Bridge g_mapEmitterBridge;
+static dx_remix_auto_emissive::Config g_remixAutoEmissive;
 static bool R_CofLanternModel(const cl_entity_s* ent,bool view) {
  return ent && ent->model && ent->model->type==mod_studio && !(ent->curstate.effects&EF_NODRAW) &&
   !Q_stricmp(ent->model->name,view?"models/weapons/lantern/v_lantern.mdl":"models/weapons/lantern/w_lantern.mdl");
@@ -2184,6 +2188,7 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_auto_emissive_cvar );
  gEngfuncs.Cvar_RegisterVariable( &dx_cof_player_shadow );
  gEngfuncs.Cvar_RegisterVariable( &dx_cof_pickup_outline );
 	DX_RagdollRegister();
@@ -3898,6 +3903,7 @@ static bool DX_ResetDevice( bool rebuildPresentParams, const char *reason )
 	if( FAILED( result ) )
 		return false;
 
+	g_remixAutoEmissive.invalidate();
 	if( g_dxLine ) g_dxLine->OnResetDevice( );
 	DX_InvalidateTextureBindCache( );
 	DX_RefreshFogCaps( );
@@ -3985,6 +3991,7 @@ static void R_Shutdown( void )
  R_LakeForestShutdown();
 	if(g_inventoryResetCallback)g_inventoryResetCallback();
 	g_mapSky.invalidate();
+	g_remixAutoEmissive.invalidate();
 	g_mapSkyRetryAt = 0;
 	R_ClearRemixMapLights();
 	DX_RagdollReset("renderer-shutdown");
@@ -7386,6 +7393,11 @@ void R_BeginFrame( qboolean clear )
 	if( !device )
 		return;
 	const auto skyConnection = ENGINE_GET_PARM( PARM_CONNSTATE );
+	const auto remixModule = dx_remix.value != 0.0f
+		? reinterpret_cast<uintptr_t>( GetModuleHandleA( "d3d9.dll" ) ) : 0;
+	const auto now = GetTickCount64();
+	g_remixAutoEmissive.update( remixModule, dx_remix_auto_emissive_cvar.value, now,
+		[]( const char *key, const char *value ) { return g_mapEmitterBridge.setConfig( key, value ); } );
 	const auto skyWorld = gp_cl ? gp_cl->models[1] : nullptr;
 	// Recover the authoritative active map even if a loading/disconnect frame
 	// cleared a previously submitted selection or no fresh BSP callback occurred.
@@ -7393,10 +7405,10 @@ void R_BeginFrame( qboolean clear )
 		g_mapSkyRetryAt = 0;
 	else if( skyConnection == ca_disconnected && !skyWorld )
 		g_mapSky.disconnected();
-	if( dx_remix.value != 0.0f && GetTickCount64() >= g_mapSkyRetryAt )
+	if( dx_remix.value != 0.0f && now >= g_mapSkyRetryAt )
 	{
-		g_mapSkyRetryAt = GetTickCount64() + 1000;
-		if( g_mapSky.update( reinterpret_cast<uintptr_t>( GetModuleHandleA("d3d9.dll") ),
+		g_mapSkyRetryAt = now + 1000;
+		if( g_mapSky.update( remixModule,
 			[]( const char* key, const char* value ) { return g_mapEmitterBridge.setConfig(key, value); } ) )
 			gEngfuncs.Con_Printf("D3D9: NUMOS sky %s -> %s\n",
 				g_mapSky.mapName().empty() ? "default" : g_mapSky.mapName().c_str(), g_mapSky.look());

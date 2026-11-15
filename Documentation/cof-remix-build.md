@@ -53,3 +53,36 @@ loading, materials, wind, LODs, native suppression, other maps and failure clean
 
 No binaries, models, textures, maps, asset archives, Ghidra installation,
 personal diagnostics, saves, credentials or shader caches are part of this update.
+
+## Automatic blend emission and Toolkit materials
+
+`dx_remix_auto_emissive` is an archived D3D9 renderer variable. Its default
+value of `0` disables Remix's automatic emissive blend override. Set it to
+`1` in the game console to restore automatic conversion. The renderer submits
+the setting during gameplay and replays it after device reset. Original
+additive draw states are preserved.
+
+Legacy materials use the runtime defaults of `rtx.legacyMaterial.enableEmissive = False`
+and `rtx.legacyMaterial.emissiveIntensity = 0`. The renderer leaves both settings
+under the user's control. The global `rtx.emissiveIntensity` multiplier also
+remains under runtime control.
+
+1. Open a capture in the Toolkit and select the target mesh in **Asset Replacements**.
+   In **Material Properties**, select or create an override for the material bound to that mesh.
+2. In the material's **Emissive** section, enable emission, set the intensity,
+   and assign an ingested **Emissive Mask** texture. Use an intensity of zero
+   when the material should produce no light.
+3. Save the replacement layer, reload it in Remix, and check the surface and
+   nearby illumination. Restart and confirm that the exported mod still loads
+   the same binding, texture and intensity.
+4. If the controls are missing or the replacement ignores the settings, check
+   the bound USD shader and its MDL material type, then check how the installed
+   Remix Plus runtime loads that replacement.
+
+[NVIDIA RTX Remix material replacement guide](https://docs.omniverse.nvidia.com/kit/docs/rtx_remix/latest/docs/howto/learning-materials.html)
+
+Build `verify_remix_auto_emissive` alongside `ref_d3d9` and run the resulting
+verification executable from the build directory's `ref/d3d9` subdirectory.
+It uses a mocked config sink and requires no game or GPU. For a visual A/B,
+use the same viewpoint and original additive surface with values `0` and `1`
+and compare the light cast on nearby surfaces.
