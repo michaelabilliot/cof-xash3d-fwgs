@@ -111,31 +111,8 @@ void CTmp::StopSuicide( void )
 	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flTimeWeaponIdle = gpGlobals->time + 1;
 }
 
-void CTmp::SendInitMessage( CBasePlayer *player )
+void CTmp::SendInitMessage( CBasePlayer * )
 {
-	if ( player && !player->IsDonator() && g_pGameRules && !g_pGameRules->IsMultiplayer() )
-	{
-		Vector vecSrc = pev->origin;
-		CBaseEntity *pGun = CBaseEntity::Create( "weapon_glock", vecSrc, pev->angles, NULL );
-
-		if ( pGun )
-		{
-			pGun->pev->angles.z = 0;
-			pGun->pev->angles.x = 0;
-
-			CGlock *pGlock = GetClassPtr( (CGlock *)pGun->pev );
-			if ( pGlock )
-			{
-				while ( !pGlock->script )
-					pGlock->script = MAKE_STRING( "inventoryitems/weapons/weapon_glock.txt" );
-
-				pGlock->m_iClip = GLOCK_MAX_CLIP;
-				pGlock->Spawn();
-			}
-
-			UTIL_Remove( this );
-		}
-	}
 }
 
 void CTmp::Spawn( )
@@ -207,7 +184,7 @@ void CTmp::Precache( void )
 	if ( custom_w_model )
 		PRECACHE_MODEL( custom_w_model );
 
-	UTIL_PrecacheOther( "ammo_glock" );
+	UTIL_PrecacheOther("ammo_tmp");
 
 	m_iShell = PRECACHE_MODEL( "models/shell.mdl" );// brass shell
 
@@ -689,14 +666,8 @@ class CTMPAmmo : public CBasePlayerAmmo
 		SET_MODEL( ENT( pev ), "models/ammo/ammo_tmp.mdl" );
 		CBasePlayerAmmo::Spawn( );
 	}
-	void SendInitMessage( CBasePlayer *player )
+	void SendInitMessage( CBasePlayer * )
 	{
-		if ( player && !player->IsDonator() )
-		{
-			CBaseEntity *pAmmo = CBaseEntity::Create( "ammo_glock", pev->origin, pev->angles, NULL );
-			if ( pAmmo )
-				UTIL_Remove( this );
-		}
 	}
 	void Precache( void )
 	{

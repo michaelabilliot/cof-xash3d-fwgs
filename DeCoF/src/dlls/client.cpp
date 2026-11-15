@@ -1263,6 +1263,7 @@ void ClientCommand( edict_t *pEntity )
 		if ( pPlayer )
 		{
 			int quickslotnumber = atoi( CMD_ARGV(1) );
+			if (!pPlayer->IsInventorySlot(quickslotnumber)) return;
 			pPlayer->m_iQuickSlotSlot[1] = quickslotnumber;
 
 			// only weapons go into the quick slots
@@ -1283,6 +1284,7 @@ void ClientCommand( edict_t *pEntity )
 		if ( pPlayer )
 		{
 			int quickslotnumber2 = atoi( CMD_ARGV(1) );
+			if (!pPlayer->IsInventorySlot(quickslotnumber2)) return;
 			pPlayer->m_iQuickSlotSlot[2] = quickslotnumber2;
 
 			// only weapons go into the quick slots
@@ -1303,6 +1305,7 @@ void ClientCommand( edict_t *pEntity )
 		if ( pPlayer )
 		{
 			int quickslotnumber3 = atoi( CMD_ARGV(1) );
+			if (!pPlayer->IsInventorySlot(quickslotnumber3)) return;
 			pPlayer->m_iQuickSlotSlot[3] = quickslotnumber3;
 
 			// only weapons go into the quick slots
@@ -2505,7 +2508,10 @@ void PlayerPostThink( edict_t *pEntity )
 	CBasePlayer *pPlayer = (CBasePlayer *)GET_PRIVATE(pEntity);
 
 	if (pPlayer)
-		pPlayer->PostThink( );
+	{
+		pPlayer->PostThink();
+		CoFR_ApplyNotarget(pPlayer);
+	}
 
 	// use the old frametime, even if the engine has reset it
 	gpGlobals->frametime = cached_frametime;
@@ -3203,7 +3209,22 @@ int AddToFullPack( struct entity_state_s *state, int e, edict_t *ent, edict_t *h
 	}
 
 	state->rendermode    = ent->v.rendermode;
-	state->renderamt     = ent->v.renderamt; 
+	state->renderamt     = ent->v.renderamt;
+	if ((ent->v.flags & FL_MONSTER) && CVAR_GET_FLOAT("cofr_render_trace") && e > 0 && e < 8192)
+	{
+		struct TraceSample { float time; int mode; int alpha; };
+		static TraceSample samples[8192]{};
+		auto& sample = samples[e];
+		const float now = gpGlobals->time;
+		if (now < sample.time || now - sample.time >= 1.f ||
+			sample.mode != state->rendermode || sample.alpha != state->renderamt)
+		{
+			sample = {now, state->rendermode, state->renderamt};
+			ALERT(at_console, "COFR PACK entity=%d class=%s model=%s mode=%d alpha=%d effects=%d health=%g sequence=%d frame=%g\n",
+				e, STRING(ent->v.classname), STRING(ent->v.model), state->rendermode, state->renderamt,
+				ent->v.effects, ent->v.health, ent->v.sequence, ent->v.frame);
+		}
+	}
 	state->renderfx      = ent->v.renderfx;
 	state->rendercolor.r = ent->v.rendercolor.x;
 	state->rendercolor.g = ent->v.rendercolor.y;

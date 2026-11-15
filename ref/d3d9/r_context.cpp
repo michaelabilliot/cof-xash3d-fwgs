@@ -4585,6 +4585,34 @@ static void R_CofUnstickShell( cl_entity_s *clent, int type )
 	VectorCopy( fixed, clent->latched.prevorigin );
 }
 
+void R_CofTraceStudio(const cl_entity_s* entity, const char* stage, int outcome)
+{
+	if (!entity || !entity->model || entity->model->type != mod_studio ||
+		entity->index < 1 || entity->index >= 8192)
+		return;
+	const cvar_t* trace = gEngfuncs.pfnGetCvarPointer("cofr_render_trace");
+	if (!trace || !trace->value)
+		return;
+	const char* model = entity->model->name;
+	if (!Q_stristr(model, "slower") && !Q_stristr(model, "faceless") && !Q_stristr(model, "psycho") &&
+		!Q_stristr(model, "runningcrazy") && !Q_stristr(model, "taller") &&
+		!Q_stristr(model, "suicider") && !Q_stristr(model, "sewmo") &&
+		!Q_stristr(model, "faster") && !Q_stristr(model, "children") && !Q_stristr(model, "nerd"))
+		return;
+	struct Sample { float time; int model, mode, alpha, outcome; };
+	static Sample samples[3][8192]{};
+	const int stageIndex = stage[0] == 'r' ? 0 : stage[0] == 'c' ? 1 : 2;
+	auto& sample = samples[stageIndex][entity->index];
+	const auto& state = entity->curstate;
+	const float now = gp_cl->time;
+	if (now >= sample.time && now - sample.time < 1.f && sample.model == state.modelindex &&
+		sample.mode == state.rendermode && sample.alpha == state.renderamt && sample.outcome == outcome)
+		return;
+	sample = {now, state.modelindex, state.rendermode, state.renderamt, outcome};
+	gEngfuncs.Con_Printf("COFR D3D9 entity=%d stage=%s outcome=%d model=%s mode=%d alpha=%d sequence=%d frame=%g\n",
+		entity->index, stage, outcome, model, state.rendermode, state.renderamt, state.sequence, state.frame);
+}
+
 static qboolean R_AddEntity( cl_entity_s *clent, int type )
 {
 	if( !clent || !clent->model )
@@ -4645,6 +4673,17 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 	const int effectiveRenderMode = modelType == mod_studio
 		? R_StudioRenderMode( clent )
 		: clent->curstate.rendermode;
+	R_CofTraceStudio(clent, "route", effectiveRenderMode);
+
+	// A spawn flicker sends explicit additive alpha zero for the hidden phase.
+	// Submitting its meshes lets the Remix bridge capture an invisible instance.
+	// Keep it out of both the frame and capture queues until it becomes visible.
+	if (modelType == mod_studio && clent->curstate.rendermode == kRenderTransAdd &&
+		clent->curstate.renderfx == kRenderFxNone && clent->curstate.renderamt == 0)
+	{
+		R_CofTraceStudio(clent, "draw", 0);
+		return false;
+	}
 
 	const bool nightmareHeadlight = R_CofClientPresent() && g_worldmodel &&
         !Q_stricmp(g_worldmodel->name,"maps/c_nightmare.bsp") && modelType==mod_sprite &&
@@ -6300,7 +6339,9 @@ static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdent
 	for( int i = 0; i < g_opaqueStudioCount; ++i )
 	{
 		cl_entity_s *ent = g_opaqueStudioEntities[i];
-		if( !R_EntityMightBeVisible( ent ) )
+		const bool visible = R_EntityMightBeVisible(ent);
+		R_CofTraceStudio(ent, "cull", !visible);
+		if (!visible)
 			continue;
 		R_DrawStudioEntity( ent );
 		R_MarkWorldTransformDirty( worldIsIdentity );
@@ -6325,7 +6366,11 @@ static int R_BuildTranslucentList( const vec3_t viewOrigin )
 	for( int i = 0; i < g_translucentCandidateCount; ++i )
 	{
 		cl_entity_s *ent = g_translucentCandidates[i];
-		if( !ent || !ent->model || !R_EntityMightBeVisible( ent ) )
+		if (!ent || !ent->model)
+			continue;
+		const bool visible = R_EntityMightBeVisible(ent);
+		R_CofTraceStudio(ent, "cull", !visible);
+		if (!visible)
 			continue;
 
 		translucent_entity_t item;

@@ -32,6 +32,7 @@ namespace {
 static cl_enginefunc_t engine{};
 static void (*toggleInventory)();
 static pfnUserMsgHook inventoryHook, noteHook, objectiveHook, resetHook, weaponListHook, currentWeaponHook;
+static int capacity = Slots;
 static std::string items[9], objectiveTitle, objectiveBody;
 static std::map<std::string, int> weaponIds;
 static std::map<int, int> weaponClips;
@@ -238,7 +239,7 @@ class InventoryPanel final : public vgui::Panel {
     }
     int hitSlot(int x, int y) const {
         if (tab != 0) return 0;
-        for (int i = 1; i <= Slots; ++i) {
+        for (int i = 1; i <= capacity; ++i) {
             int sx = 46 + ((i - 1) % 4) * 180, sy = i <= 4 ? 237 : 507;
             if (x >= sx && x < sx + 146 && y >= sy && y < sy + 146) return i;
         }
@@ -355,7 +356,7 @@ class InventoryPanel final : public vgui::Panel {
         }
     }
     void activate(int slot) {
-        if (validSlot(slot) && !items[slot].empty())
+        if (validSlot(slot, capacity) && !items[slot].empty())
             send("cof8_activate " + std::to_string(slot));
     }
     void resetClick() { lastClick = 0; lastClickScript.clear(); }
@@ -372,9 +373,9 @@ class InventoryPanel final : public vgui::Panel {
             mouseX >= width / scale || mouseY >= height / scale || inCreative(mouseX, mouseY)) return false;
         if (inside(mouseX, mouseY, 40, 68, 554, 44) ||
             inside(mouseX, mouseY, 40, 149, 700, 37) ||
-            inside(mouseX, mouseY, 40, 420, 700, 38) ||
             inside(mouseX, mouseY, 46, 237, 686, SlotSize) ||
-            inside(mouseX, mouseY, 46, 507, 686, SlotSize) ||
+            (capacity > ReducedSlots && (inside(mouseX, mouseY, 40, 420, 700, 38) ||
+                                         inside(mouseX, mouseY, 46, 507, 686, SlotSize))) ||
             inside(mouseX, mouseY, 46, 981, 124, 28)) return false;
         return true;
     }
@@ -406,8 +407,10 @@ protected:
         separator(108, 4);
         if (tab == 0) {
             text(40, 149, "QUICK SLOTS"); separator(182);
-            text(40, 420, "EXTRA SLOTS"); separator(454);
-            for (int i = 1; i <= Slots; ++i) {
+            if (capacity > ReducedSlots) {
+                text(40, 420, "EXTRA SLOTS"); separator(454);
+            }
+            for (int i = 1; i <= capacity; ++i) {
                 int x = 46 + ((i - 1) % 4) * 180, y = i <= 4 ? 237 : 507;
                 slotBox(x, y, i == selected || i == hover);
                 if (i <= 4) text(x + 10, y + 11, std::to_string(i), true);
@@ -421,7 +424,7 @@ protected:
                 }
             }
             const int detail = hover && !items[hover].empty() ? hover : selected;
-            if (!dragVisible && validSlot(detail) && !items[detail].empty()) {
+            if (!dragVisible && validSlot(detail, capacity) && !items[detail].empty()) {
                 if (hover == detail) text(46, 682, metadata("nice_name", items[detail]), true);
                 wrappedText(46, 710, 690, metadata("description", items[detail]), 4);
             }
@@ -563,7 +566,7 @@ protected:
         if (key == vgui::KEY_TAB || key == vgui::KEY_ESCAPE) closeInventory();
         else if (searchFocused) return;
         else if (key == vgui::KEY_ENTER) activate(selected);
-        else if (key == vgui::KEY_DELETE && validSlot(selected) && !items[selected].empty())
+        else if (key == vgui::KEY_DELETE && validSlot(selected, capacity) && !items[selected].empty())
             send("cof8_drop " + std::to_string(selected));
         else if (tab == 1 && key == vgui::KEY_LEFT) turnPage(-1);
         else if (tab == 1 && key == vgui::KEY_RIGHT) turnPage(1);
@@ -637,8 +640,18 @@ static void updatePanel() {
     } else panel->closeInteraction();
 }
 static int onInventory(const char* name, int size, void* data) {
-    Reader r(data, size); int slot = r.byte(); r.byte(); auto script = r.string(); r.byte(); r.byte(); r.byte();
-    if (r.ok && validSlot(slot)) items[slot] = script;
+    Reader r(data, size); int slot = r.byte(); r.byte(); auto script = r.string();
+    const bool reduced = r.byte() != 0;
+    r.byte(); r.byte();
+    if (r.ok) {
+        const int next = inventoryCapacity(reduced, false);
+        if (next != capacity) {
+            cancelDrag();
+            capacity = next;
+            for (int i = capacity + 1; i <= Slots; ++i) items[i].clear();
+        }
+        if (validSlot(slot, capacity)) items[slot] = script;
+    }
     // The original client accessor has no storage for 7/8 and would overwrite memory.
     if (slot > 6) return 1;
     return inventoryHook ? inventoryHook(name, size, data) : 1;
@@ -689,7 +702,7 @@ static int hookMessage(char* name, pfnUserMsgHook callback) {
     return engine.pfnHookUserMsg(name, callback);
 }
 static void inventoryStatus() {
-    log("inventory visible=%d parent=%p panel=%p", stockInventory ? stockInventory->isVisible() : -1, stockInventory, panel);
+    log("inventory visible=%d capacity=%d parent=%p panel=%p", stockInventory ? stockInventory->isVisible() : -1, capacity, stockInventory, panel);
 }
 static void openInventory() {
     quickPair.reset();
@@ -739,8 +752,14 @@ void CoFR_ClientShutdown() {CoFR_LegacyShutdown(); cancelDrag(); if(panel){panel
 
 void CoFR_EntityTrace(cl_entity_s* entity,int accepted,const char* reason) {
  if(!entity||!engine.pfnGetCvarFloat||engine.pfnGetCvarFloat("cofr_render_trace")==0)return;
- static float last[8192]={};int index=entity->index;if(index<1||index>=8192)return;
- float now=engine.GetClientTime();if(now>=last[index]&&now-last[index]<1.f)return;last[index]=now;
+ struct TraceSample { float time; int model, mode, alpha, accepted; };
+ static TraceSample samples[8192]{};
+ const int index=entity->index;if(index<1||index>=8192)return;
  const auto& s=entity->curstate;
+ const float now=engine.GetClientTime();
+ auto& sample=samples[index];
+ if(now>=sample.time&&now-sample.time<1.f&&sample.model==s.modelindex&&sample.mode==s.rendermode&&
+    sample.alpha==s.renderamt&&sample.accepted==accepted)return;
+ sample={now,s.modelindex,s.rendermode,s.renderamt,accepted};
  engine.Con_Printf("COFR CLIENT entity=%d accepted=%d reason=%s model=%s modelindex=%d type=%d sequence=%d frame=%g body=%d skin=%d fx=%d effects=%d mode=%d alpha=%d origin=%g,%g,%g\n",index,accepted,reason,entity->model?entity->model->name:"none",s.modelindex,entity->model?int(entity->model->type):-1,s.sequence,s.frame,s.body,s.skin,s.renderfx,s.effects,s.rendermode,s.renderamt,entity->origin[0],entity->origin[1],entity->origin[2]);
 }

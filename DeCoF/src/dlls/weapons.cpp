@@ -891,23 +891,7 @@ void CBasePlayerItem::DefaultTouch( CBaseEntity *pOther )
 	CBasePlayer *pPlayer = GetClassPtr( (CBasePlayer *)pOther->pev );
  if(m_iId==31&&!CoFR_RpgPickupAllowed(pPlayer,static_cast<CBasePlayerWeapon*>(this)->m_iClip))return;
 
-	if ( pPlayer && !strcmp( STRING( pev->classname ), "weapon_tmp" ) )
-	{
-		if ( !pPlayer->IsDonator() )
-		{
-			UTIL_ProMessage( pPlayer, "This is a donator-only weapon.", 5, false );
-			return;
-		}
-	}
 
-	if ( pPlayer && !strcmp( STRING( pev->classname ), "weapon_mp5" ) )
-	{
-		if ( !pPlayer->IsDeveloper() && pPlayer->m_iNew16a_guess != 2 && pPlayer->m_iNew16a_guess != 3 && pPlayer->m_iNew16a_guess != 4 && g_pGameRules && !g_pGameRules->IsMapperMode_guess() )
-		{
-			UTIL_ProMessage( pPlayer, "This is for mappers only.", 5, false );
-			return;
-		}
-	}
 
 	// Lantern
 	if ( !strcmp( STRING( pev->classname ), "weapon_lantern" ) )

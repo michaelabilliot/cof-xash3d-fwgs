@@ -138,12 +138,15 @@ int MsgCameraZoom_guess( const char *pszName, int iSize, void *pbuf )
 
 int MsgHealthCap_guess( const char *pszName, int iSize, void *pbuf )
 {
-	if ( gViewPort->m_pHUDControl_guess )
-	{
-		BEGIN_READ( pbuf, iSize );
-		int iType = READ_BYTE();
- CoFR_HudCap(iType);
+	if (iSize != 1 || !pbuf)
+		return 0;
+	const int iType = *static_cast<unsigned char*>(pbuf);
+	if (iType > 2)
+		return 0;
+	CoFR_HudCap(iType);
 
+	if (gViewPort && gViewPort->m_pHUDControl_guess)
+	{
 		switch ( iType )
 		{
 		case 0:

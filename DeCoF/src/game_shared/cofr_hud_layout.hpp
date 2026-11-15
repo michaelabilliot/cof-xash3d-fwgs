@@ -19,12 +19,24 @@ template<class Sink> void paint(Sink& s,const View& v,int width,int height) {
         glyph(s,"heart",50,y-1,24,28,235);
         s.box(96,y,320,26,15,15,17,215);
         s.outline(96,y,320,26,91,88,86,200);
-        const int fill=std::clamp(v.health,0,100)*314/100;
+        const int cap = healthLimit(v.cap);
+        const int boundary = cap * 314 / 100;
+        const int fill = std::clamp(v.health, 0, cap) * 314 / 100;
+        if (cap < 100)
+            s.box(99 + boundary, y + 3, 314 - boundary, 20, 48, 42, 44, 215);
         const float pulse=v.health>0&&v.health<25&&std::isfinite(v.time)?.5f+.5f*std::sin(v.time*4.2f):0.f;
         if(fill)s.box(99,y+3,fill,20,139+int(pulse*20),68,70,235);
         // Flat ink with dirt across the track; no highlight or bevel.
         s.icon("grime",98,y+2,316,22,210,255);
-        if(v.cap)label(s,96,y-18,"CAPPED",10,160);
+        if (cap < 100) {
+            const int x = 99 + boundary;
+            // Staggered segments give the edge a broken profile at HUD scale.
+            for (int i = 0; i < 5; ++i) {
+                const int offset[] = {0, -2, 1, -1, 0};
+                s.box(x + offset[i] - 1, y + 2 + 4*i, 4, 5, 12, 9, 11, 245);
+                s.box(x + offset[i] + 3, y + 2 + 4*i, 1, 5, 126, 91, 91, 220);
+            }
+        }
     }
     if(v.staminaVisible) {
         glyph(s,"runner",50,y+31,24,28,235);

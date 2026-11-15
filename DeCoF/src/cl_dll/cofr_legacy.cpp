@@ -5,8 +5,8 @@
 #include <map>
 #include <algorithm>
 #include <cmath>
-#include "../../../xash3d-fwgs/ref/d3d9/dx_cof_light.h"
-#include "../../../xash3d-fwgs/ref/d3d9/dx_cof_native_light.h"
+#include "../../../ref/d3d9/dx_cof_light.h"
+#include "../../../ref/d3d9/dx_cof_native_light.h"
 #include "hud.h"
 #include "cl_util.h"
 #include "vgui_TeamFortressViewport.h"
@@ -124,7 +124,7 @@ public:
 };
 static HudPanel* panel=nullptr;static vgui::Panel* parent=nullptr;
 static int maxHP(const char*,int size,void* data){if(size==4){BEGIN_READ(data,size);maxHealth=std::max(1,READ_SHORT());currentHealth=std::max(0,READ_SHORT());healthKnown=true;}return 1;}
-static void dump(){auto w=gHUD.m_Ammo.m_pWeapon;engine.Con_Printf("COFR HUD paint frames=%u\n",paintFrames);engine.Con_Printf("COFR HUD: assets=%d attached=%d health=%d cap=%d stamina=%d id=%d clip=%d dual=%d/%d\n",assetsReady,panel!=nullptr,healthKnown?currentHealth:gHUD.m_Health.m_iHealth,maxHealth,gViewPort&&gViewPort->m_pHUDControl_guess?gViewPort->m_pHUDControl_guess->m_iStamina_guess:-1,w?w->iId:0,w?w->iClip:0,gHUD.m_Ammo.m_iDualAmmoLeft_guess,gHUD.m_Ammo.m_iDualAmmoRight_guess);}
+static void dump(){auto w=gHUD.m_Ammo.m_pWeapon;engine.Con_Printf("COFR HUD paint frames=%u\n",paintFrames);engine.Con_Printf("COFR HUD: assets=%d attached=%d health=%d max=%d healthcap=%d stamina=%d id=%d clip=%d dual=%d/%d\n",assetsReady,panel!=nullptr,healthKnown?currentHealth:gHUD.m_Health.m_iHealth,maxHealth,hudCap,gViewPort&&gViewPort->m_pHUDControl_guess?gViewPort->m_pHUDControl_guess->m_iStamina_guess:-1,w?w->iId:0,w?w->iClip:0,gHUD.m_Ammo.m_iDualAmmoLeft_guess,gHUD.m_Ammo.m_iDualAmmoRight_guess);}
 }
 bool CoFR_CustomHudActive(){return assetsReady&&engine.pfnGetCvarFloat("cof8_hud")!=0&&engine.pfnGetCvarFloat("hud_draw")!=0;}
 void CoFR_LegacyInit(){engine.pfnRegisterVariable("cof8_hud","1",FCVAR_ARCHIVE);engine.pfnHookUserMsg("Cof8MaxHP",maxHP);engine.pfnAddCommand("cof8_hud_dump",dump);}
@@ -188,7 +188,7 @@ void CoFR_NativeEntityLight(cl_entity_t* entity){
 }
 
 void CoFR_HudCap(int value){hudCap=value;}
-void CoFR_LegacyVidInit(){if(panel){panel->videoReset();assetsReady=panel->ready();}maxHealth=100;hudCap=0;healthKnown=false;}
+void CoFR_LegacyVidInit(){if(panel){panel->videoReset();assetsReady=panel->ready();}maxHealth=100;healthKnown=false;}
 
 #include "usercmd.h"
 #include "ref_params.h"

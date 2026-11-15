@@ -1,3 +1,4 @@
+#include "cofr_inventory.h"
 /***
 *
 *	Copyright (c) 1996-2002, Valve LLC. All rights reserved.
@@ -718,6 +719,7 @@ TYPEDESCRIPTION	CBasePlayer::m_playerSaveData[] =
 	DEFINE_ARRAY( CBasePlayer, cofrInventorySlotModels, FIELD_STRING, 9 ),
 	DEFINE_ARRAY( CBasePlayer, cofrInventorySlotClassname, FIELD_STRING, 9 ),
 	DEFINE_FIELD( CBasePlayer, cofrInventorySchema, FIELD_INTEGER ),
+	DEFINE_FIELD( CBasePlayer, cofrNotarget, FIELD_INTEGER ),
 
 	DEFINE_ARRAY( CBasePlayer, inventorySlotModels, FIELD_STRING, 7 ),
 	DEFINE_ARRAY( CBasePlayer, inventorySlotClassname, FIELD_STRING, 7 ),
@@ -7470,6 +7472,7 @@ void CBasePlayer :: Precache( void )
 
 int CBasePlayer::Save( CSave &save )
 {
+	CoFR_ApplyNotarget(this);
 	cofrInventorySchema=1;
 	if ( !CBaseMonster::Save(save) )
 		return 0;
@@ -7497,6 +7500,7 @@ int CBasePlayer::Restore( CRestore &restore )
 
 	int status = restore.ReadFields( "PLAYER", this, m_playerSaveData, ARRAYSIZE(m_playerSaveData) );
 	CoFRMigrateInventory();
+	CoFR_ApplyNotarget(this);
 
 	SAVERESTOREDATA *pSaveData = (SAVERESTOREDATA *)gpGlobals->pSaveData;
 	// landmark isn't present.
@@ -7890,7 +7894,7 @@ void CBloodSplat::Spray ( void )
 
 //==============================================
 
-void CBasePlayer::GiveNamedItem( const char *pszName, bool deletewhendropped, bool bSkipDonatorCheck_guess )
+void CBasePlayer::GiveNamedItem( const char *pszName, bool deletewhendropped, bool /*bSkipDonatorCheck_guess*/ )
 {
 	if ( pszName && !strcmp( pszName, "weapon_famas" ) )
 	{
@@ -7904,17 +7908,7 @@ void CBasePlayer::GiveNamedItem( const char *pszName, bool deletewhendropped, bo
 			return;
 	}
 
-	if ( pszName && !strcmp( pszName, "weapon_tmp" ) )
-	{
-		if ( !bSkipDonatorCheck_guess && !IsDonator() && !m_iAllowedToUseTMP )
-			return;
-	}
 
-	if ( pszName && !strcmp( pszName, "weapon_mp5" ) )
-	{
-		if ( !IsDeveloper() && m_iNew16a_guess != 2 && m_iNew16a_guess != 3 && m_iNew16a_guess != 4 && g_pGameRules && !g_pGameRules->IsMapperMode_guess() )
-			return;
-	}
 
 	edict_t	*pent;
 
@@ -11233,26 +11227,12 @@ int CBasePlayer::AddItemToInventory( int name, int model, int classname )
 
 	int freeslot = 0;
 
-	if ( m_bThreeSlots )
+	for (int i = 1; i <= InventoryCapacity(); ++i)
 	{
-		for ( int i = 1; i <= 8; i++ )
+		if (IsSlotFree(cofrInventorySlot[i]))
 		{
-			if ( IsSlotFree( cofrInventorySlot[i] ) )
-			{
-				freeslot = i;
-				break;
-			}
-		}
-	}
-	else
-	{
-		for ( int i = 1; i <= 8; i++ )
-		{
-			if ( IsSlotFree( cofrInventorySlot[i] ) )
-			{
-				freeslot = i;
-				break;
-			}
+			freeslot = i;
+			break;
 		}
 	}
 
@@ -11302,24 +11282,92 @@ int CBasePlayer::IsSlotFree( int slot )
 	return TRUE;
 }
 
+int CBasePlayer::InventoryCapacity()
+{
+	return cof::inventoryCapacity(m_bThreeSlots, g_pGameRules && g_pGameRules->IsMultiplayer());
+}
+
+bool CBasePlayer::IsInventorySlot(int slot)
+{
+	return cof::validSlot(slot, InventoryCapacity());
+}
+
+void CBasePlayer::TrimInventory(bool notify)
+{
+	// The story strips the bag rather than dropping its contents into the world.
+	char* quickNames[] = {nullptr, m_sQuickSel1, m_sQuickSel2, m_sQuickSel3};
+	for (int slot = InventoryCapacity() + 1; slot <= cof::Slots; ++slot)
+	{
+		const int classname = cofrInventorySlotClassname[slot];
+		CBasePlayerItem* item = nullptr;
+		if (classname)
+			for (int i = 0; i < MAX_ITEM_TYPES && !item; ++i)
+				for (auto candidate = m_rgpPlayerItems[i]; candidate; candidate = candidate->m_pNext)
+					if (FClassnameIs(candidate->pev, STRING(classname)))
+					{
+						item = candidate;
+						break;
+					}
+		if (item)
+		{
+			const int id = item->m_iId;
+			if (id && (m_iDualWeaponLeftID == id || m_iDualWeaponRightID == id))
+			{
+				if (m_pActiveItem && FClassnameIs(m_pActiveItem->pev, "weapon_dualweapon"))
+				{
+					m_pActiveItem->Holster();
+					m_pActiveItem = nullptr;
+					pev->viewmodel = pev->weaponmodel = 0;
+				}
+				SetDualWieldWeapon(0);
+				m_iDualWeaponLeftID = m_iDualWeaponRightID = 0;
+				m_iDualWeaponLeftAmmo = m_iDualWeaponRightAmmo = -2;
+			}
+			pev->weapons &= ~(1u << id);
+			if (m_pNextItem == item)
+			{
+				m_pNextItem = nullptr;
+				m_bWeaponWaitingToDeploy = false;
+			}
+			item->DestroyItem();
+		}
+
+		for (int i = 1; i <= 3; ++i)
+		{
+			if (m_iQuickSlotSlot[i] != slot &&
+				(!classname || strcmp(quickNames[i], STRING(classname))))
+				continue;
+			quickNames[i][0] = 0;
+			m_iQuickSlotSlot[i] = 0;
+			if (notify)
+			{
+				MESSAGE_BEGIN(MSG_ONE, gmsgQSlotClear, NULL, pev);
+					WRITE_BYTE(i);
+					WRITE_BYTE(0);
+				MESSAGE_END();
+			}
+		}
+
+		cofrInventorySlot[slot] = cofrInventorySlotModels[slot] = cofrInventorySlotClassname[slot] = 0;
+		cofrClientinventorySlot[slot] = 0;
+		if (notify)
+			InventoryMessage(slot, 0, 0);
+	}
+}
+
+void CBasePlayer::ReduceInventory()
+{
+	m_bThreeSlots = true;
+	TrimInventory(true);
+	for (int slot = 1; slot <= InventoryCapacity(); ++slot)
+		InventoryMessage(slot, cofrInventorySlot[slot], 0);
+}
+
 int CBasePlayer::InventoryIsFull( void )
 {
-	if ( m_bThreeSlots )
-	{
-		for ( int i = 1; i <= 8; i++ )
-		{
-			if ( IsSlotFree( cofrInventorySlot[i] ) )
-				return FALSE;
-		}
-	}
-	else
-	{
-		for ( int i = 1; i <= 8; i++ )
-		{
-			if ( IsSlotFree( cofrInventorySlot[i] ) )
-				return FALSE;
-		}
-	}
+	for (int i = 1; i <= InventoryCapacity(); ++i)
+		if (IsSlotFree(cofrInventorySlot[i]))
+			return FALSE;
 
 	return TRUE;
 }
@@ -11509,30 +11557,13 @@ void CBasePlayer::ClearOutSlotNamed( int slot, int all )
 
 int CBasePlayer::HasItemInSlot( char *script, bool remove )
 {
-	if ( m_bThreeSlots )
+	for (int i = 1; i <= InventoryCapacity(); ++i)
 	{
-		for ( int i = 1; i <= 8; i++ )
+		if (FStrEq(STRING(cofrInventorySlot[i]), script))
 		{
-			if ( FStrEq( STRING( cofrInventorySlot[i] ), script ) )
-			{
-				if ( remove )
-					ClearOutSlot( i, 0 );
-
-				return TRUE;
-			}
-		}
-	}
-	else
-	{
-		for ( int i = 1; i <= 8; i++ )
-		{
-			if ( FStrEq( STRING( cofrInventorySlot[i] ), script ) )
-			{
-				if ( remove )
-					ClearOutSlot( i, 0 );
-
-				return TRUE;
-			}
+			if (remove)
+				ClearOutSlot(i, 0);
+			return TRUE;
 		}
 	}
 
@@ -11541,7 +11572,7 @@ int CBasePlayer::HasItemInSlot( char *script, bool remove )
 
 int CBasePlayer::HasItemInSlotNumber( int slotnum, char *script )
 {
-	if ( FStrEq( STRING( cofrInventorySlot[slotnum] ), script ) )
+	if ( IsInventorySlot(slotnum) && FStrEq( STRING( cofrInventorySlot[slotnum] ), script ) )
 	{
 		return TRUE;
 	}
@@ -11551,19 +11582,8 @@ int CBasePlayer::HasItemInSlotNumber( int slotnum, char *script )
 
 char *CBasePlayer::GetItemFromSlot( int slotnumber )
 {
-	if ( m_bThreeSlots )
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-	else
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-
-	if ( slotnumber <= 0 )
-		slotnumber = 1;
+	if (!IsInventorySlot(slotnumber))
+		return (char *)"";
 
 	ALERT( at_console, "GetItemFromSlot: %s\n", STRING( cofrInventorySlot[slotnumber] ) );
 
@@ -11572,19 +11592,8 @@ char *CBasePlayer::GetItemFromSlot( int slotnumber )
 
 char *CBasePlayer::GetModelFromSlot( int slotnumber )
 {
-	if ( m_bThreeSlots )
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-	else
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-
-	if ( slotnumber <= 0 )
-		slotnumber = 1;
+	if (!IsInventorySlot(slotnumber))
+		return (char *)"";
 
 	ALERT( at_console, "GetModelFromSlot: %s\n", STRING( cofrInventorySlotModels[slotnumber] ) );
 
@@ -11593,19 +11602,8 @@ char *CBasePlayer::GetModelFromSlot( int slotnumber )
 
 char *CBasePlayer::GetClassnameFromSlot( int slotnumber )
 {
-	if ( m_bThreeSlots )
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-	else
-	{
-		if ( slotnumber > 8 )
-			slotnumber = 8;
-	}
-
-	if ( slotnumber <= 0 )
-		slotnumber = 1;
+	if (!IsInventorySlot(slotnumber))
+		return (char *)"";
 
 	ALERT( at_console, "GetClassnameFromSlot: %s\n", STRING( cofrInventorySlotClassname[slotnumber] ) );
 
@@ -11614,10 +11612,7 @@ char *CBasePlayer::GetClassnameFromSlot( int slotnumber )
 
 void CBasePlayer::InventoryMessage( int slotnum, int slot, int clearslots )
 {
-	int threeslots = 0;
-
-	if ( m_bThreeSlots )
-		threeslots = 1;
+	const int threeslots = InventoryCapacity() == cof::ReducedSlots;
 	if ( clearslots )
 	{
 		MESSAGE_BEGIN( MSG_ONE, gmsgInventory, NULL, pev );
@@ -11664,7 +11659,7 @@ void CBasePlayer::CloseInventory( void )
 
 void CBasePlayer::InventoryEquip( int slotnum )
 {
-	if (slotnum < 1 || slotnum > 8) return;
+	if (!IsInventorySlot(slotnum)) return;
 	if ( m_bInPhoneCall )
 		return;
 
@@ -11701,7 +11696,9 @@ void CBasePlayer::InventoryEquip( int slotnum )
 
 void CBasePlayer::InventoryCombine( int slot1, int slot2, char *result )
 {
-	if (slot1<1 || slot1>8 || slot2<1 || slot2>8 || slot1==slot2 || !result) return;
+	if (!result || !IsInventorySlot(slot1) || !IsInventorySlot(slot2) || slot1 == slot2)
+		return;
+
 	if ( m_bInPhoneCall )
 		return;
 
@@ -11820,7 +11817,7 @@ void CBasePlayer::InventoryCombine( int slot1, int slot2, char *result )
 
 void CBasePlayer::InventoryUse( int slotnum )
 {
-	if (slotnum < 1 || slotnum > 8) return;
+	if (!IsInventorySlot(slotnum)) return;
 	if ( strlen( GetDescriptionFromItem( "map_name", (char *)STRING( cofrInventorySlot[slotnum] ) ) ) <= 1 )
 	{
 		UTIL_ProMessage( this, "Error! Item script seems to have no nice name!", 2, false );
@@ -11989,7 +11986,7 @@ void CBasePlayer::InventoryUse( int slotnum )
 
 void CBasePlayer::InventoryDrop( int slotnum )
 {
-	if (slotnum < 1 || slotnum > 8) return;
+	if (!IsInventorySlot(slotnum)) return;
 	if ( m_bInPhoneCall )
 		return;
 
@@ -12225,12 +12222,12 @@ void CBasePlayer::InventoryDrop( int slotnum )
 
 void CBasePlayer::InventoryCheck( int slotnum )
 {
-	if (slotnum < 1 || slotnum > 8) return;
+	if (!IsInventorySlot(slotnum)) return;
 }
 
 void CBasePlayer::DropKeyItem( int slotnum )
 {
-	if (slotnum < 1 || slotnum > 8) return;
+	if (!IsInventorySlot(slotnum)) return;
 	if ( m_bInPhoneCall )
 		return;
 
@@ -13713,7 +13710,7 @@ void CBasePlayer::CheckQuickDualWield( char *quicksel, char *lastquicksel )
 
 void CBasePlayer::QuickSelectItem( int number )
 {
-	if ( number < 1 || number > 3 )
+	if (number < 1 || number > 3 || !IsInventorySlot(m_iQuickSlotSlot[number]))
 		return;
 
 	if ( pev->flags & FL_FROZEN )
@@ -14427,15 +14424,8 @@ bool CBasePlayer::CanBeDualWielded( int weaponid )
 	return false;
 }
 
-bool CBasePlayer::CanUseWeapon_guess( int weaponid )
+bool CBasePlayer::CanUseWeapon_guess( int )
 {
-	// MP5A3: Steam group members and mapper mode only
-	if ( weaponid == 27 )
-	{
-		if ( !IsInSteamGroup_guess( 4632074 ) && !IsInSteamGroup_guess( 764566 ) && !g_pGameRules->IsMapperMode_guess() )
-			return false;
-	}
-
 	return true;
 }
 
@@ -14522,7 +14512,9 @@ void CBasePlayer::AddGoodPoint( int amount, bool subtract )
 
 void CBasePlayer::DualWield( int slot1, int slot2 )
 {
-	if (slot1<1 || slot1>8 || slot2<1 || slot2>8 || slot1==slot2) return;
+	if (!IsInventorySlot(slot1) || !IsInventorySlot(slot2) || slot1 == slot2)
+		return;
+
 	bool found1 = false;
 	bool found2 = false;
 	int weaponid1 = 0;

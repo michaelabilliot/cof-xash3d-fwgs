@@ -1921,6 +1921,14 @@ static qboolean SV_Notarget_f( sv_client_t *cl )
 	if( sv.background || !Cvar_VariableInteger( "sv_cheats" ))
 		return true;
 
+	// CoFR owns the single-player preference so it survives game-DLL flag resets.
+	if( svs.maxclients == 1 && !svgame.globals->deathmatch && !svgame.globals->coop &&
+		Cvar_FindVar( "cofr_notarget_command" ))
+	{
+		svgame.dllFuncs.pfnClientCommand( pEntity );
+		return true;
+	}
+
 	pEntity->v.flags = pEntity->v.flags ^ FL_NOTARGET;
 
 	if( !FBitSet( pEntity->v.flags, FL_NOTARGET ))

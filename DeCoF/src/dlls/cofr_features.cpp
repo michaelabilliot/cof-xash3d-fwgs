@@ -13,6 +13,7 @@
 #include "weapons.h"
 #include "gamerules.h"
 #include "cofr_features.h"
+#include "cofr_notarget.hpp"
 #include "cofr_creative.hpp"
 #include "cofr_creative_entities.hpp"
 #include "cofr_ammo_policy.hpp"
@@ -27,6 +28,25 @@ extern bool CoFR_SkipIntro(CBasePlayer*);
 extern void SET_VIEW(edict_t*,edict_t*);
 extern bool m_gbIsInCutscene;
 namespace {
+using cof::NotargetUnset;
+using cof::NotargetOn;
+using cof::NotargetOff;
+// An explicit toggle supersedes a preference stored in an older save.
+int notargetPreference = NotargetUnset;
+
+bool singlePlayer() {
+ return gpGlobals && gpGlobals->maxClients == 1 &&
+  !gpGlobals->deathmatch && !gpGlobals->coop &&
+  (!g_pGameRules || !g_pGameRules->IsMultiplayer());
+}
+
+bool toggleNotarget(CBasePlayer* player) {
+ CoFR_ApplyNotarget(player);
+ notargetPreference = player->pev->flags & FL_NOTARGET ? NotargetOff : NotargetOn;
+ CoFR_ApplyNotarget(player);
+ return notargetPreference == NotargetOn;
+}
+
 struct Carry {std::string script[9],model[9],name[9];std::map<std::string,int> clips,ammo;};
 std::map<std::string,Carry> cooperativeCarry;
 constexpr int Slots=8;
@@ -41,7 +61,7 @@ bool normal(CBasePlayer* p) {
  return p&&p->IsAlive()&&!p->pev->deadflag&&!p->pev->iuser1&&!(p->pev->flags&FL_ONTRAIN)&&
   !p->IsOnLadder()&&!p->m_bInPhoneCall&&!p->m_iUsingComputerOrPhone;
 }
-bool slot(int n) {return n>=1&&n<=Slots;}
+
 void result(CBasePlayer* p,bool okay,const std::string& text) {
  if(!p)return;
  const std::string bounded=text.substr(0,150);
@@ -76,16 +96,15 @@ void sync(CBasePlayer* p,bool force) {
 void slots(CBasePlayer* p){for(int i=1;i<=Slots;++i)p->InventoryMessage(i,p->cofrInventorySlot[i],0);}
 struct Grant {int old;Grant():old(gSpecialItemGive){gSpecialItemGive=1;++grantDepth;}~Grant(){--grantDepth;gSpecialItemGive=old;}};
 bool grant(CBasePlayer* p,const cof::CreativeItem& item,int destination) {
- if(!slot(destination))return false;
- if(p->cofrInventorySlot[destination])return false;
+ if(!p->IsInventorySlot(destination)||p->cofrInventorySlot[destination])return false;
  int before[9];for(int i=0;i<9;++i)before[i]=p->cofrInventorySlot[i];
  if(item.group==cof::CreativeGroup::Weapon){
-  for(int i=1;i<=Slots;++i)if(p->cofrInventorySlotClassname[i]&&item.classname==STRING(p->cofrInventorySlotClassname[i]))return false;
+  for(int i=1;i<=p->InventoryCapacity();++i)if(p->cofrInventorySlotClassname[i]&&item.classname==STRING(p->cofrInventorySlotClassname[i]))return false;
   Grant scope;p->GiveNamedItem(item.classname.c_str(),false,false);
  }else{
   if(!p->AddItemToInventory(ALLOC_STRING(item.script.c_str()),ALLOC_STRING(item.model.c_str()),ALLOC_STRING(item.classname.c_str())))return false;
  }
- int created=0;for(int i=1;i<=Slots;++i)if(!before[i]&&p->cofrInventorySlot[i]){created=i;break;}
+ int created=0;for(int i=1;i<=p->InventoryCapacity();++i)if(!before[i]&&p->cofrInventorySlot[i]){created=i;break;}
  if(!created)return false;
  // AddItemToInventory's native notification precedes model/class assignment for quest items.
  if(item.group==cof::CreativeGroup::Item){p->cofrInventorySlotModels[created]=ALLOC_STRING(item.model.c_str());p->cofrInventorySlotClassname[created]=ALLOC_STRING(item.classname.c_str());}
@@ -147,7 +166,7 @@ void creativeGrant(CBasePlayer* player, const cof::CreativeItem& item, int desti
  }
 
  if (!destination)
-  for (int i = 1; i <= Slots; ++i)
+  for (int i = 1; i <= player->InventoryCapacity(); ++i)
    if (!player->cofrInventorySlot[i]) { destination = i; break; }
  if (!destination) {
   result(player, false, "Inventory is full.");
@@ -263,14 +282,34 @@ void CoFR_ServerWorldPrecache(){
   precachedEntities.insert(entry.key);
  }
 }
-void CoFR_ServerFrame(CBasePlayer* p){if(!p)return;sync(p,false);
+void CoFR_ApplyNotarget(CBasePlayer* player) {
+ if (!player || !singlePlayer()) return;
+ player->cofrNotarget = cof::notargetPreferenceForPlayer(notargetPreference, player->cofrNotarget);
+ if (cof::notargetFlag(player->cofrNotarget, (player->pev->flags & FL_NOTARGET) != 0))
+  player->pev->flags |= FL_NOTARGET;
+ else
+  player->pev->flags &= ~FL_NOTARGET;
+}
+
+void CoFR_ServerFrame(CBasePlayer* p){if(!p)return;
+ CoFR_ApplyNotarget(p);
+ if (p->InventoryCapacity() < Slots)
+  for (int i = p->InventoryCapacity() + 1; i <= Slots; ++i)
+   if (p->cofrInventorySlot[i]) { p->TrimInventory(true); break; }
+ sync(p,false);
  int cap=int(p->pev->max_health);if(cap<=0)cap=100;if(cap>32767)cap=32767;
  int hp=std::max(0,std::min(32767,int(p->pev->health)));
  auto& s=sessions[p];processSyringe(p,s);if(s.maxHealth!=cap||s.health!=hp){s.maxHealth=cap;s.health=hp;static int msg=0;if(!msg)msg=REG_USER_MSG("Cof8MaxHP",4);MESSAGE_BEGIN(MSG_ONE,msg,NULL,p->pev);WRITE_SHORT(cap);WRITE_SHORT(hp);MESSAGE_END();}
 
 }
 bool CoFR_ServerCommand(CBasePlayer* p){
- const char* command=CMD_ARGV(0);if(strncmp(command,"cof8_",5))return false;
+ const char* command=CMD_ARGV(0);
+ if (!strcmp(command, "notarget") && singlePlayer()) {
+  if (p && int(CVAR_GET_FLOAT("sv_cheats")) != 0)
+   CLIENT_PRINTF(p->edict(), print_console, toggleNotarget(p) ? "notarget ON\n" : "notarget OFF\n");
+  return true;
+ }
+ if(strncmp(command,"cof8_",5))return false;
  if(!p)return true;
  if(!strcmp(command,"cof8_boat")){int mask=0;if(CMD_ARGC()==2&&cof::creativeNumber(CMD_ARGV(1),mask)&&mask>=0&&mask<=15)CoFR_BoatInput(p,unsigned(mask));return true;}
  if(!strcmp(command,"cof8_skipintro")){CoFR_SkipIntro(p);return true;}
@@ -281,7 +320,7 @@ bool CoFR_ServerCommand(CBasePlayer* p){
   if(ids[0]&&ids[1]&&ids[0]!=31&&ids[1]!=31&&p->CanBeDualWielded(ids[0])&&p->CanBeDualWielded(ids[1])&&!(p->IsAFlashlight(ids[0])&&p->IsAFlashlight(ids[1])))p->DualWield(a,b);else p->InventoryEquip(b);return true;
  }
  if(!strcmp(command,"cof8_toggle")){
-  int n=0;if(!normal(p)||CMD_ARGC()!=2||!cof::creativeNumber(CMD_ARGV(1),n)||!slot(n)||!p->cofrInventorySlot[n])return true;
+  int n=0;if(!normal(p)||CMD_ARGC()!=2||!cof::creativeNumber(CMD_ARGV(1),n)||!p->IsInventorySlot(n)||!p->cofrInventorySlot[n])return true;
   const char* name=p->cofrInventorySlotClassname[n]?STRING(p->cofrInventorySlotClassname[n]):"";auto active=p->m_pActiveItem;
   bool same=active&&!strcmp(STRING(active->pev->classname),name);
   if(active&&FClassnameIs(active->pev,"weapon_dualweapon"))for(int id:{p->m_iDualWeaponLeftID,p->m_iDualWeaponRightID}){auto w=p->GetPlayerWeapon(id);if(w&&!strcmp(STRING(w->pev->classname),name))same=true;}
@@ -342,7 +381,10 @@ bool CoFR_ServerCommand(CBasePlayer* p){
  }
  if(!strcmp(command,"cof8_status")){
   ALERT(at_console,"COFR player health=%g active=%s schema=%d map=%s clip=%d\n",p->pev->health,p->m_pActiveItem?STRING(p->m_pActiveItem->pev->classname):"none",p->cofrInventorySchema,STRING(gpGlobals->mapname),p->m_pActiveItem?((CBasePlayerWeapon*)p->m_pActiveItem)->m_iClip:-1);
-  for(int i=1;i<=8;++i)ALERT(at_console,"COFR slot %d script=%s model=%s class=%s\n",i,STRING(p->cofrInventorySlot[i]),STRING(p->cofrInventorySlotModels[i]),STRING(p->cofrInventorySlotClassname[i]));return true;
+  ALERT(at_console,"COFR capacity=%d notarget=%d healthcap=%d\n", p->InventoryCapacity(),
+   (p->pev->flags & FL_NOTARGET) != 0, p->m_iHealthCap);
+  ALERT(at_console,"COFR ammo mp5=%d tmp=%d\n", p->AmmoInventory(p->GetAmmoIndex("mp5")), p->AmmoInventory(p->GetAmmoIndex("tmp")));
+  for(int i=1;i<=Slots;++i)ALERT(at_console,"COFR slot %d script=%s model=%s class=%s\n",i,STRING(p->cofrInventorySlot[i]),STRING(p->cofrInventorySlotModels[i]),STRING(p->cofrInventorySlotClassname[i]));return true;
  }
  if(!strcmp(command,"cof8_entities")){
   if(!allowed())return true;CBaseEntity* e=NULL;int n=0;
@@ -352,7 +394,8 @@ bool CoFR_ServerCommand(CBasePlayer* p){
  if(!strcmp(command,"cof8_creative")||!strcmp(command,"cof8_creative_reset")){sync(p,true);return true;}
  if(!strcmp(command,"cof8_notarget")){
   if(!allowed()||!normal(p)){result(p,false,"Notarget requires offline single-player, sv_cheats 1 and normal control.");return true;}
-  p->pev->flags^=FL_NOTARGET;sync(p,false);result(p,true,(p->pev->flags&FL_NOTARGET)?"Notarget ON":"Notarget OFF");return true;
+  const bool enabled = toggleNotarget(p);
+  sync(p,false);result(p,true,enabled?"Notarget ON":"Notarget OFF");return true;
  }
  if(!normal(p)){result(p,false,"Inventory is unavailable in the current player state.");return true;}
  int a=0,b=0;const bool first=CMD_ARGC()>1&&cof::creativeNumber(CMD_ARGV(1),a);
@@ -362,7 +405,7 @@ bool CoFR_ServerCommand(CBasePlayer* p){
   auto& s=sessions[p];if(gpGlobals->time-s.last<0.1f){result(p,false,"Wait before another spawn.");return true;}s.last=gpGlobals->time;
   const auto& item=catalogue[a-1];
   if(!strcmp(command,"cof8_spawn")){spawn(p,item);return true;}
-  if (CMD_ARGC() != 3 || !cof::creativeNumber(CMD_ARGV(2), b) || b > Slots ||
+  if (CMD_ARGC() != 3 || !cof::creativeNumber(CMD_ARGV(2), b) || b > p->InventoryCapacity() ||
       item.group == cof::CreativeGroup::Entity) {
    result(p, false, "Choose a carried item and an inventory destination.");
    return true;
@@ -370,7 +413,7 @@ bool CoFR_ServerCommand(CBasePlayer* p){
   creativeGrant(p, item, b);
   return true;
  }
- if(!first||!slot(a)){result(p,false,"Invalid inventory slot.");return true;}
+ if(!first||!p->IsInventorySlot(a)){result(p,false,"Invalid inventory slot.");return true;}
  if (!strcmp(command, "cof8_activate")) {
   if (CMD_ARGC() == 2 && p->cofrInventorySlot[a]) activateSlot(p, a);
  }
@@ -378,10 +421,19 @@ bool CoFR_ServerCommand(CBasePlayer* p){
  else if(!strcmp(command,"cof8_use"))p->InventoryUse(a);
  else if(!strcmp(command,"cof8_drop"))p->InventoryDrop(a);
  else if(!strcmp(command,"cof8_move")||!strcmp(command,"cof8_combine")||!strcmp(command,"cof8_dual")){
-  if(CMD_ARGC()<3||!cof::creativeNumber(CMD_ARGV(2),b)||!slot(b)||a==b){result(p,false,"Invalid destination slot.");return true;}
+  if(CMD_ARGC()<3||!cof::creativeNumber(CMD_ARGV(2),b)||!p->IsInventorySlot(b)||a==b){result(p,false,"Invalid destination slot.");return true;}
   if(!strcmp(command,"cof8_move")){
    if (!p->cofrInventorySlot[a] || p->cofrInventorySlot[b]) return true;
    std::swap(p->cofrInventorySlot[a],p->cofrInventorySlot[b]);std::swap(p->cofrInventorySlotModels[a],p->cofrInventorySlotModels[b]);std::swap(p->cofrInventorySlotClassname[a],p->cofrInventorySlotClassname[b]);
+   extern int gmsgQSlotUpdate;
+   for (int i = 1; i <= 3; ++i) {
+    if (p->m_iQuickSlotSlot[i] != a) continue;
+    p->m_iQuickSlotSlot[i] = b;
+    MESSAGE_BEGIN(MSG_ONE, gmsgQSlotUpdate, NULL, p->pev);
+     WRITE_BYTE(i);
+     WRITE_BYTE(b);
+    MESSAGE_END();
+   }
    p->cofrClientinventorySlot[a]=p->cofrClientinventorySlot[b]=-1;slots(p);
   }else if(!strcmp(command,"cof8_dual"))p->DualWield(a,b);
   else{
@@ -412,7 +464,7 @@ void CoFR_Impulse101(CBasePlayer* p){
  const char* kit[]={"weapon_switchblade","weapon_mobile","weapon_glock","weapon_shotgun","weapon_rifle","weapon_m16","weapon_revolver","weapon_syringe"};
  for(const char* name:kit){
   bool owned=false;for(int i=1;i<=8;++i)if(p->cofrInventorySlot[i]&&p->cofrInventorySlotClassname[i]&&!strcmp(STRING(p->cofrInventorySlotClassname[i]),name))owned=true;
-  if(owned)continue;int free=0;for(int i=1;i<=8&&!free;++i)if(!p->cofrInventorySlot[i])free=i;
+  if(owned)continue;int free=0;for(int i=1;i<=p->InventoryCapacity()&&!free;++i)if(!p->cofrInventorySlot[i])free=i;
   if(!free)break;for(const auto& item:catalogue)if(item.classname==name){grant(p,item,free);break;}
  }
  for(int i=0;i<MAX_ITEM_TYPES;++i)for(CBasePlayerItem* item=p->m_rgpPlayerItems[i];item;item=item->m_pNext){

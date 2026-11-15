@@ -198,8 +198,12 @@ void DX_ProfileTime( int phase, double seconds )
 	++g_dxProfileFramePhaseCalls[phase];
 }
 
+static unsigned g_drawSerial;
+unsigned DX_DrawSerial() { return g_drawSerial; }
+
 void DX_ProfileDraw( bool indexed, unsigned int primitiveCount )
 {
+	++g_drawSerial;
 
 	if( g_dxSpeedsCollecting )
 	{
