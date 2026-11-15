@@ -4973,10 +4973,107 @@ static qboolean VID_ScreenShot( const char *filename, int shot_type )
 		return false;
 	}
 
-	const HRESULT result = D3DXSaveSurfaceToFile(
-		filename, D3DXIFF_PNG, backBuffer, nullptr, nullptr );
+	// Read back an unscaled surface in the actual backbuffer format. Resolve
+	// multisampling outside the scene and resize only after the readback.
+	D3DSURFACE_DESC desc = {};
+	IDirect3DSurface9 *resolved = nullptr;
+	IDirect3DSurface9 *readback = nullptr;
+	IDirect3DSurface9 *preview = nullptr;
+	ID3DXBuffer *encoded = nullptr;
+	const char *captureStep = "GetDesc";
+	HRESULT result = backBuffer->GetDesc( &desc );
+	if( SUCCEEDED( result ) && desc.Format == D3DFMT_UNKNOWN )
+		desc.Format = d3dpp.BackBufferFormat != D3DFMT_UNKNOWN ? d3dpp.BackBufferFormat : DX_BackBufferFormat( );
+	if( SUCCEEDED( result ) && ( !desc.Width || !desc.Height || desc.Format == D3DFMT_UNKNOWN ) )
+		result = D3DERR_INVALIDCALL;
+	const bool resumeScene = g_dxSceneActive;
+	if( SUCCEEDED( result ) && resumeScene )
+	{
+		captureStep = "EndScene";
+		result = device->EndScene( );
+		if( SUCCEEDED( result ) )
+			g_dxSceneActive = false;
+	}
+	if( SUCCEEDED( result ) && desc.MultiSampleType != D3DMULTISAMPLE_NONE )
+	{
+		captureStep = "CreateRenderTarget";
+		result = device->CreateRenderTarget( desc.Width, desc.Height, desc.Format,
+			D3DMULTISAMPLE_NONE, 0, FALSE, &resolved, nullptr );
+		if( SUCCEEDED( result ) )
+		{
+			captureStep = "StretchRect";
+			result = device->StretchRect( backBuffer, nullptr, resolved, nullptr, D3DTEXF_NONE );
+		}
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "CreateOffscreenPlainSurface";
+		result = device->CreateOffscreenPlainSurface( desc.Width, desc.Height, desc.Format,
+			D3DPOOL_SYSTEMMEM, &readback, nullptr );
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "GetRenderTargetData";
+		result = device->GetRenderTargetData( resolved ? resolved : backBuffer, readback );
+	}
+	if( resumeScene && !g_dxSceneActive )
+	{
+		const HRESULT resumed = device->BeginScene( );
+		g_dxSceneActive = SUCCEEDED( resumed );
+		if( SUCCEEDED( result ) && FAILED( resumed ) )
+		{
+			captureStep = "BeginScene";
+			result = resumed;
+		}
+	}
+	const bool miniShot = shot_type == VID_MINISHOT;
+	if( SUCCEEDED( result ) && miniShot )
+	{
+		captureStep = "create preview surface";
+		const UINT width = std::max( 1u, static_cast<UINT>(
+			( 200ull * desc.Width + desc.Height / 2 ) / desc.Height ) );
+		result = device->CreateOffscreenPlainSurface( width, 200, D3DFMT_X8R8G8B8,
+			D3DPOOL_SYSTEMMEM, &preview, nullptr );
+	}
+	if( SUCCEEDED( result ) && miniShot )
+	{
+		captureStep = "resize preview";
+		result = D3DXLoadSurfaceFromSurface( preview, nullptr, nullptr, readback,
+			nullptr, nullptr, D3DX_FILTER_TRIANGLE, 0 );
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "encode image";
+		result = D3DXSaveSurfaceToFileInMemory( &encoded, miniShot ? D3DXIFF_BMP : D3DXIFF_PNG,
+			miniShot ? preview : readback, nullptr, nullptr );
+	}
+	bool written = false;
+	if( SUCCEEDED( result ) && encoded )
+	{
+		auto *fs = gEngfuncs.fsapi;
+		if( shot_type == VID_SNAPSHOT )
+			fs->AllowDirectPaths( true );
+		if( file_t *file = fs->Open( filename, "wb", false ) )
+		{
+			written = fs->Write( file, encoded->GetBufferPointer( ),
+				encoded->GetBufferSize( ) ) == encoded->GetBufferSize( );
+			written = fs->Close( file ) == 0 && written;
+			if( !written )
+				fs->Delete( filename );
+		}
+		if( shot_type == VID_SNAPSHOT )
+			fs->AllowDirectPaths( false );
+	}
+	else if( FAILED( result ) )
+		gEngfuncs.Con_Printf( "D3D9: screenshot %s failed (0x%08lX, %ux%u format %d MSAA %d)\n",
+			captureStep, static_cast<unsigned long>( result ), desc.Width, desc.Height,
+			static_cast<int>( desc.Format ), static_cast<int>( desc.MultiSampleType ) );
+	if( encoded ) encoded->Release( );
+	if( preview ) preview->Release( );
+	if( readback ) readback->Release( );
+	if( resolved ) resolved->Release( );
 	backBuffer->Release( );
-	return SUCCEEDED( result );
+	return written;
 }
 
 static void R_CubemapFaceName( const char *base,

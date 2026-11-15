@@ -122,7 +122,32 @@ public:
  void icon(const char* name,int x,int y,int w,int h,int opacity,int shade){auto t=texture(std::string("gfx/vgui/cof8_hud/")+name+".tga");if(!t.id)return;color(shade,shade,shade,255-opacity);drawSetTexture(t.id);drawTexturedRect(px(x),px(y),px(x+w),px(y+h));}
  bool ready(){for(const char* n:{"heart","runner","bullet","magazine","grime"})if(!texture(std::string("gfx/vgui/cof8_hud/")+n+".tga").id)return false;return true;}
 };
+class LegacyHealthFracture : public vgui::Panel {
+public:
+ LegacyHealthFracture() : vgui::Panel(7,5,18,118) {
+  setPaintBackgroundEnabled(false);
+  setPaintBorderEnabled(false);
+  setAutoFocusNavEnabled(false);
+ }
+ bool isWithin(int,int) override {return false;}
+ vgui::Panel* isWithinTraverse(int,int) override {return nullptr;}
+ void paint() override {
+  if(!hudCap)return;
+  const int boundary=(118*(100-cof::hud::healthLimit(hudCap))+50)/100;
+  drawSetColor(3,2,4,50);
+  drawFilledRect(4,0,15,boundary);
+  constexpr int edge[]={0,0,1,2,3,2,0,-2,-3,-1,1,3,2,0,-2,-1,0,0};
+  for(int x=0;x<18;++x){
+   const int y=boundary+edge[x];
+   drawSetColor(186,121,115,20);
+   drawFilledRect(x,y-2,x+1,y+3);
+   drawSetColor(7,5,7,0);
+   drawFilledRect(x,y-1,x+1,y+2);
+  }
+ }
+};
 static HudPanel* panel=nullptr;static vgui::Panel* parent=nullptr;
+static LegacyHealthFracture* legacyFracture=nullptr;
 static int maxHP(const char*,int size,void* data){if(size==4){BEGIN_READ(data,size);maxHealth=std::max(1,READ_SHORT());currentHealth=std::max(0,READ_SHORT());healthKnown=true;}return 1;}
 static void dump(){auto w=gHUD.m_Ammo.m_pWeapon;engine.Con_Printf("COFR HUD paint frames=%u\n",paintFrames);engine.Con_Printf("COFR HUD: assets=%d attached=%d health=%d max=%d healthcap=%d stamina=%d id=%d clip=%d dual=%d/%d\n",assetsReady,panel!=nullptr,healthKnown?currentHealth:gHUD.m_Health.m_iHealth,maxHealth,hudCap,gViewPort&&gViewPort->m_pHUDControl_guess?gViewPort->m_pHUDControl_guess->m_iStamina_guess:-1,w?w->iId:0,w?w->iClip:0,gHUD.m_Ammo.m_iDualAmmoLeft_guess,gHUD.m_Ammo.m_iDualAmmoRight_guess);}
 }
@@ -134,11 +159,17 @@ void CoFR_LegacyFrame(){
   auto lock=gViewPort->m_pPadlock_guess;if(lock->m_pButtonsImage_guess)lock->m_pButtonsImage_guess->setColor(vgui::Color(255,255,255,1));gViewPort->setVisible(true);lock->setPaintEnabled(true);lock->repaint();
   if(lock->m_pButtons_guess){lock->m_pButtons_guess->setVisible(true);lock->m_pButtons_guess->setPaintEnabled(true);lock->m_pButtons_guess->setPaintBackgroundEnabled(true);lock->m_pButtons_guess->repaint();}
  }
- if(parent!=p){parent=p;panel=new HudPanel;panel->setParent(p);assetsReady=panel->ready();engine.Con_Printf("COFR HUD: source panel attached; graphical assets=%d\n",assetsReady);}
+ if(parent!=p){
+  parent=p;panel=new HudPanel;panel->setParent(p);assetsReady=panel->ready();
+  legacyFracture=new LegacyHealthFracture;
+  legacyFracture->setParent(p->m_pHealthBar_guess);
+  engine.Con_Printf("COFR HUD: source panel attached; graphical assets=%d\n",assetsReady);
+ }
  SCREENINFO info={};info.iSize=sizeof(info);if(engine.pfnGetScreenInfo(&info))panel->resize(info.iWidth,info.iHeight);panel->setVisible(CoFR_CustomHudActive());panel->repaint();
  if(CoFR_CustomHudActive()){p->m_pHealthBar_guess->setVisible(false);p->m_pStaminaBar_guess->setVisible(false);}
+ legacyFracture->setVisible(hudCap!=0&&!CoFR_CustomHudActive()&&engine.pfnGetCvarFloat("hud_draw")!=0);
 }
-void CoFR_LegacyShutdown(){panel=nullptr;parent=nullptr;assetsReady=false;maxHealth=100;healthKnown=false;}
+void CoFR_LegacyShutdown(){panel=nullptr;parent=nullptr;legacyFracture=nullptr;assetsReady=false;maxHealth=100;hudCap=0;healthKnown=false;}
 bool CoFR_BlurBackground(){auto draw=renderer<int(__cdecl*)()>("DX_CofPauseBackgroundV1");if(!draw||!draw())return false;SCREENINFO info={};info.iSize=sizeof(info);if(engine.pfnGetScreenInfo(&info))engine.pfnFillRGBA(0,0,info.iWidth,info.iHeight,0,0,0,115);return true;}
 void CoFR_CameraFlash(){auto flash=renderer<int(__cdecl*)(float)>("DX_CofCameraFlashV1");if(flash)flash(engine.GetClientTime());}
 void CoFR_RefreshCamera(){

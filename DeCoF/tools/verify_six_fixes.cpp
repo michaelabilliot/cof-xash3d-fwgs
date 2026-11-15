@@ -1,7 +1,9 @@
 #include "../src/game_shared/cofr_credits_timing.hpp"
+#include "../src/game_shared/cofr_coop_roster.hpp"
 #include "../src/game_shared/cofr_hud_layout.hpp"
 #include "../src/game_shared/cofr_inventory.h"
 #include "../src/game_shared/cofr_notarget.hpp"
+#include "../../engine/server/sv_save_tokens.h"
 
 #include <cassert>
 #include <vector>
@@ -59,14 +61,54 @@ void healthCap()
                     continue;
                 }
                 const int boundary = (cap == 1 ? 80 : 66) * 314 / 100;
-                assert(sink.boxes[1].x == 99 + boundary);
-                assert(sink.boxes[1].width == 314 - boundary);
-                assert(sink.boxes[2].width <= boundary);
-                assert(sink.boxes[3].x == 98 + boundary);
-                assert(sink.boxes.size() == 13);
+                assert(sink.boxes[1].width == std::min(health, cof::hud::healthLimit(cap)) * 314 / 100);
+                assert(sink.boxes[2].x == 99 + boundary);
+                assert(sink.boxes[2].width == 314 - boundary);
+                assert(sink.boxes[2].red < 10);
+                int left = 999, right = 0, seamRows = 0;
+                for (const auto& box : sink.boxes) {
+                    if (box.red != 7 || box.width != 7)
+                        continue;
+                    left = std::min(left, box.x);
+                    right = std::max(right, box.x + box.width);
+                    ++seamRows;
+                }
+                assert(seamRows == 30 && left <= 99 + boundary - 10 && right >= 99 + boundary + 10);
             }
         }
     }
+}
+
+void coopRoster()
+{
+    using namespace cof;
+    assert(coopPageCount(4) == 1 && coopPageCount(5) == 2);
+    assert(coopPageCount(CoopMaxPlayers) == 6);
+    int expected = 1;
+    for (int page = 0; page < coopPageCount(CoopMaxPlayers); ++page)
+        for (int row = 0; row < CoopRowsPerPage; ++row) {
+            const int slot = coopRosterSlot(page, row);
+            assert(slot == expected++);
+            assert(validCoopSlot(slot, CoopMaxPlayers));
+        }
+    assert(!validCoopSlot(0, CoopMaxPlayers));
+    assert(!validCoopSlot(25, CoopMaxPlayers));
+}
+
+void saveTokens()
+{
+    char world[] = "world";
+    char player[] = "player";
+    char* tokens[] = {world, nullptr, player};
+    char output[15] = {};
+    output[14] = '!';
+    size_t size = 0;
+    assert(SV_EncodeSaveTokens(output, 14, tokens, 3, &size));
+    assert(size == 14 && !memcmp(output, "world\0\0player", 14));
+    assert(output[14] == '!');
+    memset(output, '!', sizeof(output));
+    assert(!SV_EncodeSaveTokens(output, 13, tokens, 3, &size));
+    assert(output[13] == '!' && output[14] == '!');
 }
 
 void credits()
@@ -89,5 +131,7 @@ int main()
     inventory();
     notarget();
     healthCap();
+    coopRoster();
+    saveTokens();
     credits();
 }

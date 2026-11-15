@@ -64,11 +64,42 @@ BOOL CGameRules::CanHaveAmmo( CBasePlayer *pPlayer, const char *pszAmmoName, int
 
 //=========================================================
 //=========================================================
+static Vector FindExtraCoopSpawn( CBasePlayer *player, const Vector &origin )
+{
+	TraceResult trace;
+	UTIL_TraceHull( origin, origin, dont_ignore_monsters, human_hull, player->edict(), &trace );
+	if ( !trace.fStartSolid && !trace.fAllSolid )
+		return origin;
+
+	const Vector directions[] = {
+		Vector(1,0,0), Vector(0,1,0), Vector(-1,0,0), Vector(0,-1,0),
+		Vector(1,1,0), Vector(-1,1,0), Vector(-1,-1,0), Vector(1,-1,0)
+	};
+	for ( int distance = 40; distance <= 160; distance += 40 )
+	{
+		for ( const Vector &direction : directions )
+		{
+			const Vector candidate = origin + direction * distance;
+			UTIL_TraceLine( origin, candidate, ignore_monsters, player->edict(), &trace );
+			if ( trace.fStartSolid || trace.flFraction < 1 )
+				continue;
+			UTIL_TraceHull( candidate, candidate - Vector(0,0,48),
+				dont_ignore_monsters, human_hull, player->edict(), &trace );
+			if ( !trace.fStartSolid && !trace.fAllSolid && trace.flFraction < 1 &&
+				trace.vecPlaneNormal.z >= 0.7f && trace.pHit && trace.pHit->v.solid == SOLID_BSP )
+				return trace.vecEndPos + Vector(0,0,1);
+		}
+	}
+	return origin;
+}
+
 edict_t *CGameRules :: GetPlayerSpawnSpot( CBasePlayer *pPlayer )
 {
 	edict_t *pentSpawnSpot = EntSelectSpawnPoint( pPlayer );
 
 	pPlayer->pev->origin = VARS(pentSpawnSpot)->origin + Vector(0,0,1);
+	if ( IsCoOp() && ENTINDEX(pPlayer->edict()) > 4 && pentSpawnSpot != INDEXENT(0) )
+		pPlayer->pev->origin = FindExtraCoopSpawn( pPlayer, pPlayer->pev->origin );
 	pPlayer->pev->v_angle  = g_vecZero;
 	pPlayer->pev->velocity = g_vecZero;
 	pPlayer->pev->angles = VARS(pentSpawnSpot)->angles;

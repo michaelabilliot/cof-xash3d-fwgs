@@ -55,11 +55,7 @@ CCreateMultiplayerGameServerPage::CCreateMultiplayerGameServerPage( vgui2::Panel
 	m_szMapName[0] = 0;
 	m_szHostName[0] = 0;
 	m_szPassword[0] = 0;
-	m_iMaxPlayers = engine->GetMaxClients();
-	if ( m_iMaxPlayers <= 1 )
-	{
-		m_iMaxPlayers = 20;
-	}
+	m_iMaxPlayers = 24;
 
 	SetControlString( "ServerNameEdit", ModInfo().GetGameDescription() );
 	SetControlString( "PasswordEdit", engine->pfnGetCvarString( "sv_password" ) );
@@ -84,7 +80,8 @@ void CCreateMultiplayerGameServerPage::OnApplyChanges()
 {
 	strncpy( m_szHostName, GetControlString( "ServerNameEdit", "Cry of Fear" ), DATA_STR_LENGTH );
 	strncpy( m_szPassword, GetControlString( "PasswordEdit", "" ), DATA_STR_LENGTH );
-	m_iMaxPlayers = atoi( GetControlString( "MaxPlayersEdit", "8" ) );
+	const long players = strtol( GetControlString( "MaxPlayersEdit", "24" ), NULL, 10 );
+	m_iMaxPlayers = players < 2 ? 24 : players > 24 ? 24 : static_cast<int>( players );
 
 	KeyValues *kv = m_pMapList->GetActiveItemUserData();
 	strncpy( m_szMapName, kv->GetString( "mapname", "" ), DATA_STR_LENGTH );

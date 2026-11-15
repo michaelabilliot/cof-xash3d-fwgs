@@ -305,8 +305,13 @@ int CHud :: Redraw( float flTime, int intermission )
 	{
 		if ( gEngfuncs.GetClientTime() > m_flSaveHackTime_guess )
 		{
+#ifdef COFR_XASH_ABI
+			snprintf( szCmd, sizeof( szCmd ), "save cofsave%i\n", m_iSaveHackSlot_guess );
+			gEngfuncs.pfnClientCmd( szCmd );
+#else
 			sprintf( szCmd, "savehack cofsave%i\n", m_iSaveHackSlot_guess );
 			ServerCmd( szCmd );
+#endif
 			m_bSaveHack_guess = false;
 			m_flSaveHackTime_guess = 0;
 			m_iSaveHackSlot_guess = 0;

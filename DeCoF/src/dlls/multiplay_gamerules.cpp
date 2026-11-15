@@ -828,7 +828,6 @@ void CHalfLifeMultiplay :: Think ( void )
 						WRITE_BYTE( 0 );
 					MESSAGE_END();
 
-					m_flNextLobbyUpdateTime = gpGlobals->time + 1;
 				}
 			}
 
@@ -855,6 +854,9 @@ void CHalfLifeMultiplay :: Think ( void )
 				}
 			}
 		}
+
+		if ( m_flNextLobbyUpdateTime < gpGlobals->time )
+			m_flNextLobbyUpdateTime = gpGlobals->time + 1;
 
 		if ( m_flLobbyStartOverrideTime > 0 && m_flLobbyStartOverrideTime < gpGlobals->time )
 		{

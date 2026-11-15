@@ -8,6 +8,20 @@ template<class Sink> void label(Sink& s,int x,int y,const std::string& value,int
 template<class Sink> void glyph(Sink& s,const char* name,int x,int y,int w,int h,int opacity) {
     s.icon(name,x+1,y+1,w,h,opacity*3/4,0);s.icon(name,x,y,w,h,opacity,255);
 }
+template<class Sink> void healthFracture(Sink& s,int x,int y) {
+    // Draw across the frame as well as the track so the break remains visible
+    // when the player has less health than the permanent boundary.
+    constexpr int edge[] = {1,0,-2,-4,-6,-4,-1,2,5,3,1,-2,-5,-8,-6,-3,
+                            0,3,6,8,6,3,1,-1,-4,-6,-4,-2,0,1};
+    for(int row=0;row<30;++row) {
+        const int seam=x+edge[row]-3;
+        s.box(seam,y+row,7,1,7,5,7,255);
+        s.box(seam-2,y+row,2,1,193,125,118,245);
+        s.box(seam+7,y+row,2,1,112,78,77,240);
+    }
+    s.box(x-10,y+12,5,2,7,5,7,245);
+    s.box(x+8,y+20,5,2,7,5,7,245);
+}
 // Coordinates are logical 1080p pixels. Sink alpha uses conventional opacity.
 template<class Sink> void paint(Sink& s,const View& v,int width,int height) {
     const float scale=scaleFor(width,height);
@@ -22,20 +36,13 @@ template<class Sink> void paint(Sink& s,const View& v,int width,int height) {
         const int cap = healthLimit(v.cap);
         const int boundary = cap * 314 / 100;
         const int fill = std::clamp(v.health, 0, cap) * 314 / 100;
-        if (cap < 100)
-            s.box(99 + boundary, y + 3, 314 - boundary, 20, 48, 42, 44, 215);
         const float pulse=v.health>0&&v.health<25&&std::isfinite(v.time)?.5f+.5f*std::sin(v.time*4.2f):0.f;
         if(fill)s.box(99,y+3,fill,20,139+int(pulse*20),68,70,235);
         // Flat ink with dirt across the track; no highlight or bevel.
         s.icon("grime",98,y+2,316,22,210,255);
         if (cap < 100) {
-            const int x = 99 + boundary;
-            // Staggered segments give the edge a broken profile at HUD scale.
-            for (int i = 0; i < 5; ++i) {
-                const int offset[] = {0, -2, 1, -1, 0};
-                s.box(x + offset[i] - 1, y + 2 + 4*i, 4, 5, 12, 9, 11, 245);
-                s.box(x + offset[i] + 3, y + 2 + 4*i, 1, 5, 126, 91, 91, 220);
-            }
+            s.box(99 + boundary, y + 3, 314 - boundary, 20, 3, 2, 4, 225);
+            healthFracture(s,99+boundary,y-2);
         }
     }
     if(v.staminaVisible) {

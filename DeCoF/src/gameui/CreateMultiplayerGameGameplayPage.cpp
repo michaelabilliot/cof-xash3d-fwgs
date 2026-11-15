@@ -66,7 +66,10 @@ CCreateMultiplayerGameGameplayPage::~CCreateMultiplayerGameGameplayPage()
 //-----------------------------------------------------------------------------
 int CCreateMultiplayerGameGameplayPage::GetMaxPlayers()
 {
-	return atoi( GetValue( "maxplayers", "32" ) );
+	const long players = strtol( GetValue( "maxplayers", "24" ), NULL, 10 );
+	if ( players < 2 )
+		return 24;
+	return players > 24 ? 24 : static_cast<int>( players );
 }
 
 //-----------------------------------------------------------------------------
@@ -183,6 +186,11 @@ void CCreateMultiplayerGameGameplayPage::LoadGameOptionsList()
 
 	while ( pObj )
 	{
+		if ( !stricmp( pObj->cvarname, "maxplayers" ) && pObj->type == O_NUMBER )
+		{
+			pObj->fMin = 2;
+			pObj->fMax = 24;
+		}
 		pCtrl = new mpcontrol_t( objParent, pObj->cvarname );
 		pCtrl->type = pObj->type;
 
@@ -197,7 +205,7 @@ void CCreateMultiplayerGameGameplayPage::LoadGameOptionsList()
 		case O_STRING:
 		case O_NUMBER:
 			pEdit = new TextEntry( pCtrl, "DescEdit" );
-			pEdit->InsertString( pObj->defValue );
+			pEdit->InsertString( stricmp( pObj->cvarname, "maxplayers" ) ? pObj->defValue : "24" );
 			pCtrl->pControl = (Panel *)pEdit;
 			break;
 		case O_LIST:
