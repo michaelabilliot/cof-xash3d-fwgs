@@ -516,6 +516,24 @@ float R_ViewModelAttachmentScale() {
 }
 
 convar_t dx_player_stale_timeout =
+// Cry of Fear 1.6 added cl_fovmultiplier (client: cdata->fov = m_flFOV *
+// cl_fovmultiplier); the 1.55 client CoFR runs on lacks it, so it is applied
+// here to the final view. Like 1.6 it scales the base horizontal FOV (4:3 when
+// r_adjust_fov widened it), zooms included; the viewmodel keeps r_viewmodel_fov.
+convar_t cl_fovmultiplier = { (char *)"cl_fovmultiplier", (char *)"1", FCVAR_ARCHIVE };
+static float R_CofMultipliedFovY(float fovX,float fovY,float width,float height) {
+ const float m=cl_fovmultiplier.value;
+ if(!std::isfinite(m)||m<=0.f||m==1.f||width<=0.f||height<=0.f)return fovY;
+ const float tx=tanf(D3DXToRadian(fovX)*.5f),ty=tanf(D3DXToRadian(fovY)*.5f);
+ if(!std::isfinite(tx)||!std::isfinite(ty)||tx<=0.f||ty<=0.f)return fovY;
+ // Unadjusted, the engine derives fov_y from fov_x at the real aspect.
+ const float base=fabsf(ty-tx*height/width)<=ty*.002f?fovX:D3DXToDegree(2.f*atanf(ty*4.f/3.f));
+ const float wanted=std::max(10.f,std::min(150.f,base*m));
+ const float k=tanf(D3DXToRadian(wanted)*.5f)/tanf(D3DXToRadian(base)*.5f);
+ const float y=D3DXToDegree(2.f*atanf(ty*k));
+ return std::isfinite(y)&&y>1.f&&y<179.f?y:fovY;
+}
+
 { (char *)"dx_player_stale_timeout", (char *)"0.50", 0 };
 
 convar_t dx_player_dead_body_timeout =
@@ -2175,6 +2193,7 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_shell_unstick );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_stale_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_dead_body_timeout );
+	gEngfuncs.Cvar_RegisterVariable( &cl_fovmultiplier );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_use_engine_state );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_interpolation );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_interp_delay );
@@ -6537,7 +6556,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 			VectorCopy( g_vForward, g_dxCullForward );
 			VectorCopy( g_vRight, g_dxCullRight );
 			VectorCopy( g_vUp, g_dxCullUp );
-			g_dxCullTanY = tanf( D3DXToRadian( rvp->fov_y ) * 0.5f );
+			g_dxCullTanY = tanf( D3DXToRadian( sceneFovY ) * 0.5f );
 			g_dxCullTanX = g_dxCullTanY * aspect;
 			g_dxCullNear = 4.0f;
 			g_dxCullFar = 8192.0f;
@@ -6546,6 +6565,12 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		else
 		{
 			g_dxCullValid = false;
+		const float sceneFovY =
+			FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW )
+			? rvp->fov_y
+			: R_CofMultipliedFovY( rvp->fov_x, rvp->fov_y,
+				static_cast<float>( viewport.Width ),
+				static_cast<float>( viewport.Height ) );
 		}
 
 		D3DXMATRIX projection;
@@ -6583,7 +6608,7 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		if( !haveProjection )
 		{
 			D3DXMatrixPerspectiveFovLH( &projection,
-				D3DXToRadian( rvp->fov_y ),
+				D3DXToRadian( sceneFovY ),
 				aspect, 4.0f, 8192.0f );
 		}
 
