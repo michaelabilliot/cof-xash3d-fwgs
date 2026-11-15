@@ -516,7 +516,6 @@ float R_ViewModelAttachmentScale() {
  return std::isfinite(scale)&&scale>.2f&&scale<5.f?scale:1.f;
 }
 
-convar_t dx_player_stale_timeout =
 // Cry of Fear 1.6 added cl_fovmultiplier (client: cdata->fov = m_flFOV *
 // cl_fovmultiplier); the 1.55 client CoFR runs on lacks it, so it is applied
 // here to the final view. Like 1.6 it scales the base horizontal FOV (4:3 when
@@ -535,6 +534,7 @@ static float R_CofMultipliedFovY(float fovX,float fovY,float width,float height)
  return std::isfinite(y)&&y>1.f&&y<179.f?y:fovY;
 }
 
+convar_t dx_player_stale_timeout =
 { (char *)"dx_player_stale_timeout", (char *)"0.50", 0 };
 
 convar_t dx_player_dead_body_timeout =
@@ -2193,9 +2193,9 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_viewmodel_attachment_fov );
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_shell_unstick );
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_lantern_wall_clearance );
+	gEngfuncs.Cvar_RegisterVariable( &cl_fovmultiplier );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_stale_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_dead_body_timeout );
-	gEngfuncs.Cvar_RegisterVariable( &cl_fovmultiplier );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_use_engine_state );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_interpolation );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_interp_delay );
@@ -6575,6 +6575,12 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 
 		const float aspect = viewport.Height
 			? static_cast<float>( viewport.Width ) / viewport.Height : 1.0f;
+		const float sceneFovY =
+			FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW )
+			? rvp->fov_y
+			: R_CofMultipliedFovY( rvp->fov_x, rvp->fov_y,
+				static_cast<float>( viewport.Width ),
+				static_cast<float>( viewport.Height ) );
 
 		if( !g_dxOverviewView && r_nocull.value == 0.0f )
 		{
@@ -6591,12 +6597,6 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		else
 		{
 			g_dxCullValid = false;
-		const float sceneFovY =
-			FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW )
-			? rvp->fov_y
-			: R_CofMultipliedFovY( rvp->fov_x, rvp->fov_y,
-				static_cast<float>( viewport.Width ),
-				static_cast<float>( viewport.Height ) );
 		}
 
 		D3DXMATRIX projection;
