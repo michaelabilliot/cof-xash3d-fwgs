@@ -95,6 +95,13 @@ static void R_ResetCofPlayerVisibility(){g_cofPlayerVisibility.clear();R_ResetCo
 extern "C" __declspec(dllexport) int __cdecl DX_CofPlayerVisibilityV1(unsigned reasons,float time) {
  return g_cofPlayerVisibility.publish(reasons,time)?1:0;
 }
+static void R_AimDeadzoneStatusCmd( void );
+static void R_AimDeadzoneUnhookMove( void );
+static void R_AimDeadzoneHookMove( void );
+static void __cdecl R_AimDeadzoneCreateMove( float frametime, void *cmd, int active );
+static float g_aimCrosshairOffset[2] = {};
+static float g_aimMoveYaw = 0.0f; // aim yaw - camera yaw of the last rendered view
+static void **g_aimCreateMoveSlot = nullptr;
 bool R_CofPlayerDrawAllowed(const cl_entity_s* entity) {
  // DeadPlayer geometry delegates to StudioDrawPlayer in the native client too.
  if(!entity||(!entity->player&&entity->curstate.renderfx!=kRenderFxDeadPlayer))return true;
@@ -222,6 +229,8 @@ struct player_interp_t
 static player_interp_t g_remotePlayerInterp[MAX_CLIENTS + 1];
 
 vec3_t g_vRight, g_vUp, g_vForward, g_vOrigin, g_vAngles;
+vec3_t g_vAimAngles, g_vAimForward, g_vAimRight, g_vAimUp;
+float g_viewModelAimCorrection[2] = {};
 
 bool g_dxCullValid = false;
 vec3_t g_dxCullOrigin;
@@ -523,6 +532,28 @@ float R_ViewModelAttachmentScale() {
 // here to the final view. Like 1.6 it scales the base horizontal FOV (4:3 when
 // r_adjust_fov widened it), zooms included; the viewmodel keeps r_viewmodel_fov.
 convar_t cl_fovmultiplier = { (char *)"cl_fovmultiplier", (char *)"1", FCVAR_ARCHIVE };
+
+// Arma-style aiming deadzone (dx_aim_deadzone.h). Degrees; 0 = off.
+convar_t cl_aimdeadzone = { (char *)"cl_aimdeadzone", (char *)"0", FCVAR_ARCHIVE };
+// 1 = keep the deadzone while aiming down iron sights; 0 = recentre the
+// camera on the sights (the rifle scope always recentres).
+convar_t cl_aimdeadzone_ads = { (char *)"cl_aimdeadzone_ads", (char *)"0", FCVAR_ARCHIVE };
+// Deadzone fraction per second lost/regained entering/leaving sights or sprint (0 = instant).
+convar_t cl_aimdeadzone_ads_speed = { (char *)"cl_aimdeadzone_ads_speed", (char *)"6", FCVAR_ARCHIVE };
+// 1 = turn the drawn weapon so its barrel points at the true aim point despite
+// r_viewmodel_fov differing from the world FOV.
+convar_t cl_aimdeadzone_vmfov = { (char *)"cl_aimdeadzone_vmfov", (char *)"0", FCVAR_ARCHIVE };
+// 1 = keep the deadzone while sprinting; 0 = recentre (with cl_aimdeadzone_move).
+// CoF pmove drops sidemove while sprinting, so a kept offset makes the sprint
+// follow the weapon rather than the camera.
+convar_t cl_aimdeadzone_sprint = { (char *)"cl_aimdeadzone_sprint", (char *)"0", FCVAR_ARCHIVE };
+// 1 = no deadzone while a melee weapon (switchblade, nightstick, branch, axe,
+// pickaxe, sledgehammer, sledgeshovel) is held: the camera recentres on it.
+convar_t cl_aimdeadzone_melee_exempt = { (char *)"cl_aimdeadzone_melee_exempt", (char *)"0", FCVAR_ARCHIVE };
+// 1 = walk where the camera faces, not where the weapon points.
+convar_t cl_aimdeadzone_move = { (char *)"cl_aimdeadzone_move", (char *)"1", FCVAR_ARCHIVE };
+// 1 = draw the HUD crosshair where the weapon points instead of mid-screen.
+convar_t cl_aimdeadzone_crosshair = { (char *)"cl_aimdeadzone_crosshair", (char *)"1", FCVAR_ARCHIVE };
 static float R_CofMultipliedFovY(float fovX,float fovY,float width,float height) {
  const float m=cl_fovmultiplier.value;
  if(!std::isfinite(m)||m<=0.f||m==1.f||width<=0.f||height<=0.f)return fovY;
@@ -2156,6 +2187,7 @@ static void R_RegisterContextCommands( void )
 	gEngfuncs.Cmd_AddCommand("dx_cof_pickup_status",R_CofPickupStatusCmd,"Inspect aimed pickup outline without world lighting");
 	gEngfuncs.Cmd_AddCommand("dx_cof_shadow_probe",R_CofShadowProbeCmd,"Isolate box, CPU Simon or skinned Simon 96 units ahead");
 	gEngfuncs.Cmd_AddCommand("dx_cof_shadow_trace",R_CofShadowTraceCmd,"Log the next 32 shadow submissions");
+	gEngfuncs.Cmd_AddCommand("cl_aimdeadzone_status",R_AimDeadzoneStatusCmd,"Print the aiming deadzone's aim/camera angles");
 	g_contextCommandsRegistered = true;
 }
 
@@ -2175,6 +2207,7 @@ static void R_RemoveContextCommands( void )
 	gEngfuncs.Cmd_RemoveCommand("dx_cof_pickup_status");
 	gEngfuncs.Cmd_RemoveCommand("dx_cof_shadow_probe");
 	gEngfuncs.Cmd_RemoveCommand("dx_cof_shadow_trace");
+	gEngfuncs.Cmd_RemoveCommand("cl_aimdeadzone_status");
 	g_contextCommandsRegistered = false;
 }
 
@@ -2220,6 +2253,14 @@ static void R_RegisterContextCvars( void )
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_shell_unstick );
 	gEngfuncs.Cvar_RegisterVariable( &dx_cof_lantern_wall_clearance );
 	gEngfuncs.Cvar_RegisterVariable( &cl_fovmultiplier );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_ads );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_ads_speed );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_vmfov );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_sprint );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_melee_exempt );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_move );
+	gEngfuncs.Cvar_RegisterVariable( &cl_aimdeadzone_crosshair );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_stale_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_dead_body_timeout );
 	gEngfuncs.Cvar_RegisterVariable( &dx_player_use_engine_state );
@@ -3979,6 +4020,7 @@ static qboolean R_Init( void )
 
 static void R_Shutdown( void )
 {
+ R_AimDeadzoneUnhookMove();
  R_CofGunSmokeShutdown();
  R_LakeReedsShutdown();
  R_LakeBedReset();
@@ -4766,6 +4808,20 @@ static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r
 {
 	if( !device || w <= 0.0f || h <= 0.0f )
 		return;
+	// cl_aimdeadzone_crosshair: CoF's own crosshair is three thin FillRGBA
+	// bars (a red "T") around the view centre; move them to the aim point.
+	if( ( g_aimCrosshairOffset[0] != 0.0f || g_aimCrosshairOffset[1] != 0.0f ) &&
+		cl_aimdeadzone_crosshair.value != 0.0f && g_sceneViewportValid &&
+		std::min( w, h ) <= 3.0f && std::max( w, h ) <= 40.0f )
+	{
+		const float cx = g_sceneViewport.X + g_sceneViewport.Width * 0.5f;
+		const float cy = g_sceneViewport.Y + g_sceneViewport.Height * 0.5f;
+		if( x >= cx - 64.0f && x + w <= cx + 64.0f && y >= cy - 64.0f && y + h <= cy + 64.0f )
+		{
+			x += g_aimCrosshairOffset[0];
+			y += g_aimCrosshairOffset[1];
+		}
+	}
 
 	R_Flush2DBatch( );
 	DX_PROFILE_SCOPE( profile2dFillScope, DX_PROFILE_2D );
@@ -5034,6 +5090,11 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 	VectorCopy( g_vForward, savedForward );
 	VectorCopy( g_vRight, savedRight );
 	VectorCopy( g_vUp, savedUp );
+	vec3_t savedAim[4];
+	VectorCopy( g_vAimAngles, savedAim[0] );
+	VectorCopy( g_vAimForward, savedAim[1] );
+	VectorCopy( g_vAimRight, savedAim[2] );
+	VectorCopy( g_vAimUp, savedAim[3] );
 	VectorCopy( g_dxCullOrigin, savedCullOrigin );
 	VectorCopy( g_dxCullForward, savedCullForward );
 	VectorCopy( g_dxCullRight, savedCullRight );
@@ -5248,6 +5309,10 @@ static qboolean VID_CubemapShot( const char *base, uint size,
 	VectorCopy( savedForward, g_vForward );
 	VectorCopy( savedRight, g_vRight );
 	VectorCopy( savedUp, g_vUp );
+	VectorCopy( savedAim[0], g_vAimAngles );
+	VectorCopy( savedAim[1], g_vAimForward );
+	VectorCopy( savedAim[2], g_vAimRight );
+	VectorCopy( savedAim[3], g_vAimUp );
 	VectorCopy( savedCullOrigin, g_dxCullOrigin );
 	VectorCopy( savedCullForward, g_dxCullForward );
 	VectorCopy( savedCullRight, g_dxCullRight );
@@ -5647,7 +5712,7 @@ bool R_CofHandheldLightPose(dx_cof_light_state_v2& pose) {
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
- if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points,mirrored))return false;
+ if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAimAngles,offsets,points,mirrored))return false;
  for(int i=0;i<3;++i){pose.origin[i]=points[i];pose.direction[i]=points[3+i]-points[i];}
  return DX_CofValid(pose);
 }
@@ -5664,7 +5729,7 @@ bool R_CofPhoneLightPose(dx_cof_light_state_v2& pose) {
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
- if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points))return false;
+ if(!R_StudioViewModelLightAttachments(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAimAngles,offsets,points))return false;
  // Native74910 receives viewmodel attachment[1], not the camera or phone pivot.
  // The held phone follows normal view aim; only a stowed, switched-on
  // portable light uses the separate world-grounded direction.
@@ -5684,7 +5749,7 @@ bool R_CofWeaponLightPose(dx_cof_light_state_v2& pose) {
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_x.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_y.value)),
   std::max(-128.f,std::min(128.f,r_viewmodel_offset_z.value))};
- if(!R_StudioViewModelTacLightPoints(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAngles,offsets,points,mirrored))return false;
+ if(!R_StudioViewModelTacLightPoints(ent,R_CurrentRenderTime(pose.time),g_vOrigin,g_vAimAngles,offsets,points,mirrored))return false;
  for(int i=0;i<3;++i){pose.origin[i]=points[i];pose.direction[i]=points[3+i]-points[i];}
  return DX_CofValid(pose);
 }
@@ -5901,12 +5966,12 @@ static void R_DrawViewModel( void )
 	const bool dualCurrent=g_cofDual.current(static_cast<float>(gp_cl->time))!=nullptr;
 	const bool primaryMirrored=R_CofPrimaryMirrored(static_cast<float>(gp_cl->time));
 	DX_SetRenderStateCached(D3DRS_CULLMODE,primaryMirrored?D3DCULL_CW:D3DCULL_CCW);
-	if(viewModel)R_DrawStudioViewModel( viewModel, g_vOrigin, g_vAngles,
-		g_vForward, g_vRight, g_vUp,
+	if(viewModel)R_DrawStudioViewModel( viewModel, g_vOrigin, g_vAimAngles,
+		g_vAimForward, g_vAimRight, g_vAimUp,
 		forwardOffset, rightOffset, upOffset, primaryMirrored, true, dualCurrent?g_cofDual.primaryHiddenArm:0 );
 	g_cofDual.submit(static_cast<float>(gp_cl->time),g_cofDualPass,[&](cl_entity_t* secondary,bool mirrored) {
 		DX_SetRenderStateCached(D3DRS_CULLMODE,mirrored?D3DCULL_CW:D3DCULL_CCW);
-		R_DrawStudioViewModel(secondary,g_vOrigin,g_vAngles,g_vForward,g_vRight,g_vUp,
+		R_DrawStudioViewModel(secondary,g_vOrigin,g_vAimAngles,g_vAimForward,g_vAimRight,g_vAimUp,
 			forwardOffset,rightOffset,upOffset,mirrored,true,g_cofDual.secondaryHiddenArm,false);
 		const auto debug=gEngfuncs.pfnGetCvarPointer?gEngfuncs.pfnGetCvarPointer("cof8_dual_debug"):nullptr;
 		static unsigned budget=120;
@@ -6132,7 +6197,7 @@ static void R_CollectLanternLights() {
     std::clamp(r_viewmodel_offset_y.value,-128.f,128.f),std::clamp(r_viewmodel_offset_z.value,-128.f,128.f)};
    for(int hand=0;hand<2;++hand)if((!draw||draw->value!=0.f)&&R_CofLanternModel(hands[hand],true)) {
     float points[6];
-    if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(R_CurrentRenderTime(0.f))))
+    if(R_StudioViewModelLightAttachments(hands[hand],R_CurrentRenderTime(0.f),g_vOrigin,g_vAimAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(R_CurrentRenderTime(0.f))))
      {R_CofKeepViewLightOutOfWalls(points);submit(-1-hand,points);}
    }
   }
@@ -6171,7 +6236,7 @@ static void R_CollectCofFlareLights() {
     std::strcmp(label,"discard")&&std::strcmp(label,"flare_holster");
    if(!dualBurning&&!cof_features::litFlareSequence(label,frame))continue;
    float points[6],offsets[3]={r_viewmodel_offset_x.value,r_viewmodel_offset_y.value,r_viewmodel_offset_z.value};
-   if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(now)))
+   if(R_StudioViewModelLightAttachments(ent,now,g_vOrigin,g_vAimAngles,offsets,points,hand==1?g_cofDual.mirror:R_CofPrimaryMirrored(now)))
     {R_CofKeepViewLightOutOfWalls(points);R_AddDLight(points,220.f,255,8,3,now+.1f,-20-hand);}
   }
  }
@@ -6194,7 +6259,7 @@ static void R_SelectCofPickup() {
   if(!ent||!ent->model||ent->model->type!=mod_studio||(ent->curstate.effects&EF_NODRAW)||
      !g_cofPickups.contains(ent->index,ent->curstate.modelindex,now))continue;
   float center[3];for(int i=0;i<3;++i)center[i]=ent->origin[i]+(ent->model->mins[i]+ent->model->maxs[i])*.5f;
-  const float strength=cof_features::pickupStrength(g_vOrigin,g_vForward,center);
+  const float strength=cof_features::pickupStrength(g_vOrigin,g_vAimForward,center);
   if(strength<=g_cofPickupStrength||!gEngfuncs.CL_TraceLine)continue;
   auto trace=gEngfuncs.CL_TraceLine(g_vOrigin,center,PM_WORLD_ONLY);
   if(trace.startsolid||trace.allsolid||trace.fraction<.98f)continue;
@@ -6578,6 +6643,164 @@ void R_DrawEnts( const vec3_t view_origin )
 	}
 }
 
+#include "dx_aim_deadzone.h"
+static aim_deadzone::State g_aimDeadzone;
+static struct { aim_deadzone::Input in; bool firstPerson=false; unsigned blockers=0; float aim[2]{},camera[2]{},origin[3]{},time=0.f; } g_aimDeadzoneLast;
+static void R_AimDeadzoneStatusCmd( void )
+{
+ const auto& l=g_aimDeadzoneLast;
+ gEngfuncs.Con_Printf("cl_aimdeadzone: blockers=%x radius=%.2f blend=%.2f firstPerson=%d sights=%d scope=%d time=%.2f\n"
+  "  aim=(%.2f %.2f) camera=(%.2f %.2f) offset=(%.2f %.2f) origin=(%.1f %.1f %.1f)\n",
+  l.blockers,l.in.radius,g_aimDeadzone.blend,l.firstPerson?1:0,l.in.sights?1:0,l.in.snap?1:0,l.time,
+  l.aim[0],l.aim[1],l.camera[0],l.camera[1],l.aim[0]-l.camera[0],aim_deadzone::wrap(l.aim[1]-l.camera[1]),
+  l.origin[0],l.origin[1],l.origin[2]);
+ gEngfuncs.Con_Printf("  move: hooked=%d yaw=%.2f  crosshair offset=(%.1f %.1f)px\n",
+  g_aimCreateMoveSlot&&*g_aimCreateMoveSlot==reinterpret_cast<void*>(&R_AimDeadzoneCreateMove)?1:0,g_aimMoveYaw,
+  g_aimCrosshairOffset[0],g_aimCrosshairOffset[1]);
+ gEngfuncs.Con_Printf("  viewmodel aim correction=(%.2f %.2f)\n",g_viewModelAimCorrection[0],g_viewModelAimCorrection[1]);
+ if(auto vm=R_CurrentViewModel())
+  gEngfuncs.Con_Printf("  viewmodel %s seq=%d angles=(%.2f %.2f %.2f) origin=(%.1f %.1f %.1f) cur=(%.2f %.2f)\n",
+   vm->model?vm->model->name:"-",vm->curstate.sequence,vm->angles[0],vm->angles[1],vm->angles[2],
+   vm->origin[0],vm->origin[1],vm->origin[2],vm->curstate.angles[0],vm->curstate.angles[1]);
+}
+// The viewmodel is posed in an iron-sight sequence (not the way out of one),
+// or (sprint=true) in a sprint sequence.
+static bool R_ViewModelInSights(bool sprint=false) {
+ auto ent=R_CurrentViewModel();
+ if(!ent||!ent->model||ent->model->type!=mod_studio||(ent->curstate.effects&EF_NODRAW)||!gEngfuncs.Mod_Extradata)return false;
+ auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
+ const int seq=ent->curstate.sequence;
+ if(!R_StudioHeaderValid(hdr)||seq<0||seq>=hdr->numseq||
+    !R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t)))return false;
+ const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
+ char label[33]{};memcpy(label,seqs[seq].label,32);
+ return sprint?aim_deadzone::sprintSequence(label):aim_deadzone::sightsSequence(label);
+}
+// Rendered camera angles for this view. Only the local first-person view of
+// a live player lags; cubemaps, overviews, cutscene cameras and third person
+// render the engine angles and recentre the deadzone.
+static void R_AimDeadzoneCamera( const struct ref_viewpass_s *rvp, vec3_t camera )
+{
+ VectorCopy(rvp->viewangles,camera);
+ if(FBitSet(rvp->flags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ aim_deadzone::Input in;
+ unsigned blockers=0;
+ if(!gp_cl)blockers|=1u;
+ else {
+  if(rvp->viewentity!=gp_cl->playernum+1)blockers|=2u;
+  if(gp_cl->viewentity!=gp_cl->playernum+1)blockers|=4u;
+ }
+ if(g_sceneViewModelHidden)blockers|=8u;
+ if(ENGINE_GET_PARM(PARM_LOCAL_HEALTH)<=0)blockers|=16u;
+ if(ENGINE_GET_PARM(PARM_THIRDPERSON))blockers|=32u;
+ const bool firstPerson=blockers==0;
+ in.radius=firstPerson?cl_aimdeadzone.value:0.f;
+ in.snap=R_CofRifleScopeActive();
+ // Sprinting zeroes sidemove in CoF pmove, so camera-relative movement needs
+ // the camera on the aim while sprinting.
+ in.sights=(cl_aimdeadzone_ads.value==0.f&&R_ViewModelInSights())||
+  (cl_aimdeadzone_move.value!=0.f&&cl_aimdeadzone_sprint.value==0.f&&R_ViewModelInSights(true));
+ if(cl_aimdeadzone_melee_exempt.value!=0.f) {
+  const auto vm=R_CurrentViewModel();
+  if(vm&&vm->model&&!(vm->curstate.effects&EF_NODRAW)&&aim_deadzone::meleeModel(vm->model->name))in.sights=true;
+ }
+ in.sightsSpeed=cl_aimdeadzone_ads_speed.value;
+ const float aim[2]={rvp->viewangles[PITCH],rvp->viewangles[YAW]};float out[2];
+ aim_deadzone::update(g_aimDeadzone,aim,gp_cl?static_cast<float>(gp_cl->time):0.f,in,out);
+ camera[PITCH]=out[0];camera[YAW]=out[1];
+ auto& l=g_aimDeadzoneLast;l.in=in;l.firstPerson=firstPerson;l.blockers=blockers;l.time=gp_cl?static_cast<float>(gp_cl->time):0.f;
+ l.aim[0]=aim[0];l.aim[1]=aim[1];l.camera[0]=out[0];l.camera[1]=out[1];VectorCopy(rvp->vieworigin,l.origin);
+ g_aimMoveYaw=firstPerson&&in.radius>0.f?aim_deadzone::wrap(aim[1]-out[1]):0.f;
+ if(firstPerson&&in.radius>0.f&&cl_aimdeadzone_move.value!=0.f)R_AimDeadzoneHookMove();
+}
+
+// cl_aimdeadzone_move. The CoFR client.dll proxy exports CL_CreateMove as
+// "jmp dword ptr [slot]", the slot being a pointer in its own .data. Wrap it
+// so the finished usercmd's forward/side input is re-expressed relative to
+// the camera instead of the aim (yaw only; pitch keeps swimming/ladders).
+struct aim_usercmd_prefix_t { int16_t lerp_msec; uint8_t msec, pad1; float viewangles[3]; float forwardmove, sidemove, upmove; };
+typedef void (__cdecl *aim_create_move_t)( float frametime, void *cmd, int active );
+static aim_create_move_t g_aimOrigCreateMove = nullptr;
+static HMODULE g_aimClientModule = nullptr;
+static void __cdecl R_AimDeadzoneCreateMove( float frametime, void *cmd, int active )
+{
+ if(g_aimOrigCreateMove)g_aimOrigCreateMove(frametime,cmd,active);
+ if(!cmd||cl_aimdeadzone_move.value==0.f||g_aimMoveYaw==0.f)return;
+ auto c=static_cast<aim_usercmd_prefix_t*>(cmd);
+ aim_deadzone::cofMove(g_aimMoveYaw,c->forwardmove,c->sidemove);
+}
+static void R_AimDeadzoneHookMove( void )
+{
+ const HMODULE client=GetModuleHandleA("client.dll");
+ if(!client)return;
+ if(g_aimCreateMoveSlot&&g_aimClientModule==client&&
+    *g_aimCreateMoveSlot==reinterpret_cast<void*>(&R_AimDeadzoneCreateMove))return;
+ const auto entry=reinterpret_cast<const uint8_t*>(GetProcAddress(client,"CL_CreateMove"));
+ if(!entry||entry[0]!=0xFF||entry[1]!=0x25)return;
+ void **slot=nullptr;memcpy(&slot,entry+2,sizeof(slot));
+ const auto dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(client);
+ const auto nt=reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const uint8_t*>(client)+dos->e_lfanew);
+ const auto lo=reinterpret_cast<const uint8_t*>(client),hi=lo+nt->OptionalHeader.SizeOfImage;
+ if(reinterpret_cast<const uint8_t*>(slot)<lo||reinterpret_cast<const uint8_t*>(slot)+sizeof(void*)>hi)return;
+ void *current=*slot;
+ if(!current||current==reinterpret_cast<void*>(&R_AimDeadzoneCreateMove))return;
+ g_aimOrigCreateMove=reinterpret_cast<aim_create_move_t>(current);
+ g_aimCreateMoveSlot=slot;g_aimClientModule=client;
+ InterlockedExchangePointer(slot,reinterpret_cast<void*>(&R_AimDeadzoneCreateMove));
+ gEngfuncs.Con_Printf("D3D9: cl_aimdeadzone_move hooked client CL_CreateMove\n");
+}
+static void R_AimDeadzoneUnhookMove( void )
+{
+ if(g_aimCreateMoveSlot&&g_aimOrigCreateMove&&g_aimClientModule&&g_aimClientModule==GetModuleHandleA("client.dll")&&
+    *g_aimCreateMoveSlot==reinterpret_cast<void*>(&R_AimDeadzoneCreateMove))
+  InterlockedExchangePointer(g_aimCreateMoveSlot,reinterpret_cast<void*>(g_aimOrigCreateMove));
+ g_aimCreateMoveSlot=nullptr;g_aimOrigCreateMove=nullptr;g_aimClientModule=nullptr;g_aimMoveYaw=0.f;
+}
+// The viewmodel is drawn with its own r_viewmodel_fov projection, so turning
+// it by the deadzone offset moves its barrel by tan(off)/tan(vmfov/2) of the
+// screen while the true aim moves by tan(off)/tan(worldfov/2). Scale the
+// weapon's camera-relative direction by tan(vmfov/2)/tan(worldfov/2) so the
+// drawn barrel's vanishing point lands on the projected aim point.
+static void R_AimDeadzoneViewModelCorrection( const struct ref_viewpass_s *rvp )
+{
+ if(FBitSet(rvp->flags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ g_viewModelAimCorrection[0]=g_viewModelAimCorrection[1]=0.f;
+ const auto& l=g_aimDeadzoneLast;
+ if(cl_aimdeadzone_vmfov.value==0.f)return;
+ if(!l.firstPerson||l.in.radius<=0.f||(l.aim[0]==l.camera[0]&&l.aim[1]==l.camera[1]))return;
+ if(g_sceneProjection._34!=1.f||g_sceneProjection._22<=0.f)return;
+ const float vmFov=std::max(10.f,std::min(170.f,r_viewmodel_fov.value));
+ const float k=tanf(D3DXToRadian(vmFov)*.5f)*g_sceneProjection._22;
+ if(!std::isfinite(k)||k<=0.f||fabsf(k-1.f)<1e-3f)return;
+ const float cx=DotProduct(g_vAimForward,g_vRight),cy=DotProduct(g_vAimForward,g_vUp),cz=DotProduct(g_vAimForward,g_vForward);
+ if(cz<=.1f)return;
+ vec3_t dir;
+ for(int i=0;i<3;++i)dir[i]=g_vForward[i]*cz+(g_vRight[i]*cx+g_vUp[i]*cy)*k;
+ const float flat=sqrtf(dir[0]*dir[0]+dir[1]*dir[1]);
+ if(flat<1e-4f)return;
+ // View-angle convention: pitch positive looks down.
+ const float pitch=-RAD2DEG(atan2f(dir[2],flat)),yaw=RAD2DEG(atan2f(dir[1],dir[0]));
+ const float dp=pitch-g_vAimAngles[PITCH],dy=aim_deadzone::wrap(yaw-g_vAimAngles[YAW]);
+ if(!std::isfinite(dp)||!std::isfinite(dy))return;
+ g_viewModelAimCorrection[0]=dp;g_viewModelAimCorrection[1]=dy;
+}
+// Screen-space offset (pixels) of the true aim point from the view centre.
+static void R_AimDeadzoneCrosshair( const struct ref_viewpass_s *rvp )
+{
+ if(FBitSet(rvp->flags,RF_DRAW_CUBEMAP|RF_DRAW_OVERVIEW))return;
+ g_aimCrosshairOffset[0]=g_aimCrosshairOffset[1]=0.f;
+ const auto& l=g_aimDeadzoneLast;
+ if(!l.firstPerson||l.in.radius<=0.f||(l.aim[0]==l.camera[0]&&l.aim[1]==l.camera[1]))return;
+ if(DotProduct(g_vAimForward,g_vForward)<=.1f)return;
+ vec3_t point;VectorMA(g_vOrigin,4096.f,g_vAimForward,point);
+ D3DXVECTOR3 projected;
+ if(!R_ProjectWorldPoint(point,projected))return;
+ const float x=projected.x-(g_sceneViewport.X+g_sceneViewport.Width*.5f);
+ const float y=projected.y-(g_sceneViewport.Y+g_sceneViewport.Height*.5f);
+ if(!std::isfinite(x)||!std::isfinite(y))return;
+ g_aimCrosshairOffset[0]=x;g_aimCrosshairOffset[1]=y;
+}
+
 static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 {
 	++g_cofDualPass;
@@ -6619,9 +6842,13 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 		g_sceneViewport = viewport;
 		g_sceneViewportValid = true;
 
-		AngleVectors( rvp->viewangles, g_vForward, g_vRight, g_vUp );
+		VectorCopy( rvp->viewangles, g_vAimAngles );
+		AngleVectors( g_vAimAngles, g_vAimForward, g_vAimRight, g_vAimUp );
+		vec3_t cameraAngles;
+		R_AimDeadzoneCamera( rvp, cameraAngles );
+		AngleVectors( cameraAngles, g_vForward, g_vRight, g_vUp );
 		VectorCopy( rvp->vieworigin, g_vOrigin );
-		VectorCopy( rvp->viewangles, g_vAngles );
+		VectorCopy( cameraAngles, g_vAngles );
 
 		const D3DXVECTOR3 eye( rvp->vieworigin[0], rvp->vieworigin[1], rvp->vieworigin[2] );
 		const D3DXVECTOR3 at( rvp->vieworigin[0] + g_vForward[0],
@@ -6704,6 +6931,8 @@ static void DX_RenderFrame( const struct ref_viewpass_s *rvp )
 
 		device->SetTransform( D3DTS_PROJECTION, &projection );
 		g_sceneProjection = projection;
+		R_AimDeadzoneCrosshair( rvp );
+		R_AimDeadzoneViewModelCorrection( rvp );
 	}
 
 	DX_UpdateFog( rvp );
@@ -7051,6 +7280,18 @@ static void R_DrawStretchPic( float x, float y, float w, float h,
 		return;
 
 	R_Set2DMode( true );
+	// cl_aimdeadzone_crosshair: HUD crosshair sprites (#HUD/cof_crosshair...,
+	// crosshair_new, crosshairs) follow the weapon inside the deadzone.
+	if( ( g_aimCrosshairOffset[0] != 0.0f || g_aimCrosshairOffset[1] != 0.0f ) &&
+		cl_aimdeadzone_crosshair.value != 0.0f )
+	{
+		const char *name = DX_TextureName( static_cast<unsigned int>( texnum ) );
+		if( name && Q_stristr( name, "crosshair" ) )
+		{
+			x += g_aimCrosshairOffset[0];
+			y += g_aimCrosshairOffset[1];
+		}
+	}
 	R_Queue2DTexturedQuad( x, y, w, h, s1, t1, s2, t2,
 		texnum, g_2dRenderMode, g_Color );
 }

@@ -3704,7 +3704,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 
 	const float forwardOffset = std::max( -16.0f,
 		std::min( 16.0f, dx_muzzleflash_forward_offset.value ) );
-	if( viewModel ) VectorMA( flash.origin, forwardOffset, g_vForward, flash.origin );
+	if( viewModel ) VectorMA( flash.origin, forwardOffset, g_vAimForward, flash.origin );
 
 	flash.textureId = R_FindMuzzleFlashTexture( spriteType );
 	flash.scale = scale;
@@ -3720,7 +3720,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
  if(R_CofClientPresent()) {
   vec3_t smokeForward;
   if(!viewModel && ent)AngleVectors(ent->angles,smokeForward,nullptr,nullptr);
-  else VectorCopy(g_vForward,smokeForward);
+  else VectorCopy(g_vAimForward,smokeForward);
   R_CofGunSmokeShot(origin,smokeForward,flash.startTime);
  }
 

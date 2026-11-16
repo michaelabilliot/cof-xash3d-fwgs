@@ -89,6 +89,12 @@ extern IDirect3DDevice9 *device;
 extern float g_frametime;
 extern bool g_dxOverviewView;
 extern vec3_t g_vRight, g_vUp, g_vForward, g_vOrigin, g_vAngles;
+// True aim (engine view angles). Equal to g_vAngles unless cl_aimdeadzone
+// lets the rendered camera lag behind the weapon.
+extern vec3_t g_vAimAngles, g_vAimForward, g_vAimRight, g_vAimUp;
+// Pitch/yaw added to the drawn viewmodel so its barrel, seen through the
+// r_viewmodel_fov projection, points at the true aim's world-projected spot.
+extern float g_viewModelAimCorrection[2];
 
 extern bool g_dxCullValid;
 extern vec3_t g_dxCullOrigin, g_dxCullForward, g_dxCullRight, g_dxCullUp;
