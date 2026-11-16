@@ -6514,7 +6514,7 @@ void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_
  g_cofShadowEntity.curstate.scale=1.f;g_cofShadowEntity.curstate.body=0;g_cofShadowEntity.curstate.skin=0;g_cofShadowEntity.curstate.sequence=sequence;g_cofShadowEntity.curstate.gaitsequence=gaitSequence;
  g_cofShadowEntity.curstate.framerate=1.f;g_cofShadowEntity.curstate.animtime=now;
  VectorCopy(gp_cl->simorg,g_cofShadowEntity.origin);VectorCopy(gp_cl->simorg,g_cofShadowEntity.curstate.origin);
- g_cofShadowEntity.angles[0]=g_cofShadowEntity.angles[2]=0;g_cofShadowEntity.angles[1]=g_vAngles[YAW];
+ g_cofShadowEntity.angles[0]=g_cofShadowEntity.angles[2]=0;g_cofShadowEntity.angles[1]=g_vAimAngles[YAW];
  VectorCopy(g_cofShadowEntity.angles,g_cofShadowEntity.curstate.angles);
  // This private world-space body, rather than the visible camera hands,
  // can cast giant finger silhouettes in the short camera exposure.
@@ -6525,7 +6525,7 @@ void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_
   if(!g_cofShadowMesh.available()&&!(omitArms?R_BuildCofShadowMeshFiltered(hdr,g_cofShadowMesh,true):R_BuildCofShadowMesh(hdr,g_cofShadowMesh)))return;
   const float elapsed=std::clamp(now-g_cofShadowPoseTime,0.f,.1f);
   cof_shadow_motion::Input motion;
-  motion.now=now;motion.dt=elapsed;motion.yaw=g_vAngles[YAW];motion.pitch=g_vAngles[PITCH];
+  motion.now=now;motion.dt=elapsed;motion.yaw=g_vAimAngles[YAW];motion.pitch=g_vAimAngles[PITCH];
   motion.vx=g_cofShadowVelocity[0];motion.vy=g_cofShadowVelocity[1];motion.vz=g_cofShadowVerticalSpeed;motion.speed=speed;
   motion.crouched=crouched;motion.ladder=climbing;motion.swim=swimming;motion.action=action;motion.frame=actionFrame;motion.weapon=primary.key;motion.choice=choice;
   g_cofShadowMotion.advance(motion);
@@ -6604,7 +6604,8 @@ void R_DrawCofPlayerShadow(cl_entity_s* player,model_t* model,model_t* donor,cl_
 }
 
 static void R_BuildViewModelWorld(const cl_entity_s* ent,const float* viewOrigin,const float* viewAngles,
- const float* viewForward,const float* viewRight,const float* viewUp,float forwardOffset,float rightOffset,float upOffset,D3DMATRIX& viewModelWorld,bool mirror=false)
+ const float* viewForward,const float* viewRight,const float* viewUp,float forwardOffset,float rightOffset,float upOffset,D3DMATRIX& viewModelWorld,bool mirror=false,
+ const float* angleCorrection=nullptr)
 {
 
 	vec3_t modelOrigin;
@@ -6639,6 +6640,11 @@ static void R_BuildViewModelWorld(const cl_entity_s* ent,const float* viewOrigin
 	{
 		VectorCopy( viewOrigin, modelOrigin );
 		VectorCopy( viewAngles, modelAngles );
+	}
+	if( angleCorrection )
+	{
+		modelAngles[PITCH] += angleCorrection[0];
+		modelAngles[YAW] += angleCorrection[1];
 	}
 
 	for( int axis = 0; axis < 3; ++axis )
@@ -6861,7 +6867,7 @@ void R_DrawStudioViewModel( cl_entity_s *ent,
 	}
 
 	D3DMATRIX viewModelWorld;
-    R_BuildViewModelWorld(ent,viewOrigin,viewAngles,viewForward,viewRight,viewUp,forwardOffset,rightOffset,upOffset,viewModelWorld,mirror);
+    R_BuildViewModelWorld(ent,viewOrigin,viewAngles,viewForward,viewRight,viewUp,forwardOffset,rightOffset,upOffset,viewModelWorld,mirror,g_viewModelAimCorrection);
 	device->SetTransform( D3DTS_WORLD, &viewModelWorld );
 
 	studiohdr_t *hdr = static_cast<studiohdr_t *>(
