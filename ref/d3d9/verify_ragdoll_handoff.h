@@ -94,7 +94,8 @@ static void adapterHandoffChecks(const std::string &path) {
         }
         require(acknowledgements[1]==3002 && std::abs(headshotMomentum(*d).x()-8)<2e-4f,"logged torso clusters retain shared 8 Ns budget and acknowledge once");
         const auto momentum=headshotMomentum(*d);DX_RagdollPose(&ent,hdr,world,pose,.03f);require((headshotMomentum(*d)-momentum).length2()==0,"repeated render cannot replay lethal discharge");
-        studio_cache_t cache{};cache.model=&model;cache.batches.emplace_back();auto &batch=cache.batches[0];batch.vertexCount=16;batch.primitiveCount=1;batch.indexBuffer=reinterpret_cast<IDirect3DIndexBuffer9*>(1);
+        studio_cache_t cache{};cache.model=&model;cache.batches.emplace_back();auto &batch=cache.batches[0];batch.vertexCount=16;batch.primitiveCount=1;
+        cache.indexBuffer=reinterpret_cast<IDirect3DIndexBuffer9*>(1);
         const auto *parts=reinterpret_cast<const mstudiobodyparts_t*>(bytes.data()+hdr->bodypartindex);const auto *sub=reinterpret_cast<const mstudiomodel_t*>(bytes.data()+parts[0].modelindex)+body;
         const auto *v=reinterpret_cast<const vec3_t*>(bytes.data()+sub->vertindex);const byte *bone= reinterpret_cast<const byte*>(bytes.data()+sub->vertinfoindex);
         for(int i=0;i<16;++i){studio_source_vertex_t vertex{};vertex.x=v[i][0];vertex.y=v[i][1];vertex.z=v[i][2];vertex.bone=bone[i];vertex.normalBone=bone[i];batch.sources.push_back(vertex);}

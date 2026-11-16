@@ -10,6 +10,9 @@
 #include "dx_cof_shadow_motion.h"
 #include "dx_audi_replacement.h"
 
+#include <map>
+#include <tuple>
+
 constexpr float DX_STUDIO_SHADE_LAMBERT = 1.4953241f;
 
 #ifndef MAXSTUDIOBONES
@@ -2596,7 +2599,6 @@ static void R_FreeStudioRemixBlendBuffer( const studio_cache_t &cache )
 		cache.remixBlendVertexBuffer = nullptr;
 	}
 	cache.remixBlendVertexCount = 0;
-	cache.remixBlendSplitNormals = false;
 }
 
 static void R_FreeStudioBuffers( studio_cache_t &cache )
@@ -2625,11 +2627,11 @@ static void R_FreeStudioBuffers( studio_cache_t &cache )
 			batch.vertexBuffer->Release( );
 			batch.vertexBuffer = nullptr;
 		}
-		if( batch.indexBuffer )
-		{
-			batch.indexBuffer->Release( );
-			batch.indexBuffer = nullptr;
-		}
+	}
+	if( cache.indexBuffer )
+	{
+		cache.indexBuffer->Release( );
+		cache.indexBuffer = nullptr;
 	}
 	cache.poseUploaded = false;
 	cache.buffersUploadNormals = false;
@@ -2648,6 +2650,95 @@ static void R_DestroyStudioGpuCache( studio_cache_t &cache )
 	cache.containsChrome = false;
 }
 
+namespace {
+class StudioRemixMeshes
+{
+public:
+	struct Entry
+	{
+		uint64_t handle;
+		uint64_t readyFrame = 0;
+		bool attempted = false;
+	};
+
+	Entry *find( const studio_cache_t &cache, uint64_t materials )
+	{
+		const HMODULE current = GetModuleHandleA( "d3d9.dll" );
+		if( current != module )
+		{
+			meshes.clear( );
+			module = current;
+			command = module ? reinterpret_cast<Command>(
+				GetProcAddress( module, "remixapi_D3D9RetainedMeshV1" ) ) : nullptr;
+		}
+		if( !command )
+			return nullptr;
+
+		const auto key = std::make_tuple( cache.model, cache.body, cache.skin, cache.hiddenArm, materials );
+		auto found = meshes.find( key );
+		if( found == meshes.end( ) )
+		{
+			// Bounds both retained GPU geometry and rejected learning attempts per map.
+			if( meshes.size( ) >= 256 )
+				return nullptr;
+			found = meshes.emplace( key, Entry{ nextHandle++ } ).first;
+		}
+		return &found->second;
+	}
+
+	bool begin( Entry &entry, unsigned surfaces, unsigned bones )
+	{
+		if( entry.attempted )
+			return false;
+		entry.attempted = true;
+		return command( device, Begin, entry.handle, surfaces, bones, nullptr ) != FALSE;
+	}
+
+	void finish( Entry &entry, unsigned bones )
+	{
+		if( command( device, Finish, entry.handle, 0, bones, nullptr ) )
+			entry.readyFrame = g_studioPoseFrame + 1;
+	}
+
+	bool draw( const Entry &entry, const D3DMATRIX &world, const BoneMat34 *bones, unsigned count ) const
+	{
+		// Use the same row layout as the shadow path's native instance transforms.
+		std::array<float, ( MAXSTUDIOBONES + 1 ) * 12> transforms;
+		for( unsigned row = 0; row < 3; ++row )
+		{
+			for( unsigned column = 0; column < 4; ++column )
+				transforms[row * 4 + column] = world.m[column][row];
+		}
+		static_assert( sizeof( BoneMat34 ) == 12 * sizeof( float ) );
+		memcpy( transforms.data( ) + 12, bones, count * sizeof( BoneMat34 ) );
+		for( unsigned i = 0; i < ( count + 1 ) * 12; ++i )
+		{
+			if( !std::isfinite( transforms[i] ) )
+				return false;
+		}
+		return command( device, Draw, entry.handle, 0, count, transforms.data( ) ) != FALSE;
+	}
+
+	void clear( )
+	{
+		if( !meshes.empty( ) && command && device && module == GetModuleHandleA( "d3d9.dll" ) )
+			command( device, Clear, 0, 0, 0, nullptr );
+		meshes.clear( );
+	}
+
+private:
+	using Command = BOOL (WINAPI *)( IDirect3DDevice9 *, uint32_t, uint64_t, uint32_t, uint32_t, const float * );
+	enum : uint32_t { Begin, Finish, Draw, Clear };
+	using Key = std::tuple<model_t *, int, int, int, uint64_t>;
+	std::map<Key, Entry> meshes;
+	HMODULE module = nullptr;
+	Command command = nullptr;
+	uint64_t nextHandle = 1;
+};
+
+StudioRemixMeshes g_studioRemixMeshes;
+}
+
 void R_ResetAudiReplacement( )
 {
 	audi_replacement::asset.reset();
@@ -2655,6 +2746,7 @@ void R_ResetAudiReplacement( )
 
 void R_ClearStudioGpuCaches( )
 {
+	g_studioRemixMeshes.clear( );
 	audi_replacement::asset.reset();
 	for( auto &cache : g_studioEntityGpuCacheStorage )
 		R_DestroyStudioGpuCache( cache );
@@ -2670,6 +2762,8 @@ void R_ClearStudioGpuCaches( )
 
 void R_ModelsLostDevice( )
 {
+	R_ClearNativeWorldBatches( );
+	g_studioRemixMeshes.clear( );
 	R_ResetAudiReplacement();
 	DX_ShutdownWorkers( );
 	R_FreeModelScratchBuffers( );
@@ -2694,6 +2788,10 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 	const bool uploadNormals = R_StudioUploadNormals( );
 	const bool gpuSkinning = R_StudioGpuSkinningForCache( cache );
 	const bool combinedVB = !gpuSkinning;
+	if( cache.indexBuffer && cache.buffersUploadNormals == uploadNormals &&
+		cache.combinedVertexBufferMode == combinedVB && cache.gpuSkinningBufferMode == gpuSkinning &&
+		( gpuSkinning ? cache.gpuSkinSourceVertexBuffer != nullptr : cache.combinedVertexBuffer != nullptr ) )
+		return true;
 	if( cache.buffersUploadNormals != uploadNormals ||
 		cache.combinedVertexBufferMode != combinedVB ||
 		cache.gpuSkinningBufferMode != gpuSkinning )
@@ -2797,6 +2895,8 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 			auto *destination = static_cast<studio_skin_vertex_t *>( sourceMemory );
 			for( const auto &batch : cache.batches )
 			{
+				if( batch.primitiveCount == 0 )
+					continue;
 				for( size_t sourceIndex = 0; sourceIndex < batch.sources.size( ); ++sourceIndex )
 				{
 					const studio_source_vertex_t &source = batch.sources[sourceIndex];
@@ -2862,49 +2962,49 @@ static bool R_CreateStudioBuffers( studio_cache_t &cache )
 		}
 	}
 
-	for( auto &batch : cache.batches )
+	if( !cache.indexBuffer )
 	{
-		if( batch.vertexCount == 0 || batch.primitiveCount == 0 )
-			continue;
-
-		if( !combinedVB && !gpuSkinning && !batch.vertexBuffer )
+		// Keep batch-local indices and draw order so the same ranges and materials
+		// reach Remix, with one index-buffer bind for all batches of this model.
+		size_t indexCount = 0;
+		for( auto &batch : cache.batches )
 		{
-			UINT batchVertexBytes = 0;
-			if( !R_UIntMul( batch.vertexCount, vertexStride, batchVertexBytes ) ||
-				batchVertexBytes > DX_SCRATCH_MAX_BYTES )
-				return false;
-			HRESULT result = device->CreateVertexBuffer(
-				batchVertexBytes, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
-				vertexFVF, D3DPOOL_DEFAULT, &batch.vertexBuffer, nullptr );
-			if( FAILED( result ) || !batch.vertexBuffer )
+			if( batch.vertexCount == 0 || batch.primitiveCount == 0 )
+				continue;
+			if( batch.indices.size( ) > DX_SCRATCH_MAX_BYTES / sizeof( DWORD ) - indexCount )
 			{
 				R_FreeStudioBuffers( cache );
 				return false;
 			}
+			batch.indexStart = static_cast<UINT>( indexCount );
+			indexCount += batch.indices.size( );
 		}
 
-		if( batch.indexBuffer )
-			continue;
-
-		HRESULT result = device->CreateIndexBuffer(
-			static_cast<UINT>( batch.indices.size( ) * sizeof( DWORD ) ),
-			D3DUSAGE_WRITEONLY, D3DFMT_INDEX32, D3DPOOL_MANAGED,
-			&batch.indexBuffer, nullptr );
-		if( FAILED( result ) || !batch.indexBuffer )
+		if( indexCount == 0 || FAILED( device->CreateIndexBuffer(
+			static_cast<UINT>( indexCount * sizeof( DWORD ) ), D3DUSAGE_WRITEONLY,
+			D3DFMT_INDEX32, D3DPOOL_MANAGED, &cache.indexBuffer, nullptr ) ) || !cache.indexBuffer )
 		{
 			R_FreeStudioBuffers( cache );
 			return false;
 		}
 
 		void *indexMemory = nullptr;
-		result = batch.indexBuffer->Lock( 0, 0, &indexMemory, 0 );
-		if( FAILED( result ) || !indexMemory )
+		if( FAILED( cache.indexBuffer->Lock( 0, 0, &indexMemory, 0 ) ) || !indexMemory )
 		{
 			R_FreeStudioBuffers( cache );
 			return false;
 		}
-		memcpy( indexMemory, batch.indices.data( ), batch.indices.size( ) * sizeof( DWORD ) );
-		batch.indexBuffer->Unlock( );
+		for( const auto &batch : cache.batches )
+		{
+			if( batch.vertexCount != 0 && batch.primitiveCount != 0 )
+				memcpy( static_cast<DWORD *>( indexMemory ) + batch.indexStart,
+					batch.indices.data( ), batch.indices.size( ) * sizeof( DWORD ) );
+		}
+		if( FAILED( cache.indexBuffer->Unlock( ) ) )
+		{
+			R_FreeStudioBuffers( cache );
+			return false;
+		}
 	}
 
 	cache.buffersUploadNormals = uploadNormals;
@@ -3128,6 +3228,16 @@ static bool R_BuildStudioTopology( studio_cache_t &cache,
 		}
 	}
 
+	cache.remixBlendCompatible = std::all_of( cache.batches.begin( ), cache.batches.end( ),
+		[]( const studio_batch_t &batch )
+		{
+			if( batch.indices.empty( ) )
+				return true;
+			if( batch.chrome || ( batch.materialFlags & ( STUDIO_NF_ADDITIVE | STUDIO_NF_MASKED ) ) )
+				return false;
+			return std::all_of( batch.sources.begin( ), batch.sources.end( ),
+				[]( const studio_source_vertex_t &vertex ) { return vertex.bone == vertex.normalBone; } );
+		} );
 	cache.topologyValid = !cache.batches.empty( );
 	if( !cache.topologyValid )
 		return false;
@@ -4013,9 +4123,10 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 	int boundTexture = glowShellPass ? glowShellTexture : -1;
 	unsigned int lastLightingClass = ~0u;
 	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
+	device->SetIndices( cache.indexBuffer );
 	for( const auto &batch : cache.batches )
 	{
-		if( !batch.indexBuffer || batch.primitiveCount == 0 )
+		if( batch.primitiveCount == 0 )
 			continue;
 		if( R_LakeForestStudioTextureSuppressed(ent,batch.textureId) )continue;
 
@@ -4073,12 +4184,11 @@ static bool R_DrawStudioSkinBatches( const studio_cache_t &cache,
 				DX_STUDIO_GPU_SKIN_CONST_CHROMESCALE, chromeScale, 1 );
 		}
 
-		device->SetIndices( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
 			static_cast<INT>( batch.vertexStart ), 0, batch.vertexCount,
-			0, batch.primitiveCount );
+			batch.indexStart, batch.primitiveCount );
 	}
 
 	device->SetVertexShader( nullptr );
@@ -4118,16 +4228,15 @@ static bool R_EnsureStudioRemixBlendBuffer( const studio_cache_t &cache )
 	}
 
 	auto *destination = static_cast<studio_blend_vertex_t *>( memory );
-	bool splitNormals = false;
 	for( const auto &batch : cache.batches )
 	{
+		if( batch.primitiveCount == 0 )
+			continue;
 		for( size_t sourceIndex = 0; sourceIndex < batch.sources.size( ); ++sourceIndex )
 		{
 			const studio_source_vertex_t &source = batch.sources[sourceIndex];
 			studio_blend_vertex_t &vertex = destination[batch.vertexStart + static_cast<UINT>( sourceIndex )];
 			const int bone = source.bone < MAXSTUDIOBONES ? source.bone : 0;
-			const int normalBone = source.normalBone < MAXSTUDIOBONES ? source.normalBone : bone;
-			splitNormals |= normalBone != bone;
 			vertex.x = source.x; vertex.y = source.y; vertex.z = source.z;
 			vertex.weight = 1.0f;
 			vertex.indices[0] = vertex.indices[1] = static_cast<byte>( bone );
@@ -4136,9 +4245,12 @@ static bool R_EnsureStudioRemixBlendBuffer( const studio_cache_t &cache )
 			vertex.u = source.u; vertex.v = source.v;
 		}
 	}
-	cache.remixBlendVertexBuffer->Unlock( );
+	if( FAILED( cache.remixBlendVertexBuffer->Unlock( ) ) )
+	{
+		R_FreeStudioRemixBlendBuffer( cache );
+		return false;
+	}
 	cache.remixBlendVertexCount = cache.gpuSkinSourceVertexCount;
-	cache.remixBlendSplitNormals = splitNormals;
 	return true;
 }
 
@@ -4147,28 +4259,63 @@ static bool R_EnsureStudioRemixBlendBuffer( const studio_cache_t &cache )
 // Indexed vertex blending gives Remix the bone palette instead: it skins the mesh itself and updates
 // it only when a bone moves. Chrome and the glow shell need view-dependent texture coordinates and
 // keep the vertex shader.
-// Off by default (dx_studio_remix_vertex_blend): Remix computes smooth normals of the meshes it skins
-// from their bind pose and then skinning overwrites them, so textures in rtx.smoothNormalsTextures lose
-// their smoothing on this path.
+// CoFR's Remix runtime generates texture-tagged smooth normals after skinning, from the posed mesh.
 static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl_entity_s *ent )
 {
-	if( dx_remix.value == 0.0f || dx_studio_remix_vertex_blend.value == 0.0f )
+	if( dx_remix.value == 0.0f || dx_studio_remix_vertex_blend.value == 0.0f ||
+		!ent || ent->curstate.rendermode != kRenderNormal ||
+		ent->curstate.renderfx == kRenderFxLightMultiplier )
 		return false;
 	if( !cache.gpuSkinningBufferMode || !cache.gpuSkinSourceVertexBuffer || !cache.gpuSkinningPoseValid ||
 		cache.gpuSkinningBoneCount <= 0 || cache.gpuSkinningBoneCount > DX_STUDIO_REMIX_BLEND_MAX_BONES ||
-		cache.containsChrome )
+		!cache.remixBlendCompatible )
 	{
 		return false;
 	}
-	if( !R_EnsureStudioRemixBlendBuffer( cache ) || cache.remixBlendSplitNormals )
-		return false;
-	if( !DX_BindStudioRemixBlendDeclaration( ) )
-		return false;
-
 	// Bone matrices are 3x4 rows applied to column vectors. D3D applies its matrices to row vectors,
 	// so each bone goes in transposed, followed by the entity's world matrix.
 	D3DMATRIX d3dWorld{};
-	device->GetTransform( D3DTS_WORLD, &d3dWorld );
+	if( FAILED( device->GetTransform( D3DTS_WORLD, &d3dWorld ) ) )
+		return false;
+	StudioRemixMeshes::Entry *native = nullptr;
+	unsigned surfaceCount = 0;
+	if( !ent->player && ent->index > 0 && ent->curstate.renderfx == kRenderFxNone &&
+		!( ent->curstate.effects & EF_FULLBRIGHT ) && !g_dxOverviewView &&
+		FBitSet( g_currentViewFlags, RF_DRAW_WORLD ) &&
+		!FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW | RF_ONLY_CLIENTDRAW ) &&
+		!R_RemixCaptureAll( ) )
+	{
+		uint64_t materials = 14695981039346656037ull;
+		for( const auto &batch : cache.batches )
+		{
+			if( batch.primitiveCount == 0 )
+				continue;
+			if( R_LakeForestStudioTextureSuppressed( ent, batch.textureId ) ||
+				batch.textureId <= 0 || batch.textureId > g_texcount || !g_Textures[batch.textureId].tex )
+			{
+				surfaceCount = 0;
+				break;
+			}
+			++surfaceCount;
+			materials = ( materials ^ static_cast<uint32_t>( batch.textureId ) ) * 1099511628211ull;
+			materials = ( materials ^ batch.materialFlags ) * 1099511628211ull;
+			materials = ( materials ^ reinterpret_cast<uintptr_t>( g_Textures[batch.textureId].tex ) ) * 1099511628211ull;
+		}
+		if( surfaceCount > 0 && surfaceCount <= 64 )
+			native = g_studioRemixMeshes.find( cache, materials );
+	}
+	const unsigned boneCount = static_cast<unsigned>( cache.gpuSkinningBoneCount );
+	if( native && native->readyFrame != 0 && native->readyFrame <= g_studioPoseFrame &&
+		g_studioRemixMeshes.draw( *native, d3dWorld, cache.gpuSkinningBoneMatrices, boneCount ) )
+	{
+		DX_RagdollSubmitted( ent, cache, cache.gpuSkinningBoneMatrices, boneCount, &d3dWorld,
+			"remix-retained-mesh" );
+		return true;
+	}
+
+	if( !R_EnsureStudioRemixBlendBuffer( cache ) || !DX_BindStudioRemixBlendDeclaration( ) )
+		return false;
+
 	D3DXMATRIX world;
 	DX_ToD3DXMatrix( d3dWorld, world );
 	for( int bone = 0; bone < cache.gpuSkinningBoneCount; ++bone )
@@ -4180,7 +4327,11 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 			m[0][2], m[1][2], m[2][2], 0.0f,
 			m[0][3], m[1][3], m[2][3], 1.0f );
 		const D3DXMATRIX blend = boneMatrix * world;
-		device->SetTransform( D3DTS_WORLDMATRIX( bone ), &blend );
+		if( FAILED( device->SetTransform( D3DTS_WORLDMATRIX( bone ), &blend ) ) )
+		{
+			device->SetTransform( D3DTS_WORLD, &d3dWorld );
+			return false;
+		}
 	}
 	DX_RagdollSubmitted( ent, cache, cache.gpuSkinningBoneMatrices, cache.gpuSkinningBoneCount, &d3dWorld,
 		"remix-vertex-blend" );
@@ -4191,9 +4342,11 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 
 	int boundTexture = -1;
 	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
+	device->SetIndices( cache.indexBuffer );
+	const bool learning = native && g_studioRemixMeshes.begin( *native, surfaceCount, boneCount );
 	for( const auto &batch : cache.batches )
 	{
-		if( !batch.indexBuffer || batch.primitiveCount == 0 )
+		if( batch.primitiveCount == 0 )
 			continue;
 		if( R_LakeForestStudioTextureSuppressed( ent, batch.textureId ) )
 			continue;
@@ -4203,13 +4356,15 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 			boundTexture = batch.textureId;
 		}
 		R_ApplyStudioMaterialState( batch.materialFlags, ent, materialState );
-		device->SetIndices( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
 			static_cast<INT>( batch.vertexStart ), 0, batch.vertexCount,
-			0, batch.primitiveCount );
+			batch.indexStart, batch.primitiveCount );
 	}
+
+	if( learning )
+		g_studioRemixMeshes.finish( *native, boneCount );
 
 	// D3DTS_WORLDMATRIX( 0 ) is D3DTS_WORLD.
 	DX_SetRenderStateCached( D3DRS_VERTEXBLEND, D3DVBF_DISABLE );
@@ -4221,9 +4376,11 @@ static bool R_DrawStudioRemixBlendBatches( const studio_cache_t &cache, const cl
 }
 
 // Draws the cached GPU-skinned pose, through vertex blending when Remix runs.
-static bool R_DrawStudioSkinnedPose( const studio_cache_t &cache, const cl_entity_s *ent )
+static bool R_DrawStudioSkinnedPose( const studio_cache_t &cache, const cl_entity_s *ent,
+	bool allowVertexBlend )
 {
-	const bool drawn = R_DrawStudioRemixBlendBatches( cache, ent ) || R_DrawStudioSkinBatches( cache, ent, false );
+	const bool drawn = ( allowVertexBlend && R_DrawStudioRemixBlendBatches( cache, ent ) ) ||
+		R_DrawStudioSkinBatches( cache, ent, false );
 	if( drawn && R_StudioGlowShellEnabled( ent ) )
 		R_DrawStudioSkinBatches( cache, ent, true );
 	return drawn;
@@ -4321,7 +4478,7 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 	// Use immutable source vertices/indices whenever GPU skinning is available.
 	// R_DrawViewModel already sets the weapon projection and near plane. Let
 	// hardware clip after skinning rather than changing the submitted topology.
-	if( R_DrawStudioSkinnedPose( cache, ent ) )
+	if( R_DrawStudioSkinnedPose( cache, ent, false ) )
 		return true;
 
 	// Unsupported hardware, oversized skeletons and an explicit opt-out retain
@@ -4426,9 +4583,10 @@ static bool R_DrawStudioRemixViewModelBatches( const studio_cache_t &cache,
 	return true;
 }
 
-static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity_s *ent )
+static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity_s *ent,
+	bool allowVertexBlend )
 {
-	if( R_DrawStudioSkinnedPose( cache, ent ) )
+	if( R_DrawStudioSkinnedPose( cache, ent, allowVertexBlend ) )
 		return;
 
 	const bool studioNormals = R_StudioNormalsEnabled( );
@@ -4445,9 +4603,10 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 
 	int boundTexture = -1;
 	studio_material_state_t materialState = DX_STUDIO_MATERIAL_BASE;
+	device->SetIndices( cache.indexBuffer );
 	for( const auto &batch : cache.batches )
 	{
-		if( !batch.indexBuffer || batch.primitiveCount == 0 )
+		if( batch.primitiveCount == 0 )
 			continue;
 		if( R_LakeForestStudioTextureSuppressed(ent,batch.textureId) )continue;
 		if( !combinedVB && !batch.vertexBuffer )
@@ -4462,12 +4621,11 @@ static void R_DrawStudioGpuBatches( const studio_cache_t &cache, const cl_entity
 
 		if( !combinedVB )
 			device->SetStreamSource( 0, batch.vertexBuffer, 0, vertexStride );
-		device->SetIndices( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
 			combinedVB ? static_cast<INT>( batch.vertexStart ) : 0,
-			0, batch.vertexCount, 0, batch.primitiveCount );
+			0, batch.vertexCount, batch.indexStart, batch.primitiveCount );
 	}
 
 	if( R_StudioGlowShellEnabled( ent ) )
@@ -5934,7 +6092,7 @@ static void R_DrawStudioEntityModel( model_t *mod, cl_entity_s *ent,
 		if( !( forceOverlayDepth &&
 			R_DrawStudioRemixViewModelBatches( cache, ent, currentWorldMatrix ) ) )
 		{
-			R_DrawStudioGpuBatches( cache, ent );
+			R_DrawStudioGpuBatches( cache, ent, !forceOverlayDepth );
 		}
 
         R_QueueNightmarePhoto(ent,cache,muzzleWorld);

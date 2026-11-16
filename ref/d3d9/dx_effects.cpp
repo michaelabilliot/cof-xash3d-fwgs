@@ -159,10 +159,9 @@ static void R_FlushParticles( )
 {
 	if( g_dxParticleVerts.empty( ) )
 		return;
-	R_DrawScratch( D3DPT_TRIANGLELIST,
-		static_cast<UINT>( g_dxParticleVerts.size( ) / 3 ),
-		static_cast<UINT>( g_dxParticleVerts.size( ) ),
-		g_dxParticleVerts.data( ), sizeof( particle_vertex_t ) );
+	R_DrawScratchQuads(
+		g_dxParticleVerts.data( ), static_cast<UINT>( g_dxParticleVerts.size( ) / 4 ),
+		sizeof( particle_vertex_t ) );
 	g_dxParticleVerts.clear( );
 }
 
@@ -198,8 +197,6 @@ static void R_AppendParticleQuad( const vec3_t origin, float size,
 	g_dxParticleVerts.push_back( v0 );
 	g_dxParticleVerts.push_back( v1 );
 	g_dxParticleVerts.push_back( v2 );
-	g_dxParticleVerts.push_back( v0 );
-	g_dxParticleVerts.push_back( v2 );
 	g_dxParticleVerts.push_back( v3 );
 }
 
@@ -227,8 +224,6 @@ static void R_AppendTracer( const vec3_t start, const vec3_t end,
 	g_dxParticleVerts.push_back( v0 );
 	g_dxParticleVerts.push_back( v1 );
 	g_dxParticleVerts.push_back( v2 );
-	g_dxParticleVerts.push_back( v0 );
-	g_dxParticleVerts.push_back( v2 );
 	g_dxParticleVerts.push_back( v3 );
 }
 
@@ -248,7 +243,7 @@ static void R_DrawParticles( particle_t *particles, float partsize,
 	R_BeginParticlePass( additive,
 		dx_remix.value != 0.0f && !tracerList );
 	g_dxParticleVerts.clear( );
-	g_dxParticleVerts.reserve( 2048 * 6 );
+	g_dxParticleVerts.reserve( std::min( static_cast<UINT>( maxDraw ), DX_SCRATCH_QUAD_LIMIT ) * 4 );
 
 	const float sizeScale = std::max( 0.05f, std::min( 16.0f, dx_particle_size_scale.value ) );
 	const float baseParticleSize = std::max( 0.25f, partsize <= 0.0f ? 1.0f : partsize ) * sizeScale;
@@ -286,7 +281,7 @@ static void R_DrawParticles( particle_t *particles, float partsize,
 		}
 
 		++drawn;
-		if( g_dxParticleVerts.size( ) >= 2048u * 6u )
+		if( g_dxParticleVerts.size( ) >= DX_SCRATCH_QUAD_LIMIT * 4 )
 			R_FlushParticles( );
 	}
 
@@ -1293,7 +1288,7 @@ static bool R_DrawBeamGeometry( BEAM &beam, model_t *model )
 	return false;
 }
 
-static void R_DrawBeamStripLayer( const BEAM &beam, int texture,
+static UINT R_BuildBeamStripLayer( const BEAM &beam, brush_vertex_t *vertices,
 	float noiseScale, float widthScale, float alphaScale, float phaseOffset,
 	bool coilNoise )
 {
@@ -1303,7 +1298,7 @@ static void R_DrawBeamStripLayer( const BEAM &beam, int texture,
 	const float beamWidth = std::max( 0.05f, beam.width * widthScale *
 		std::max( 0.05f, std::min( 16.0f, dx_beam_width_scale.value ) ) );
 	if( length < 0.1f || beamWidth <= 0.0f )
-		return;
+		return 0;
 
 	int segments = std::max( 2, std::min( D3D_BEAM_MAX_SEGMENTS, beam.segments ) );
 	if( coilNoise || FBitSet( beam.flags, FBEAM_SINENOISE ) )
@@ -1383,7 +1378,6 @@ static void R_DrawBeamStripLayer( const BEAM &beam, int texture,
 		}
 	}
 
-	brush_vertex_t vertices[D3D_BEAM_MAX_SEGMENTS * 2];
 	const D3DCOLOR color = R_ScaleColorAlpha( R_BeamColor( beam ), alphaScale );
 	const float scroll = fmodf( beam.freq * beam.speed + phaseOffset * 0.03125f, 1.0f );
 	const float texLength = length * 0.01f;
@@ -1425,10 +1419,7 @@ static void R_DrawBeamStripLayer( const BEAM &beam, int texture,
 		b.diffuse = color; b.u = 1.0f; b.v = v;
 	}
 
-	DX_Bind( 0, texture );
-	R_DrawScratch( D3DPT_TRIANGLESTRIP,
-		static_cast<UINT>( segments * 2 - 2 ),
-		static_cast<UINT>( segments * 2 ), vertices, sizeof( brush_vertex_t ) );
+	return static_cast<UINT>( segments * 2 );
 }
 
 static void R_RegisterEgonLight( const BEAM &beam )
@@ -1455,25 +1446,63 @@ static void R_DrawBeamStrip( const BEAM &beam, model_t *model )
 	if( !R_BeamFrameTexture( beam, model, texture ) )
 		return;
 
-	const bool noisyBeam = R_BeamUsesSineNoise( beam );
-	if( noisyBeam )
+	constexpr UINT layerVertices = D3D_BEAM_MAX_SEGMENTS * 2;
+	brush_vertex_t vertices[layerVertices * 3]{};
+	UINT counts[3]{};
+	if( R_BeamUsesSineNoise( beam ) )
 	{
 
 		if( FBitSet( beam.flags, FBEAM_SINENOISE ) )
 			R_RegisterEgonLight( beam );
 
 		const float noiseScale = R_BeamNoiseScale( beam );
-		R_DrawBeamStripLayer( beam, texture, noiseScale * 0.35f, 1.05f, 0.50f, 0.0f, false );
+		counts[0] = R_BuildBeamStripLayer( beam, vertices, noiseScale * 0.35f, 1.05f, 0.50f, 0.0f, false );
 		if( FBitSet( beam.flags, FBEAM_SINENOISE ) )
 		{
-			R_DrawBeamStripLayer( beam, texture, noiseScale, 0.58f, 0.75f, 2.0943951f, true );
-			R_DrawBeamStripLayer( beam, texture, noiseScale * 0.75f, 0.36f, 0.90f, 4.1887902f, true );
+			counts[1] = R_BuildBeamStripLayer( beam, vertices + counts[0],
+				noiseScale, 0.58f, 0.75f, 2.0943951f, true );
+			counts[2] = R_BuildBeamStripLayer( beam, vertices + counts[0] + counts[1],
+				noiseScale * 0.75f, 0.36f, 0.90f, 4.1887902f, true );
 		}
-		return;
 	}
+	else
+		counts[0] = R_BuildBeamStripLayer( beam, vertices, 1.0f, 1.0f, 1.0f, 0.0f, false );
 
-	R_DrawBeamStripLayer( beam, texture, 1.0f, 1.0f, 1.0f, 0.0f, false );
+	const UINT total = counts[0] + counts[1] + counts[2];
+	if( !total )
+		return;
+
+	DX_Bind( 0, texture );
+	if( dx_remix.value != 0.0f && counts[1] && counts[2] )
+	{
+		// Keep each strip's winding and the original layer order in one draw.
+		WORD indices[( layerVertices - 2 ) * 9];
+		UINT n = 0, base = 0;
+		for( UINT count : counts )
+		{
+			for( UINT i = 2; i < count; ++i )
+			{
+				const UINT odd = i & 1;
+				indices[n++] = static_cast<WORD>( base + i - 2 + odd );
+				indices[n++] = static_cast<WORD>( base + i - 1 - odd );
+				indices[n++] = static_cast<WORD>( base + i );
+			}
+			base += count;
+		}
+		if( R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST, total, n / 3, indices,
+			D3DFMT_INDEX16, vertices, sizeof( brush_vertex_t ) ) )
+			return;
+	}
+	UINT base = 0;
+	for( UINT count : counts )
+	{
+		if( count )
+			R_DrawScratch( D3DPT_TRIANGLESTRIP, count - 2, count, vertices + base, sizeof( brush_vertex_t ) );
+		base += count;
+	}
 }
+
+static std::vector<brush_vertex_t> g_beamFollowVertices;
 
 static void R_AppendBeamQuad( std::vector<brush_vertex_t> &vertices,
 	const vec3_t start, const vec3_t end, float width,
@@ -1503,8 +1532,8 @@ static void R_AppendBeamQuad( std::vector<brush_vertex_t> &vertices,
 	d.x = end[0] - normal[0]; d.y = end[1] - normal[1]; d.z = end[2] - normal[2];
 	d.diffuse = endColor; d.u = 0.0f; d.v = v1;
 
-	vertices.push_back( a ); vertices.push_back( b ); vertices.push_back( c );
-	vertices.push_back( a ); vertices.push_back( c ); vertices.push_back( d );
+	vertices.push_back( a ); vertices.push_back( b );
+	vertices.push_back( c ); vertices.push_back( d );
 }
 
 static void R_DrawBeamFollow( BEAM &beam, model_t *model, float frameTime )
@@ -1554,15 +1583,15 @@ static void R_DrawBeamFollow( BEAM &beam, model_t *model, float frameTime )
 	const float life = std::max( 0.01f, beam.amplitude );
 	const float width = std::max( 0.05f, beam.width *
 		std::max( 0.05f, std::min( 16.0f, dx_beam_width_scale.value ) ) );
-	std::vector<brush_vertex_t> vertices;
-	vertices.reserve( 192 );
+	auto &vertices = g_beamFollowVertices;
+	vertices.clear( );
 
 	vec3_t previous;
 	VectorCopy( beam.source, previous );
 	float previousAlpha = 1.0f;
 	float texV = 0.0f;
 	int trailCount = 0;
-	for( particle_t *p = particles; p && trailCount++ < 8192; p = p->next )
+	for( particle_t *p = particles; p && trailCount++ < static_cast<int>( DX_SCRATCH_QUAD_LIMIT ); p = p->next )
 	{
 		const float alpha = R_BeamClamp01( static_cast<float>( p->die - gp_cl->time ) / life );
 		if( alpha <= 0.0f )
@@ -1583,9 +1612,8 @@ static void R_DrawBeamFollow( BEAM &beam, model_t *model, float frameTime )
 	if( !vertices.empty( ) )
 	{
 		DX_Bind( 0, texture );
-		R_DrawScratch( D3DPT_TRIANGLELIST,
-			static_cast<UINT>( vertices.size( ) / 3 ),
-			static_cast<UINT>( vertices.size( ) ), vertices.data( ), sizeof( brush_vertex_t ) );
+		R_DrawScratchQuads( vertices.data( ), static_cast<UINT>( vertices.size( ) / 4 ),
+			sizeof( brush_vertex_t ) );
 	}
 
 	int driftCount = 0;
