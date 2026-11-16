@@ -91,7 +91,9 @@ class HudPanel:public vgui::Panel {
  int capacity(int id){
   if(id>0&&id<256&&magazineCapacity[id]>0)return magazineCapacity[id];
   // Native WeaponList has reserve maxima, not magazine capacities. WpnInfo supplies these elsewhere.
-  switch(id){case 3:return 15;case 4:return 5;case 7:return 12;case 8:return 1;case 9:return 30;case 11:return 5;case 13:return 1;case 14:return 30;case 19:return 18;case 20:return 5;case 21:return 6;case 26:return 10;case 27:return 30;case 31:return 1;default:return 0;}
+  // Until WpnInfo arrives (only on reserve changes), use the iMaxClip of each native
+  // GetItemInfo. The bullet row has exactly this many slots, so a low value hides rounds.
+  switch(id){case 3:return 15;case 4:return 5;case 7:return 8;case 8:return 1;case 9:return 20;case 11:return 5;case 13:return 1;case 14:return 30;case 19:return 18;case 20:return 13;case 21:return 5;case 23:return 30;case 26:return 10;case 27:return 30;case 31:return 1;default:return 0;}
  }
  void paint() override {
   if(!CoFR_CustomHudActive()||!gViewPort||!gViewPort->m_pHUDControl_guess)return;
