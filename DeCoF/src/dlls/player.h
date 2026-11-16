@@ -794,7 +794,12 @@ public:
 	int cofrInventorySlotClassname[9];
 	int cofrClientinventorySlot[9];
 	int cofrInventorySchema;
+	int cofrNotarget;
 	cof::StairSprintTracker cofrStairSprint;
+	int InventoryCapacity();
+	bool IsInventorySlot(int slot);
+	void ReduceInventory();
+	void TrimInventory(bool notify);
 	void CoFRMigrateInventory();
 
 };

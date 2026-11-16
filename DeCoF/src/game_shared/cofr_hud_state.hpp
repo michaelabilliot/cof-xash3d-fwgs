@@ -8,6 +8,7 @@
 #include <cstring>
 #include <string>
 namespace cof::hud {
+constexpr int healthLimit(int cap) { return cap == 1 ? 80 : cap == 2 ? 66 : 100; }
 struct Weapon { int ammo=-1, capacity=0; bool defined=false; };
 struct State {
     std::array<Weapon,256> weapons{};

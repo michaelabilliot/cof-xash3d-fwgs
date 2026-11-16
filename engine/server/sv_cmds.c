@@ -1058,6 +1058,7 @@ void SV_InitOperatorCommands( void )
 	{
 		Cmd_AddCommand( "save", SV_Save_f, "save the game to a file" );
 		Cmd_AddCommand( "savequick", SV_QuickSave_f, "save the game to the quicksave" );
+		Cmd_AddCommand( "quicksave", SV_QuickSave_f, "save the game to the quicksave" );
 		Cmd_AddCommand( "autosave", SV_AutoSave_f, "save the game to 'autosave' file" );
 	}
 	else if( host.type == HOST_DEDICATED )

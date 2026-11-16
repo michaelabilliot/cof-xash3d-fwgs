@@ -6164,6 +6164,9 @@ static void R_DrawPlayerWeapon( model_t *playerModel,
 
 static void R_ProcessStudioClientEvents(studiohdr_t* hdr,cl_entity_s* ent,float frame,float now);
 
+unsigned DX_DrawSerial();
+void R_CofTraceStudio(const cl_entity_s* entity, const char* stage, int outcome);
+
 void R_DrawStudioEntity( cl_entity_s *ent )
 {
 	if( !device || !ent || !ent->model || ent->model->type != mod_studio )
@@ -6239,9 +6242,11 @@ void R_DrawStudioEntity( cl_entity_s *ent )
 	const D3DCOLOR studioLight = R_StudioEntityLight(
 		ent, lightOrigin, studioLightDir, &studioDirectLightScale );
 
+	const unsigned before = DX_DrawSerial();
 	R_DrawStudioEntityModel( mod, ent, ent->curstate.sequence,
 		renderFrame, gaitSeq, gaitFrame, gaitBoneYaw, studioPoseTime,
 		studioLight, studioLightDir, studioDirectLightScale, false, &entityWorld );
+	R_CofTraceStudio(ent, "draw", DX_DrawSerial() - before);
 	R_ProcessStudioClientEvents( hdr, ent, renderFrame, studioPoseTime );
 	const float pickupStrength=R_CofPickupStrength(ent);
 	if(pickupStrength>0.f) {

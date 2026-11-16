@@ -6151,19 +6151,13 @@ void CCofClearItems::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 
 				if ( plr )
 				{
-					plr->m_bThreeSlots = true;
-
-					for ( int j = 1; j <= 3; j++ )
-						plr->InventoryMessage( j, plr->cofrInventorySlot[j], 0 );
+					plr->ReduceInventory();
 				}
 			}
 		}
 		else
 		{
-			pPlayer->m_bThreeSlots = true;
-
-			for ( int k = 1; k <= 3; k++ )
-				pPlayer->InventoryMessage( k, pPlayer->cofrInventorySlot[k], 0 );
+			pPlayer->ReduceInventory();
 		}
 	}
 

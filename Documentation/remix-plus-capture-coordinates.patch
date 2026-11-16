@@ -1,0 +1,3428 @@
+diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md
+index 42e7a3d9..249eb945 100644
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -28,6 +28,11 @@ Entry format:
+ - Docs: [RemixApi.md](RemixApi.md)   (only if a public doc covers it)
+ ```
+ 
++## 2026-11-13
++
++### Capture coordinate systems
++Published USD captures carry the scene up axis, scale and playback range on their root layer. Meshes, cameras and analytic lights share the basis derived from the captured view and projection.
++
+ ## 2026-10-30
+ 
+ ### Remix API: repeated materials, identical transforms and the texture lock
+diff --git a/src/dxvk/rtx_render/rtx_asset_exporter.cpp b/src/dxvk/rtx_render/rtx_asset_exporter.cpp
+index 471c5250..49860e2b 100644
+--- a/src/dxvk/rtx_render/rtx_asset_exporter.cpp
++++ b/src/dxvk/rtx_render/rtx_asset_exporter.cpp
+@@ -93,7 +93,7 @@ namespace dxvk {
+     return m_exporterThread;
+   }
+ 
+-  void AssetExporter::exportImage(Rc<DxvkContext> ctx, const std::string& filename, Rc<DxvkImage> image, bool thumbnail/* = false*/) {
++  void AssetExporter::exportImage(Rc<DxvkContext> ctx, const std::string& filename, Rc<DxvkImage> image, bool thumbnail, std::shared_ptr<CaptureJobs> batch) {
+     ScopedCpuProfileZone();
+     // NOTE: Should use a mutex here...
+     {
+@@ -103,7 +103,7 @@ namespace dxvk {
+       }
+     }
+ 
+-    m_numExportsInFlight++;
++    auto completion = std::make_shared<CaptureJob>(m_numExportsInFlight, batch, filename);
+ 
+     // We want to retain most of the src image state
+     DxvkImageCreateInfo srcDesc = image->info();
+@@ -148,8 +148,8 @@ namespace dxvk {
+ 
+     const uint32_t numMipLevels = dstDesc.mipLevels;
+ 
+-    Rc<DxvkImage>* pBlitTemps = useBlit ? new Rc<DxvkImage>[numMipLevels] : nullptr;
+-    Rc<DxvkImage>* pBlitDests = new Rc<DxvkImage>[numMipLevels];
++    std::shared_ptr<Rc<DxvkImage>[]> pBlitTemps(useBlit ? new Rc<DxvkImage>[numMipLevels] : nullptr);
++    std::shared_ptr<Rc<DxvkImage>[]> pBlitDests(new Rc<DxvkImage>[numMipLevels]);
+ 
+     // Push a copy operation to the GPU; get that GPU data in CPU addressable space
+     for (uint32_t level = 0; level < numMipLevels; ++level) {
+@@ -245,10 +245,11 @@ namespace dxvk {
+     ctx->signal(m_readbackSignal, syncValue);
+ 
+     // Spawn a thread so we dont sync with the GPU here (GPU runs async with CPU)
+-    Future<void> result = getExporterThread()->Schedule([this, device = ctx->getDevice(), pBlitDests, pBlitTemps, syncValue, filename, outFormat, dstDesc, swizzle] {
++    Future<void> result = getExporterThread()->Schedule([this, pBlitDests, pBlitTemps, syncValue, filename, outFormat, dstDesc, swizzle, completion] {
++      completion->run([&] {
+       ScopedCpuProfileZoneN("Export Image Finalize");
+       // Stall until the GPU has completed its copy to system memory (GPU->CPU)
+-      this->m_readbackSignal->wait(syncValue);
++      completion->waitReadback([&] { return this->m_readbackSignal->value() >= syncValue; });
+ 
+       // Push texture header to the GLI container
+       const gli::extent3d outExtent = { dstDesc.extent.width, dstDesc.extent.height, 1 };
+@@ -284,21 +285,19 @@ namespace dxvk {
+ 
+       // Write our file, converting its format first if nessecary
+       const bool success = gli::save(exportTex, filename);
+-      if (!success) {
+-        Logger::err(str::format("RTX: Failed to write texture \"", filename, "\""));
+-      }
++      if (!success) { throw std::runtime_error("Failed to write texture " + filename); }
+ 
+-      delete[] pBlitTemps;
+-      delete[] pBlitDests;
+-      m_numExportsInFlight--;
++      });
++      if (!completion->error().empty()) { Logger::err(completion->error()); }
+     });
+ 
+     if (!result.valid()) {
++      completion->fail("Asset export queue rejected the task");
+       Logger::err(str::format("RTX: Failed to write texture \"", filename, "\".  Coding error, kMaxConcurrentExports, may be too low (currently: ", kMaxConcurrentExports, ")."));
+     }
+   }
+ 
+-  void AssetExporter::exportBuffer(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback) {
++  void AssetExporter::exportBuffer(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback, std::shared_ptr<CaptureJobs> batch) {
+     ScopedCpuProfileZone();
+     // NOTE: Should use a mutex here...
+     {
+@@ -308,7 +307,7 @@ namespace dxvk {
+       }
+     }
+ 
+-    m_numExportsInFlight++;
++    auto completion = std::make_shared<CaptureJob>(m_numExportsInFlight, batch, "mesh buffer (" + std::to_string(buffer.length()) + " bytes)");
+ 
+     // We want to retain most of the src image state
+     // NOTE: Some image formats arent well supported by DDS tools, like B8G8R8A8...  So we might want to blit rather than copy for such formats.
+@@ -335,29 +334,32 @@ namespace dxvk {
+     const uint64_t syncValue = ++m_signalValue;
+     ctx->signal(m_readbackSignal, syncValue);
+ 
+-    Future<void> result = getExporterThread()->Schedule([this, cDestBuffer = bufferDest, syncValue, bufferCallback] {
++    Future<void> result = getExporterThread()->Schedule([this, cDestBuffer = bufferDest, syncValue, bufferCallback, completion] {
++      completion->run([&] {
+       ScopedCpuProfileZoneN("Export Buffer Finalize");
+       // Stall until the GPU has completed its copy to system memory (GPU->CPU)
+-      this->m_readbackSignal->wait(syncValue);
++      completion->waitReadback([&] { return this->m_readbackSignal->value() >= syncValue; });
+       bufferCallback(cDestBuffer);
+-      m_numExportsInFlight--;
++      });
++      if (!completion->error().empty()) { Logger::err(completion->error()); }
+     });
+ 
+     if (!result.valid()) {
++      completion->fail("Asset export queue rejected the task");
+       Logger::err(str::format("RTX: Failed to dump buffer.  Coding error, kMaxConcurrentExports, may be too low (currently: ", kMaxConcurrentExports, ")."));
+     }
+   }
+ 
+-  void AssetExporter::generateSceneThumbnail(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename) {
++  void AssetExporter::generateSceneThumbnail(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, std::shared_ptr<CaptureJobs> batch) {
+     auto& resourceManager = ctx->getCommonObjects()->getResources();
+     auto finalOutput = resourceManager.getRaytracingOutput().m_finalOutput.image(Resources::AccessType::Read);
+ 
+     env::createDirectory(dir);
+ 
+-    exportImage(ctx, str::format(dir, filename, ".dds"), finalOutput, true);
++    exportImage(ctx, str::format(dir, filename, ".dds"), finalOutput, true, batch);
+   }
+ 
+-  void AssetExporter::bakeSkyProbe(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename) {
++  void AssetExporter::bakeSkyProbe(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, std::shared_ptr<CaptureJobs> batch) {
+     auto& resourceManager = ctx->getCommonObjects()->getResources();
+ 
+     auto skyprobeView = resourceManager.getSkyProbe(ctx);
+@@ -372,7 +374,7 @@ namespace dxvk {
+ 
+     ctx->getCommonObjects()->metaImageUtils().cubemapToLatLong(ctx, skyprobeView.view, latlong.view, transform);
+ 
+-    dumpImageToFile(ctx, dir, filename, latlong.image);
++    dumpImageToFile(ctx, dir, filename, latlong.image, batch);
+   }
+ 
+ } // namespace dxvk
+diff --git a/src/dxvk/rtx_render/rtx_asset_exporter.h b/src/dxvk/rtx_render/rtx_asset_exporter.h
+index a18b5aaf..804b9d73 100644
+--- a/src/dxvk/rtx_render/rtx_asset_exporter.h
++++ b/src/dxvk/rtx_render/rtx_asset_exporter.h
+@@ -29,6 +29,7 @@
+ #include "../util/util_env.h"
+ #include "../util/util_string.h"
+ #include "rtx_constants.h"
++#include "rtx_capture_jobs.h"
+ 
+ 
+ namespace dxvk {
+@@ -46,18 +47,18 @@ namespace dxvk {
+ 
+     void waitForAllExportsToComplete(const float numSecsToWait = 10);
+ 
+-    void dumpImageToFile(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, Rc<DxvkImage> image) {
++    void dumpImageToFile(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, Rc<DxvkImage> image, std::shared_ptr<CaptureJobs> batch = {}) {
+       env::createDirectory(dir);
+-      exportImage(ctx, str::format(dir, filename), image);
++      exportImage(ctx, str::format(dir, filename), image, false, batch);
+     }
+ 
+-    void copyBufferFromGPU(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback) {
+-      exportBuffer(ctx, buffer, bufferCallback);
++    void copyBufferFromGPU(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback, std::shared_ptr<CaptureJobs> batch = {}) {
++      exportBuffer(ctx, buffer, bufferCallback, batch);
+     }
+ 
+-    void generateSceneThumbnail(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename);
++    void generateSceneThumbnail(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, std::shared_ptr<CaptureJobs> batch = {});
+ 
+-    void bakeSkyProbe(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename);
++    void bakeSkyProbe(Rc<DxvkContext> ctx, const std::string& dir, const std::string& filename, std::shared_ptr<CaptureJobs> batch = {});
+ 
+     size_t getNumExportsInFlights() const {
+       return m_numExportsInFlight.load();
+@@ -73,9 +74,9 @@ namespace dxvk {
+     using ThreadPool = WorkerThreadPool<kMaxConcurrentExports, false, false>;
+     std::unique_ptr<ThreadPool> m_exporterThread;
+ 
+-    void exportImage(Rc<DxvkContext> ctx, const std::string& filename, Rc<DxvkImage> image, bool thumbnail = false);
++    void exportImage(Rc<DxvkContext> ctx, const std::string& filename, Rc<DxvkImage> image, bool thumbnail = false, std::shared_ptr<CaptureJobs> batch = {});
+ 
+-    void exportBuffer(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback);
++    void exportBuffer(Rc<DxvkContext> ctx, const DxvkBufferSlice& buffer, BufferCallback bufferCallback, std::shared_ptr<CaptureJobs> batch = {});
+ 
+     std::unique_ptr<ThreadPool>& getExporterThread();
+   };
+diff --git a/src/dxvk/rtx_render/rtx_capture_jobs.h b/src/dxvk/rtx_render/rtx_capture_jobs.h
+new file mode 100644
+index 00000000..859db036
+--- /dev/null
++++ b/src/dxvk/rtx_render/rtx_capture_jobs.h
+@@ -0,0 +1,94 @@
++#pragma once
++
++#include <atomic>
++#include <chrono>
++#include <condition_variable>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <stdexcept>
++#include <string>
++#include <thread>
++
++namespace dxvk {
++// One batch belongs to one capture, independent of later exporter submissions.
++class CaptureJobs {
++public:
++  uint64_t begin(const std::string& label) {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    const auto id = ++m_next;
++    m_pending.emplace(id, label);
++    return id;
++  }
++  void finish(uint64_t id, const std::string& failure) {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    if (!failure.empty() && m_error.empty()) { m_error = failure; }
++    m_pending.erase(id);
++    m_changed.notify_all();
++  }
++  void fail(const std::string& failure) {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    if (m_error.empty()) { m_error = failure; }
++  }
++  void cancel() { m_cancelled.store(true); m_changed.notify_all(); }
++  bool cancelled() const { return m_cancelled.load(); }
++  void wait(std::chrono::milliseconds timeout) {
++    std::unique_lock<std::mutex> lock(m_mutex);
++    if (!m_changed.wait_for(lock, timeout, [&] { return m_pending.empty() || cancelled(); })) {
++      std::string detail = "Capture preparation timed out; outstanding jobs: " + std::to_string(m_pending.size());
++      size_t shown = 0;
++      for (const auto& [id, label] : m_pending) { if (shown++ == 8) { break; } detail += "\n" + label; }
++      m_cancelled.store(true);
++      throw std::runtime_error(detail);
++    }
++    if (cancelled()) { throw std::runtime_error("Capture cancelled"); }
++    if (!m_error.empty()) { throw std::runtime_error(m_error); }
++  }
++  void drain() {
++    std::unique_lock<std::mutex> lock(m_mutex);
++    m_changed.wait(lock, [&] { return m_pending.empty(); });
++  }
++private:
++  std::mutex m_mutex;
++  std::condition_variable m_changed;
++  std::map<uint64_t, std::string> m_pending;
++  std::string m_error;
++  uint64_t m_next = 0;
++  std::atomic<bool> m_cancelled{false};
++};
++
++class CaptureJob {
++public:
++  CaptureJob(std::atomic<uint64_t>& counter, std::shared_ptr<CaptureJobs> batch, std::string label)
++    : m_counter(counter), m_batch(std::move(batch)), m_label(std::move(label)) {
++    if (m_batch) { m_id = m_batch->begin(m_label); }
++    ++m_counter;
++  }
++  ~CaptureJob() {
++    if (m_batch) { m_batch->finish(m_id, m_finished ? m_error : m_label + ": task did not complete (queue rejection or submission failure)"); }
++    --m_counter;
++  }
++  template<class Fn> void run(Fn&& operation) noexcept {
++    try { operation(); m_finished = true; }
++    catch (const std::exception& error) { fail(error.what()); }
++    catch (...) { fail("Unknown asset-export exception"); }
++  }
++  void fail(const std::string& error) { m_error = m_label + ": " + error; m_finished = true; }
++  const std::string& error() const { return m_error; }
++  template<class Ready> void waitReadback(Ready&& ready, std::chrono::milliseconds timeout = std::chrono::seconds(120)) {
++    const auto deadline = std::chrono::steady_clock::now() + timeout;
++    while (!ready()) {
++      if (m_batch && m_batch->cancelled()) { throw std::runtime_error("Readback cancelled"); }
++      if (std::chrono::steady_clock::now() >= deadline) { throw std::runtime_error("GPU readback timed out"); }
++      std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    }
++    if (m_batch && m_batch->cancelled()) { throw std::runtime_error("Readback cancelled"); }
++  }
++private:
++  std::atomic<uint64_t>& m_counter;
++  std::shared_ptr<CaptureJobs> m_batch;
++  std::string m_label, m_error;
++  uint64_t m_id = 0;
++  bool m_finished = false;
++};
++}
+diff --git a/src/dxvk/rtx_render/rtx_fork_capture.cpp b/src/dxvk/rtx_render/rtx_fork_capture.cpp
+index 05939b7f..f96190c6 100644
+--- a/src/dxvk/rtx_render/rtx_fork_capture.cpp
++++ b/src/dxvk/rtx_render/rtx_fork_capture.cpp
+@@ -13,10 +13,10 @@
+ #include "rtx_materials.h"           // LegacyMaterialData, kSurfaceMaterialInvalidTextureIndex
+ #include "rtx_texture_manager.h"     // RtxTextureManager, TextureRef
+ #include "rtx_constants.h"           // kEmptyHash
+-#include "rtx_options.h"             // RtxOptions::leftHandedCoordinateSystem()
+ 
+ #include "../../lssusd/game_exporter_types.h"   // lss::Export, lss::Material, lss::ext, lss::commonDirName
+ #include "../../lssusd/game_exporter_paths.h"
++#include "../../lssusd/capture_texture.h"
+ #include "../../lssusd/usd_include_begin.h"
+ #include <pxr/base/gf/matrix4d.h>
+ #include <pxr/base/gf/vec3d.h>
+@@ -38,7 +38,8 @@ namespace fork_hooks {
+       XXH64_hash_t runtimeMaterialHash,
+       const LegacyMaterialData& materialData,
+       bool bEnableOpacity) {
+-    lss::Material lssMat; // to be populated
++    lss::Material lssMat{};
++    const auto readbackDir = lss::captureTextureDirectory(BASE_DIR, capturer.m_pCap->idStr); // to be populated
+ 
+     // Use runtime material hash so replacements resolve to the same material at runtime.
+     const std::string matName = dxvk::hashToString(runtimeMaterialHash);
+@@ -66,12 +67,13 @@ namespace fork_hooks {
+       if (imageView && imageView->image().ptr()) {
+         try {
+           const std::string albedoTexFilename(matName + lss::ext::dds);
+-          capturer.m_exporter.dumpImageToFile(ctx, BASE_DIR + lss::commonDirName::texDir,
++          capturer.m_exporter.dumpImageToFile(ctx, readbackDir,
+                                               albedoTexFilename,
+-                                              imageView->image());
+-          const std::string albedoTexPath = str::format(BASE_DIR + lss::commonDirName::texDir, albedoTexFilename);
++                                              imageView->image(), capturer.m_captureJobs);
++          const std::string albedoTexPath = str::format(readbackDir, albedoTexFilename);
+           lssMat.albedoTexPath = albedoTexPath;
+         } catch (const std::exception& e) {
++          capturer.m_captureJobs->fail(e.what());
+           Logger::err(str::format("[GameCapturer] Failed to export D3D9 texture for material '", matName, "': ", e.what()));
+         }
+       } else {
+@@ -99,12 +101,13 @@ namespace fork_hooks {
+           if (imageInfo.extent.width > 0 && imageInfo.extent.height > 0) {
+             const std::string albedoTexFilename(matName + lss::ext::dds);
+             try {
+-              capturer.m_exporter.dumpImageToFile(ctx, BASE_DIR + lss::commonDirName::texDir,
++              capturer.m_exporter.dumpImageToFile(ctx, readbackDir,
+                                                   albedoTexFilename,
+-                                                  apiImageView->image());
+-              const std::string albedoTexPath = str::format(BASE_DIR + lss::commonDirName::texDir, albedoTexFilename);
++                                                  apiImageView->image(), capturer.m_captureJobs);
++              const std::string albedoTexPath = str::format(readbackDir, albedoTexFilename);
+               lssMat.albedoTexPath = albedoTexPath;
+             } catch (const std::exception& e) {
++          capturer.m_captureJobs->fail(e.what());
+               Logger::warn(str::format("[GameCapturer] Failed to export API texture for material ", matName, ": ", e.what()));
+             }
+           } else {
+@@ -121,6 +124,13 @@ namespace fork_hooks {
+       }
+     }
+ 
++    if (lssMat.albedoTexPath.empty() && !colorTexture.isValid() && (textureHash == 0 || textureHash == kEmptyHash)) {
++      try {
++        const auto path = str::format(readbackDir, matName + lss::ext::dds);
++        lss::writeCaptureWhiteTexture(path);
++        lssMat.albedoTexPath = path;
++      } catch (const std::exception& error) { capturer.m_captureJobs->fail(error.what()); }
++    }
+     lssMat.enableOpacity = bEnableOpacity;
+ 
+     // Sampler info is only available on the D3D9 path; API-submitted materials may have no sampler.
+@@ -138,20 +148,5 @@ namespace fork_hooks {
+     Logger::debug("[GameCapturer][" + capturer.m_pCap->idStr + "][Mat:" + matName + "] New");
+   }
+ 
+-  // Applies the global coordinate-system transform for the USD export stage. With rtx.leftHandedCoordinateSystem
+-  // the handedness inversion is skipped, because external API content is already in consistent Y-up space.
+-  void captureCoordSystemSkip(lss::Export& exportPrep) {
+-    // For external API content with explicit left-handed coordinate system setting,
+-    // skip the coordinate transformation - it's already in consistent Y-up space.
+-    // External API cameras are always LHS, so if the game is configured as LHS,
+-    // assume external content.
+-    if (!RtxOptions::leftHandedCoordinateSystem()) {
+-      const bool bInvX = (!exportPrep.camera.view.bInv) && (exportPrep.camera.proj.bInv || exportPrep.camera.isLHS());
+-      const bool bInvY = (!exportPrep.camera.view.bInv) && exportPrep.camera.proj.bInv;
+-      const pxr::GfVec3d scale{ bInvX ? -1.0 : 1.0, bInvY ? -1.0 : 1.0, 1.0 };
+-      exportPrep.globalXform.SetScale(scale);
+-    }
+-  }
+-
+ } // namespace fork_hooks
+ } // namespace dxvk
+diff --git a/src/dxvk/rtx_render/rtx_fork_hooks.h b/src/dxvk/rtx_render/rtx_fork_hooks.h
+index 3032c2b2..ddbbcc24 100644
+--- a/src/dxvk/rtx_render/rtx_fork_hooks.h
++++ b/src/dxvk/rtx_render/rtx_fork_hooks.h
+@@ -138,10 +138,6 @@ namespace dxvk {
+       bool bEnableOpacity);
+ 
+     // Applies the coordinate-system transform for the USD export stage.
+-    // Skips the handedness inversion when rtx.leftHandedCoordinateSystem is set,
+-    // because external API content is already in consistent Y-up space.
+-    // Implementation in rtx_fork_capture.cpp.
+-    void captureCoordSystemSkip(lss::Export& exportPrep);
+ 
+     // Drains the deferred external-light erases, updates and activations, in that order,
+     // then activates the persistent lights.
+diff --git a/src/dxvk/rtx_render/rtx_game_capturer.cpp b/src/dxvk/rtx_render/rtx_game_capturer.cpp
+index 73a68659..ab67adb7 100644
+--- a/src/dxvk/rtx_render/rtx_game_capturer.cpp
++++ b/src/dxvk/rtx_render/rtx_game_capturer.cpp
+@@ -27,6 +27,7 @@
+ #include "rtx_camera.h"
+ #include "rtx_options.h"
+ #include "rtx_utils.h"
++#include <cstring>
+ #include "rtx_instance_manager.h"
+ #include "rtx_scene_manager.h"
+ #include "rtx_materials.h"
+@@ -43,6 +44,7 @@
+ #include "../../util/util_window.h"
+ 
+ #include "../../lssusd/game_exporter.h"
++#include "../../lssusd/capture_texture.h"
+ #include "../../lssusd/game_exporter_paths.h"
+ #include "../../lssusd/game_exporter_types.h"
+ #include "../../lssusd/usd_common.h"
+@@ -60,6 +62,9 @@
+ #define BASE_DIR (util::RtxFileSys::path(util::RtxFileSys::Captures).string())
+ 
+ namespace dxvk {
++
++  // Defined by the shared normal codec compiled in rtx_geometry_utils.cpp.
++  Vector3 decodeNormal(uint32_t packed);
+   namespace {
+     static inline pxr::GfMatrix4d matrix4ToGfMatrix4d(const Matrix4& mat4) {
+       const auto& float4x4 = reinterpret_cast<const float(&)[4][4]>(mat4);
+@@ -73,6 +78,9 @@ namespace dxvk {
+       }
+       return result;
+     }
++    static std::string captureReadbackDirectory(const std::string& id) {
++      return lss::captureTextureDirectory(BASE_DIR, id);
++    }
+     static inline std::string buildStagePath(const std::string& stageName) {
+       std::stringstream stagePathSS;
+       stagePathSS << BASE_DIR << "/" << stageName;
+@@ -128,12 +136,13 @@ namespace dxvk {
+       Logger::info(str::format("[GameCapturer] DXVK_RTX_CAPTURE_ENABLE_ON_FRAME: ", env::getEnvVar("DXVK_RTX_CAPTURE_ENABLE_ON_FRAME")));
+     }
+     env::createDirectory(BASE_DIR);
+-    env::createDirectory(BASE_DIR + lss::commonDirName::texDir);
+     env::createDirectory(BASE_DIR + lss::commonDirName::matDir);
+     lss::GameExporter::setMultiThreadSafety(true);
+   }
+ 
+   GameCapturer::~GameCapturer() {
++    if (m_captureJobs) { m_captureJobs->cancel(); m_captureJobs->drain(); }
++    if (m_exportThread.joinable()) { m_exportThread.join(); }
+   }
+ 
+   void GameCapturer::step(const Rc<DxvkContext> ctx, const HWND hwnd) {
+@@ -175,10 +184,14 @@ namespace dxvk {
+     assert(m_state.has<State::Initializing>());
+     assert(!m_state.has<State::Capturing>());
+     
++    if (m_exportThread.joinable()) { m_exportThread.join(); }
++    if (m_captureJobs) { m_captureJobs->drain(); }
++    m_captureJobs = std::make_shared<CaptureJobs>();
+     m_options = getOptions();
+     
+     m_pCap = std::make_unique<Capture>();
+-    m_pCap->idStr = hashToString(Capture::nextId++).substr(4, 4);
++    m_pCap->idStr = hashToString(Capture::nextId++).substr(4, 4) + "-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
++    std::filesystem::create_directories(std::filesystem::u8path(captureReadbackDirectory(m_pCap->idStr)));
+     m_pCap->bCaptureInstances = m_options.bCaptureInstances;
+     m_pCap->bSkyProbeBaked = false;
+     if (m_pCap->bCaptureInstances) {
+@@ -198,18 +211,11 @@ namespace dxvk {
+   void GameCapturer::prepareInstanceStage(const Rc<DxvkContext> ctx) {
+     const auto ogStagePathStr = buildStagePath(m_options.instanceStageName);
+     std::string stagePathStr;
+-    if (RtxOptions::captureOverwriteExistingCapture()) {
+-      if (std::filesystem::exists(ogStagePathStr)) {
+-        std::filesystem::remove(ogStagePathStr);
+-      }
+-      stagePathStr = ogStagePathStr;
+-    } else {
+-      stagePathStr = env::dedupeFilename(ogStagePathStr);
+-    }
++    stagePathStr = env::dedupeFilename(ogStagePathStr);
+     const auto resolvedFileName = std::filesystem::path(stagePathStr).stem().string();
+     m_pCap->instance.stageName = resolvedFileName;
+     m_pCap->instance.stagePath = stagePathStr;
+-    m_exporter.generateSceneThumbnail(ctx, BASE_DIR + lss::commonDirName::thumbDir, resolvedFileName);
++    m_exporter.generateSceneThumbnail(ctx, BASE_DIR + lss::commonDirName::thumbDir, resolvedFileName, m_captureJobs);
+   }
+ 
+   void GameCapturer::capture(const Rc<DxvkContext> ctx, const float frameTimeMilliseconds) {
+@@ -272,7 +278,14 @@ namespace dxvk {
+         }
+       }
+       capCamera.view.coord = isMirrorTransform(viewToWorld) ? lss::LHS : lss::RHS;
+-      Logger::debug(str::format("Is Camera Left Handed: ", capCamera.isLHS()));
++      const auto up = sceneCamera.getUp();
++      const auto right = sceneCamera.getRight();
++      const auto forward = sceneCamera.getDirection();
++      Logger::info(str::format("[CaptureCoordinates] zUp=", RtxOptions::zUp(),
++        " configuredLHS=", RtxOptions::leftHandedCoordinateSystem(), " worldLHS=", capCamera.isLHS(),
++        " viewDet=", determinant(sceneCamera.getWorldToView()), " projDet=", determinant(viewToProj),
++        " up=(", up.x, ",", up.y, ",", up.z, ") right=(", right.x, ",", right.y, ",", right.z,
++        ") forward=(", forward.x, ",", forward.y, ",", forward.z, ")"));
+       
+       // Set first frame time (should be 0.f)
+       capCamera.firstTime = m_pCap->currentFrameNum;
+@@ -288,27 +301,8 @@ namespace dxvk {
+     pxr::GfVec3d direction = pxr::GfVec3d(sceneCamera.getDirection().x, sceneCamera.getDirection().y, sceneCamera.getDirection().z);
+     pxr::GfVec3d up = pxr::GfVec3d(sceneCamera.getUp().x, sceneCamera.getUp().y, sceneCamera.getUp().z);
+ 
+-    // Flip the up vector of camera if the game flips this vector in the view matrix
+-    up = capCamera.view.bInv ? -up : up;
+-
+-    // Transform camera to match the world space corrections (flipping or mirror) in GameExporter::exportInstances
+-    if (capCamera.proj.bInv && !capCamera.view.bInv) {
+-      position[0] *= -1.0;
+-      position[1] *= -1.0;
+-      direction[0] *= -1.0;
+-      direction[1] *= -1.0;
+-      up[0] *= -1.0;
+-    } else {
+-      if (capCamera.isLHS() && !capCamera.view.bInv) {
+-        position[0] *= -1.0;
+-        direction[0] *= -1.0;
+-      }
+-    }
+-
+-    pxr::GfMatrix4d worldToView;
+-    worldToView.SetLookAt(position, position + direction, up);
+-    worldToView.Orthonormalize();
+-    capCamera.xforms.push_back({ m_pCap->currentFrameNum, worldToView.GetInverse() });
++    capCamera.xforms.push_back({ m_pCap->currentFrameNum,
++      capCamera.usdCameraTransform(position, direction, up) });
+   }
+ 
+   void GameCapturer::captureLights() {
+@@ -320,31 +314,72 @@ namespace dxvk {
+         captureSphereLight(rtLight.getSphereLight());
+         break;
+       case RtLightType::Rect:
+-        // Todo: Handle Rect lights
+-        Logger::err("[GameCapturer][" + m_pCap->idStr + "] RectLight not implemented");
+-        assert(false);
+-        break;
+       case RtLightType::Disk:
+-        // Todo: Handle Disk lights
+-        Logger::err("[GameCapturer][" + m_pCap->idStr + "] DiskLight not implemented");
+-        assert(false);
+-        break;
+-      case RtLightType::Cylinder:
+-        // Todo: Handle Cylinder lights
+-        Logger::err("[GameCapturer][" + m_pCap->idStr + "] CylinderLight not implemented");
+-        assert(false);
++      case RtLightType::Cylinder: {
++        const auto hash = rtLight.getTransformedHash();
++        const bool first = m_pCap->sphereLights.count(hash) == 0;
++        auto& light = m_pCap->sphereLights[hash];
++        light.lightName = hashToString(hash);
++        auto ci = rtLight.getColorAndIntensity();
++        light.color[0] = ci.x; light.color[1] = ci.y; light.color[2] = ci.z;
++        light.intensity = ci.w;
++        light.radius = 1.f;
++        pxr::GfMatrix4d transform(1);
++        auto setAxes = [&](Vector3 x, Vector3 y, Vector3 direction, Vector3 position) {
++          transform.SetRow(0, pxr::GfVec4d(x.x, x.y, x.z, 0));
++          transform.SetRow(1, pxr::GfVec4d(y.x, y.y, y.z, 0));
++          transform.SetRow(2, pxr::GfVec4d(-direction.x, -direction.y, -direction.z, 0));
++          transform.SetRow(3, pxr::GfVec4d(position.x, position.y, position.z, 1));
++        };
++        auto setShaping = [&](const RtLightShaping& shape) {
++          light.shapingEnabled = shape.getEnabled();
++          if (light.shapingEnabled) {
++            light.coneAngleDegrees = std::acos(std::clamp(shape.getCosConeAngle(), -1.f, 1.f)) * kRadiansToDegrees;
++            light.coneSoftness = shape.getConeSoftness();
++            light.focusExponent = shape.getFocusExponent();
++          }
++        };
++        if (rtLight.getType() == RtLightType::Rect) {
++          const auto& source = rtLight.getRectLight();
++          light.kind = lss::AreaLightKind::Rect;
++          light.width = source.getDimensions().x; light.height = source.getDimensions().y;
++          setAxes(source.getXAxis(), source.getYAxis(), source.getDirection(), source.getPosition());
++          setShaping(source.getShaping());
++        } else if (rtLight.getType() == RtLightType::Disk) {
++          const auto& source = rtLight.getDiskLight();
++          light.kind = lss::AreaLightKind::Disk;
++          const auto dimensions = source.getHalfDimensions();
++          setAxes(source.getXAxis() * dimensions.x, source.getYAxis() * dimensions.y, source.getDirection(), source.getPosition());
++          setShaping(source.getShaping());
++        } else {
++          const auto& source = rtLight.getCylinderLight();
++          light.kind = lss::AreaLightKind::Cylinder;
++          light.width = source.getAxisLength(); light.radius = source.getRadius();
++          auto axis = source.getAxis(); auto pos = source.getPosition();
++          transform.SetRotate(pxr::GfRotation(pxr::GfVec3d::XAxis(), pxr::GfVec3d(axis.x, axis.y, axis.z)));
++          transform.SetTranslateOnly(pxr::GfVec3d(pos.x, pos.y, pos.z));
++        }
++        if (first) { light.firstTime = m_pCap->currentFrameNum; }
++        light.finalTime = m_pCap->currentFrameNum;
++        light.xforms.push_back({m_pCap->currentFrameNum, transform});
+         break;
++      }
+       case RtLightType::Distant:
+         captureDistantLight(rtLight.getDistantLight());
+         break;
+       }
+     };
+ 
+-    for (auto&& pair : m_sceneManager.getLightManager().getLightTable()) {
+-      captureLight(pair.second);
+-    }
+-    for (auto&& pair : m_sceneManager.getLightManager().getExternallyTrackedLightTable()) {
+-      captureLight(pair.second);
++    // The prepared list retains the lights used for rendering after the API's
++    // per-frame active handle set has been cleared.
++    for (const auto* light : m_sceneManager.getLightManager().getLinearizedLights()) {
++      if (light == nullptr) { continue; }
++      const auto color = light->getColorAndIntensity();
++      if (!std::isfinite(color.x) || !std::isfinite(color.y) || !std::isfinite(color.z) || !std::isfinite(color.w) || color.w < 0) {
++        m_captureJobs->fail("Non-finite or negative light in capture: " + hashToString(light->getInitialHash()));
++      } else if (color.w > 0) {
++        captureLight(*light);
++      }
+     }
+   }
+ 
+@@ -367,7 +402,7 @@ namespace dxvk {
+       const dxvk::RtLightShaping& shaping = rtLight.getShaping();
+       if (shaping.getEnabled()) {
+         sphereLight.shapingEnabled = true;
+-        sphereLight.coneAngleDegrees = std::acos(shaping.getCosConeAngle()) * kRadiansToDegrees;
++        sphereLight.coneAngleDegrees = std::acos(std::clamp(shaping.getCosConeAngle(), -1.f, 1.f)) * kRadiansToDegrees;
+         sphereLight.coneSoftness = shaping.getConeSoftness();
+         sphereLight.focusExponent = shaping.getFocusExponent();
+         rotation = pxr::GfRotation(-pxr::GfVec3d::ZAxis(), pxr::GfVec3f(&shaping.getDirection()[0]));
+@@ -403,20 +438,7 @@ namespace dxvk {
+   }
+ 
+   pxr::GfMatrix4d GameCapturer::instanceXformCorrection() const {
+-    pxr::GfMatrix4d xform { 1.0 };
+-    if (m_pCap->camera.proj.bInv && !m_pCap->camera.view.bInv) {
+-      // Add flip transformation for games that render world upside down
+-      xform[0][0] = xform[1][1] = -1.0;
+-    } else {
+-      // Add mirror transformation for games that need additional basis changing because view and projection transformation have different handedness.
+-      // Note1: Don't do this transformation if the view and projection have same handedness, they will automatically cancel out.
+-      // Note2: Don't do this transformation if the game also flip the up vector in view matrix.
+-      //        Because it will automatically cancel out the basis changing and we only need to send an identity matrix here.
+-      if (m_pCap->camera.isLHS() && !m_pCap->camera.view.bInv) {
+-        xform[0][0] = -1.0;
+-      }
+-    }
+-    return xform;
++    return m_pCap->camera.worldBasis();
+   }
+ 
+   // A draw GPU-instanced by the host (remixapi_InstanceInfoGpuInstancingEXT) is one RtInstance whose
+@@ -543,7 +565,7 @@ namespace dxvk {
+       if (pRtInstance->getBlas()->input.cameraType == CameraType::Sky) {
+         if (!m_pCap->bSkyProbeBaked) {
+           const std::string skyProbeFilename = getBakedSkyProbeName(m_pCap->instance.stageName);
+-          m_exporter.bakeSkyProbe(ctx, BASE_DIR + lss::commonDirName::texDir, skyProbeFilename);
++          m_exporter.bakeSkyProbe(ctx, captureReadbackDirectory(m_pCap->idStr), skyProbeFilename, m_captureJobs);
+           m_pCap->bSkyProbeBaked = true;
+           Logger::debug("[GameCapturer][" + m_pCap->idStr + "][SkyProbe] Bake scheduled to " + skyProbeFilename);
+         }
+@@ -758,17 +780,17 @@ namespace dxvk {
+                                           const float currentFrameNum,
+                                           std::shared_ptr<Mesh> pMesh) {
+                                             
+-    AssetExporter::BufferCallback captureMeshPositionsAsync = [this, ctx, numVertices, inputPositionBuffer, currentFrameNum, pMesh](Rc<DxvkBuffer> posBuf) {
++    AssetExporter::BufferCallback captureMeshPositionsAsync = [numVertices, inputPositionBuffer, currentFrameNum, pMesh](Rc<DxvkBuffer> posBuf) {
+       // Prep helper vars
+       constexpr size_t positionSubElementSize = sizeof(float);
+       const size_t positionStride = inputPositionBuffer.stride() / positionSubElementSize;
+       const DxvkBufferSlice positionBuffer(posBuf, 0, posBuf->info().size);
+       // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t)inputPositionBuffer.stride() + sizeof(pxr::GfVec3f)) <=
+-            (positionBuffer.length() - inputPositionBuffer.offsetFromSlice()));
++      if (!(((size_t) (numVertices - 1) * (size_t)inputPositionBuffer.stride() + sizeof(pxr::GfVec3f)) <=
++            (positionBuffer.length() - inputPositionBuffer.offsetFromSlice()))) { throw std::runtime_error("Invalid capture buffer: ((size_t) (numVertices - 1) * (size_t)inputPositionBuffer.stride() + sizeof(pxr::GfVec3f)) <=             (positionBuffer.length() - inputPositionBuffer.offsetFromSlice())"); }
+       // Get copied-to-CPU GPU buffer
+       const float* pVkPosBuf = (float*) positionBuffer.mapPtr((size_t)inputPositionBuffer.offsetFromSlice());
+-      assert(pVkPosBuf);
++      if (!(pVkPosBuf)) { throw std::runtime_error("Invalid capture buffer: pVkPosBuf"); }
+       // Copy GPU buffer to local VtArray
+       pxr::VtArray<pxr::GfVec3f> positions;
+       positions.reserve(numVertices);
+@@ -783,7 +805,7 @@ namespace dxvk {
+       if(correctBakedTransforms()) {
+         pMesh->originCalc.compareAndSwap(originCalc);
+       }
+-      assert(positions.size() > 0);
++      if (!(positions.size() > 0)) { throw std::runtime_error("Invalid capture buffer: positions.size() > 0"); }
+       // Create comparison function that returns float
+       static auto positionsDifferentEnough = [](const pxr::GfVec3f& a, const pxr::GfVec3f& b) {
+         const static float captureMeshPositionDelta = RtxOptions::captureMeshPositionDelta();
+@@ -794,7 +816,7 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.positionBufs, positions, currentFrameNum, positionsDifferentEnough);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, inputPositionBuffer, captureMeshPositionsAsync);
++    m_exporter.copyBufferFromGPU(ctx, inputPositionBuffer, captureMeshPositionsAsync, m_captureJobs);
+   }
+ 
+   template <typename T>
+@@ -804,25 +826,50 @@ namespace dxvk {
+                                         const float currentFrameNum,
+                                         std::shared_ptr<Mesh> pMesh) {
+                                           
+-    AssetExporter::BufferCallback captureMeshNormalsAsync = [ctx, numVertices, inputNormalBuffer, currentFrameNum, pMesh](Rc<DxvkBuffer> norBuf) {
+-      assert(inputNormalBuffer.vertexFormat() == VK_FORMAT_R32G32B32_SFLOAT);
+-      // Prep helper vars
+-      constexpr size_t normalSubElementSize = sizeof(float);
+-      const size_t normalStride = inputNormalBuffer.stride() / normalSubElementSize;
+-      const DxvkBufferSlice normalBuffer(norBuf, 0, norBuf->info().size );
+-      // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t)inputNormalBuffer.stride() + sizeof(pxr::GfVec3f)) <=
+-            (normalBuffer.length() - inputNormalBuffer.offsetFromSlice()));
+-      // Get copied-to-CPU GPU buffer
+-      const float* pVkNormalBuf = (float*) normalBuffer.mapPtr((size_t)inputNormalBuffer.offsetFromSlice());
+-      assert(pVkNormalBuf);
+-      // Copy GPU buffer to local VtArray
++    AssetExporter::BufferCallback captureMeshNormalsAsync = [numVertices, inputNormalBuffer, currentFrameNum, pMesh](Rc<DxvkBuffer> norBuf) {
++      const auto format = inputNormalBuffer.vertexFormat();
++      const auto stride = inputNormalBuffer.stride();
++      const auto offset = inputNormalBuffer.offsetFromSlice();
++      const DxvkBufferSlice normalBuffer(norBuf, 0, norBuf->info().size);
++      const auto length = normalBuffer.length();
++      const auto invalid = [&](const char* reason) {
++        return std::runtime_error(str::format("Invalid capture normal buffer for mesh ",
++          pMesh->lssData.meshName, ": ", reason, " (format=", int(format),
++          ", stride=", stride, ", offset=", offset, ", vertices=", numVertices, ", bytes=", length, ")"));
++      };
++
++      size_t elementSize;
++      switch (format) {
++      case VK_FORMAT_R32G32B32_SFLOAT: elementSize = 3 * sizeof(float); break;
++      case VK_FORMAT_R32G32B32A32_SFLOAT: elementSize = 4 * sizeof(float); break;
++      // Remix stores a spherical octahedral normal in two UNORM16 fields.
++      case VK_FORMAT_R32_UINT: elementSize = sizeof(uint32_t); break;
++      default: throw invalid("unsupported vertex format");
++      }
++      if (numVertices == 0 || stride < elementSize || offset > length ||
++          elementSize > length - offset || numVertices - 1 > (length - offset - elementSize) / stride) {
++        throw invalid("vertex span exceeds the copied slice");
++      }
++      const auto* source = static_cast<const unsigned char*>(normalBuffer.mapPtr(offset));
++      if (source == nullptr) {
++        throw invalid("readback is not mapped");
++      }
++
+       pxr::VtArray<pxr::GfVec3f> normals;
+       normals.reserve(numVertices);
+       for (size_t idx = 0; idx < numVertices; ++idx) {
+-        normals.push_back(pxr::GfVec3f(&pVkNormalBuf[idx * normalStride]));
++        const auto* vertex = source + idx * stride;
++        if (format == VK_FORMAT_R32_UINT) {
++          uint32_t packed;
++          std::memcpy(&packed, vertex, sizeof(packed));
++          const auto normal = decodeNormal(packed);
++          normals.push_back(pxr::GfVec3f(normal.x, normal.y, normal.z));
++        } else {
++          float normal[3];
++          std::memcpy(normal, vertex, sizeof(normal));
++          normals.push_back(pxr::GfVec3f(normal));
++        }
+       }
+-      assert(normals.size() > 0);
+       // Create comparison function that returns float
+       static auto normalsDifferentEnough = [](const pxr::GfVec3f& a, const pxr::GfVec3f& b) {
+         const static float captureMeshNormalDelta = RtxOptions::captureMeshNormalDelta();
+@@ -833,17 +880,17 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.normalBufs, normals, currentFrameNum, normalsDifferentEnough);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, inputNormalBuffer, captureMeshNormalsAsync);
++    m_exporter.copyBufferFromGPU(ctx, inputNormalBuffer, captureMeshNormalsAsync, m_captureJobs);
+   }
+ 
+   template<typename T>
+   static void getIndicesFromVK(const size_t numIndices, const DxvkBufferSlice& indexBuffer, pxr::VtArray<int>& indices) {
+     // Ensure no reads are out of bounds
+-    assert((size_t) numIndices * sizeof(T) <= indexBuffer.length());
++    if (!((size_t) numIndices * sizeof(T) <= indexBuffer.length())) { throw std::runtime_error("Invalid capture buffer: (size_t) numIndices * sizeof(T) <= indexBuffer.length()"); }
+ 
+     // Get copied-to-CPU GPU buffer
+     const T* pVkIndexBuf = (T*) indexBuffer.mapPtr(0);
+-    assert(pVkIndexBuf);
++    if (!(pVkIndexBuf)) { throw std::runtime_error("Invalid capture buffer: pVkIndexBuf"); }
+     for (size_t idx = 0; idx < numIndices; ++idx) {
+       indices.push_back(pVkIndexBuf[idx]);
+     }
+@@ -855,7 +902,7 @@ namespace dxvk {
+                                         const lss::Camera& capCam,
+                                         std::shared_ptr<Mesh> pMesh) {
+ 
+-    AssetExporter::BufferCallback captureMeshIndicesAsync = [ctx, geomData, currentFrameNum, pMesh, capCam, this](Rc<DxvkBuffer> idxBuf) {
++    AssetExporter::BufferCallback captureMeshIndicesAsync = [geomData, currentFrameNum, pMesh, capCam](Rc<DxvkBuffer> idxBuf) {
+       const size_t numIndices = geomData.indexCount;
+       const DxvkBufferSlice indexBuffer(idxBuf, 0, idxBuf->info().size);
+       // Copy GPU buffer to local VtArray
+@@ -870,16 +917,11 @@ namespace dxvk {
+         getIndicesFromVK<uint32_t>(numIndices, indexBuffer, indices);
+         break;
+       default:
+-        assert(0);
++        if (!(0)) { throw std::runtime_error("Invalid capture buffer: 0"); }
+       }
+-      assert(indices.size() > 0);
+-
+-      // Need to change winding order in 3 situations:
+-      // 1. The mesh is LHS
+-      // 2. View and Projection transformation have different handedness (because we need to add a mirror transformation in this case)
+-      // 3. We need to flip meshes in world space to correct upside down
+-      // However, swap twice is the same as original order. So, we do XOR here make sure we only swap the winding order when 1 or 3 (odd number) of these 3 situations happen.
+-      const bool isChangingHandedness = (capCam.proj.bInv ^ (pMesh->lssData.isLhs ^ capCam.isLHS()));
++      if (!(indices.size() > 0)) { throw std::runtime_error("Invalid capture buffer: indices.size() > 0"); }
++
++      const bool isChangingHandedness = capCam.reverseWinding(pMesh->lssData.isLhs);
+       if (isChangingHandedness){
+         for (uint32_t i = 0; i < numIndices; i+=3) {
+           std::swap(indices[i], indices[i + 2]);
+@@ -894,7 +936,7 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.idxBufs, indices, currentFrameNum, differentIndices);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, geomData.indexBuffer, captureMeshIndicesAsync);
++    m_exporter.copyBufferFromGPU(ctx, geomData.indexBuffer, captureMeshIndicesAsync, m_captureJobs);
+   }
+ 
+   void GameCapturer::captureMeshTexCoords(const Rc<DxvkContext> ctx,
+@@ -902,7 +944,7 @@ namespace dxvk {
+                                           const float currentFrameNum,
+                                           std::shared_ptr<Mesh> pMesh) {
+ 
+-    AssetExporter::BufferCallback captureMeshTexCoordsAsync = [ctx, geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> texBuf) {
++    AssetExporter::BufferCallback captureMeshTexCoordsAsync = [geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> texBuf) {
+       // Only float32 texcoord formats can be safely read as float* on the CPU.
+       // Non-float32 formats (e.g. R16G16_SFLOAT) are normally converted to R32G32_SFLOAT by the
+       // GPU interleaver before reaching here, but guard defensively in case that changes.
+@@ -917,11 +959,11 @@ namespace dxvk {
+       const size_t texcoordStride = geomData.texcoordBuffer.stride() / texcoordSubElementSize;
+       const DxvkBufferSlice texcoordBuffer(texBuf, 0, texBuf->info().size);
+       // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t) geomData.texcoordBuffer.stride() + sizeof(pxr::GfVec2f)) <=
+-             (texcoordBuffer.length() - geomData.texcoordBuffer.offsetFromSlice()));
++      if (!(((size_t) (numVertices - 1) * (size_t) geomData.texcoordBuffer.stride() + sizeof(pxr::GfVec2f)) <=
++             (texcoordBuffer.length() - geomData.texcoordBuffer.offsetFromSlice()))) { throw std::runtime_error("Invalid capture buffer: ((size_t) (numVertices - 1) * (size_t) geomData.texcoordBuffer.stride() + sizeof(pxr::GfVec2f)) <=              (texcoordBuffer.length() - geomData.texcoordBuffer.offsetFromSlice())"); }
+       // Get copied-to-CPU GPU buffer
+       const float* pVkTexcoordsBuf = (float*) texcoordBuffer.mapPtr((size_t) geomData.texcoordBuffer.offsetFromSlice());
+-      assert(pVkTexcoordsBuf);
++      if (!(pVkTexcoordsBuf)) { throw std::runtime_error("Invalid capture buffer: pVkTexcoordsBuf"); }
+       // Copy GPU buffer to local VtArray
+       pxr::VtArray<pxr::GfVec2f> texcoords;
+       texcoords.reserve(numVertices);
+@@ -929,7 +971,7 @@ namespace dxvk {
+         texcoords.push_back(pxr::GfVec2f(pVkTexcoordsBuf[idx * texcoordStride],
+                                          1.0f - pVkTexcoordsBuf[idx * texcoordStride + 1]));
+       }
+-      assert(texcoords.size() > 0);
++      if (!(texcoords.size() > 0)) { throw std::runtime_error("Invalid capture buffer: texcoords.size() > 0"); }
+       // Create comparison function that returns float
+       static auto differentIndices = [](const pxr::GfVec2f& a, const pxr::GfVec2f& b) {
+         const static float captureMeshTexcoordDelta = RtxOptions::captureMeshTexcoordDelta();
+@@ -940,7 +982,7 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.texcoordBufs, texcoords, currentFrameNum, differentIndices);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, geomData.texcoordBuffer, captureMeshTexCoordsAsync);
++    m_exporter.copyBufferFromGPU(ctx, geomData.texcoordBuffer, captureMeshTexCoordsAsync, m_captureJobs);
+   }
+ 
+   void GameCapturer::captureMeshColor(const Rc<DxvkContext> ctx,
+@@ -948,19 +990,19 @@ namespace dxvk {
+                                       const float currentFrameNum,
+                                       std::shared_ptr<Mesh> pMesh) {
+ 
+-    AssetExporter::BufferCallback captureMeshColorAsync = [ctx, geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> colBuf) {
+-      assert(geomData.color0Buffer.vertexFormat() == VK_FORMAT_B8G8R8A8_UNORM);
++    AssetExporter::BufferCallback captureMeshColorAsync = [geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> colBuf) {
++      if (!(geomData.color0Buffer.vertexFormat() == VK_FORMAT_B8G8R8A8_UNORM)) { throw std::runtime_error("Invalid capture buffer: geomData.color0Buffer.vertexFormat() == VK_FORMAT_B8G8R8A8_UNORM"); }
+       // Prep helper vars
+       const size_t numVertices = geomData.vertexCount;
+       constexpr size_t colorSubElementSize = sizeof(uint8_t);
+       const size_t colorStride = geomData.color0Buffer.stride() / colorSubElementSize;
+       const DxvkBufferSlice colorBuffer(colBuf, 0, colBuf->info().size);
+       // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t) geomData.color0Buffer.stride() + sizeof(uint8_t) * 3) <=
+-             (colorBuffer.length() - geomData.color0Buffer.offsetFromSlice()));
++      if (!(((size_t) (numVertices - 1) * (size_t) geomData.color0Buffer.stride() + sizeof(uint8_t) * 3) <=
++             (colorBuffer.length() - geomData.color0Buffer.offsetFromSlice()))) { throw std::runtime_error("Invalid capture buffer: ((size_t) (numVertices - 1) * (size_t) geomData.color0Buffer.stride() + sizeof(uint8_t) * 3) <=              (colorBuffer.length() - geomData.color0Buffer.offsetFromSlice())"); }
+       // Get copied-to-CPU GPU buffer
+       const uint8_t* pVkColorBuf = (uint8_t*) colorBuffer.mapPtr((size_t) geomData.color0Buffer.offsetFromSlice());
+-      assert(pVkColorBuf);
++      if (!(pVkColorBuf)) { throw std::runtime_error("Invalid capture buffer: pVkColorBuf"); }
+       // Copy GPU buffer to local VtArray
+       pxr::VtArray<pxr::GfVec4f> colors;
+       colors.reserve(numVertices);
+@@ -970,7 +1012,7 @@ namespace dxvk {
+                                       (float) pVkColorBuf[idx * colorStride + 0] / 255.f,
+                                       (float) pVkColorBuf[idx * colorStride + 3] / 255.f));
+       }
+-      assert(colors.size() > 0);
++      if (!(colors.size() > 0)) { throw std::runtime_error("Invalid capture buffer: colors.size() > 0"); }
+       // Create comparison function that returns float
+       static auto colorsDifferentEnough = [](const pxr::GfVec4f& a, const pxr::GfVec4f& b) {
+         const static float captureMeshColorDelta = RtxOptions::captureMeshColorDelta();
+@@ -981,14 +1023,14 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.colorBufs, colors, currentFrameNum, colorsDifferentEnough);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, geomData.color0Buffer, captureMeshColorAsync);
++    m_exporter.copyBufferFromGPU(ctx, geomData.color0Buffer, captureMeshColorAsync, m_captureJobs);
+   }
+ 
+   void GameCapturer::captureMeshBlending(const Rc<DxvkContext> ctx,
+                                          const RasterGeometry& geomData,
+                                          const float currentFrameNum,
+                                          std::shared_ptr<Mesh> pMesh) {
+-    AssetExporter::BufferCallback captureMeshBlendWeightsAsync = [ctx, geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> inBuf) {
++    AssetExporter::BufferCallback captureMeshBlendWeightsAsync = [geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> inBuf) {
+       // Prep helper vars
+       const size_t numVertices = geomData.vertexCount;
+       const size_t bonesPerVertex = pMesh->lssData.bonesPerVertex;
+@@ -996,18 +1038,18 @@ namespace dxvk {
+       const DxvkBufferSlice bufferSlice(inBuf, 0, inBuf->info().size);
+       const VkFormat format = geomData.blendWeightBuffer.vertexFormat();
+       if (bonesPerVertex <= 2) {
+-        assert(format == VK_FORMAT_R32_SFLOAT || format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT);
++        if (!(format == VK_FORMAT_R32_SFLOAT || format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT)) { throw std::runtime_error("Invalid capture buffer: format == VK_FORMAT_R32_SFLOAT || format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT"); }
+       } else if (bonesPerVertex == 3) {
+-        assert(format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT);
++        if (!(format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT)) { throw std::runtime_error("Invalid capture buffer: format == VK_FORMAT_R32G32_SFLOAT || format == VK_FORMAT_R32G32B32_SFLOAT"); }
+       } else if (bonesPerVertex == 4) {
+-        assert(format == VK_FORMAT_R32G32B32_SFLOAT);
++        if (!(format == VK_FORMAT_R32G32B32_SFLOAT)) { throw std::runtime_error("Invalid capture buffer: format == VK_FORMAT_R32G32B32_SFLOAT"); }
+       }
+       // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t) geomData.blendWeightBuffer.stride() + sizeof(float) * bonesPerVertex) <=
+-             (bufferSlice.length() - geomData.blendWeightBuffer.offsetFromSlice()));
++      if (!(((size_t) (numVertices - 1) * (size_t) geomData.blendWeightBuffer.stride() + sizeof(float) * bonesPerVertex) <=
++             (bufferSlice.length() - geomData.blendWeightBuffer.offsetFromSlice()))) { throw std::runtime_error("Invalid capture buffer: ((size_t) (numVertices - 1) * (size_t) geomData.blendWeightBuffer.stride() + sizeof(float) * bonesPerVertex) <=              (bufferSlice.length() - geomData.blendWeightBuffer.offsetFromSlice())"); }
+       // Get copied-to-CPU GPU buffer
+       const float* pVkBwBuf = (float*) bufferSlice.mapPtr((size_t) geomData.blendWeightBuffer.offsetFromSlice());
+-      assert(pVkBwBuf);
++      if (!(pVkBwBuf)) { throw std::runtime_error("Invalid capture buffer: pVkBwBuf"); }
+       // Copy GPU buffer to local VtArray
+       pxr::VtArray<float> targetBuffer;
+       targetBuffer.reserve(numVertices * bonesPerVertex);
+@@ -1021,7 +1063,7 @@ namespace dxvk {
+         // D3D9 only stores bonesPerVertex - 1 weights. The last weight is 1 minus the other weights.
+         targetBuffer.push_back(lastWeight);
+       }
+-      assert(targetBuffer.size() > 0);
++      if (!(targetBuffer.size() > 0)) { throw std::runtime_error("Invalid capture buffer: targetBuffer.size() > 0"); }
+       // Create comparison function that returns float
+       static auto weightsDifferentEnough = [](const float& a, const float& b) {
+         const static float delta = RtxOptions::captureMeshBlendWeightDelta();
+@@ -1030,19 +1072,19 @@ namespace dxvk {
+       // Cache buffer iff new buffer differs from previous buffer
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.blendWeightBufs, targetBuffer, currentFrameNum, weightsDifferentEnough);
+     };
+-    AssetExporter::BufferCallback captureMeshBlendIndicesAsync = [ctx, geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> inBuf) {
+-      assert(geomData.blendIndicesBuffer.vertexFormat() == VK_FORMAT_R8G8B8A8_USCALED);
++    AssetExporter::BufferCallback captureMeshBlendIndicesAsync = [geomData, currentFrameNum, pMesh](Rc<DxvkBuffer> inBuf) {
++      if (!(geomData.blendIndicesBuffer.vertexFormat() == VK_FORMAT_R8G8B8A8_USCALED)) { throw std::runtime_error("Invalid capture buffer: geomData.blendIndicesBuffer.vertexFormat() == VK_FORMAT_R8G8B8A8_USCALED"); }
+       // Prep helper vars
+       const size_t numVertices = geomData.vertexCount;
+       const size_t bonesPerVertex = pMesh->lssData.bonesPerVertex;
+       const size_t stride = geomData.blendIndicesBuffer.stride() / sizeof(uint8_t);
+       const DxvkBufferSlice bufferSlice(inBuf, 0, inBuf->info().size);
+       // Ensure no reads are out of bounds
+-      assert(((size_t) (numVertices - 1) * (size_t) geomData.blendIndicesBuffer.stride() + sizeof(uint8_t) * bonesPerVertex) <=
+-             (bufferSlice.length() - geomData.blendIndicesBuffer.offsetFromSlice()));
++      if (!(((size_t) (numVertices - 1) * (size_t) geomData.blendIndicesBuffer.stride() + sizeof(uint8_t) * bonesPerVertex) <=
++             (bufferSlice.length() - geomData.blendIndicesBuffer.offsetFromSlice()))) { throw std::runtime_error("Invalid capture buffer: ((size_t) (numVertices - 1) * (size_t) geomData.blendIndicesBuffer.stride() + sizeof(uint8_t) * bonesPerVertex) <=              (bufferSlice.length() - geomData.blendIndicesBuffer.offsetFromSlice())"); }
+       // Get copied-to-CPU GPU buffer
+       const uint8_t* VkBuf = (uint8_t*) bufferSlice.mapPtr((size_t) geomData.blendIndicesBuffer.offsetFromSlice());
+-      assert(VkBuf);
++      if (!(VkBuf)) { throw std::runtime_error("Invalid capture buffer: VkBuf"); }
+       // Copy GPU buffer to local VtArray
+       pxr::VtArray<int> targetBuffer;
+       targetBuffer.reserve(numVertices * bonesPerVertex);
+@@ -1051,7 +1093,7 @@ namespace dxvk {
+           targetBuffer.push_back(VkBuf[idx * stride + bone_idx]);
+         }
+       }
+-      assert(targetBuffer.size() > 0);
++      if (!(targetBuffer.size() > 0)) { throw std::runtime_error("Invalid capture buffer: targetBuffer.size() > 0"); }
+       // Create comparison function that returns float
+       static auto weightsDifferentEnough = [](const int& a, const int& b) {
+         return a != b;
+@@ -1060,10 +1102,10 @@ namespace dxvk {
+       evalNewBufferAndCache(pMesh, pMesh->lssData.buffers.blendIndicesBufs, targetBuffer, currentFrameNum, weightsDifferentEnough);
+     };
+     pMesh->meshSync.numOutstandingInc();
+-    m_exporter.copyBufferFromGPU(ctx, geomData.blendWeightBuffer, captureMeshBlendWeightsAsync);
++    m_exporter.copyBufferFromGPU(ctx, geomData.blendWeightBuffer, captureMeshBlendWeightsAsync, m_captureJobs);
+     if (geomData.blendIndicesBuffer.defined()) {
+       pMesh->meshSync.numOutstandingInc();
+-      m_exporter.copyBufferFromGPU(ctx, geomData.blendIndicesBuffer, captureMeshBlendIndicesAsync);
++      m_exporter.copyBufferFromGPU(ctx, geomData.blendIndicesBuffer, captureMeshBlendIndicesAsync, m_captureJobs);
+     }
+   }
+ 
+@@ -1078,7 +1120,7 @@ namespace dxvk {
+     bool bSufficientlyDifferent = false;
+     if (bufferCache.size() > 0) {
+       const auto& prevBuf = (--bufferCache.cend())->second;
+-      assert(newBuffer.size() == prevBuf.size());
++      if (!(newBuffer.size() == prevBuf.size())) { throw std::runtime_error("Invalid capture buffer: newBuffer.size() == prevBuf.size()"); }
+       for (size_t idx = 0; idx < newBuffer.size(); ++idx) {
+         const T& newVal = newBuffer[idx];
+         const T& prevVal = prevBuf[idx];
+@@ -1103,23 +1145,21 @@ namespace dxvk {
+     assert(m_state.has<State::BeginExport>());
+     assert(!m_state.has<State::PreppingExport>());
+     assert(!m_state.has<State::Exporting>());
+-    static auto exportThreadTask = [this](const Rc<DxvkContext> ctx,
+-                                          std::unique_ptr<Capture> pCap,
++    auto exportThreadTask = [this](std::unique_ptr<Capture> pCap,
+                                           State* pState,
+                                           CompletedCapture* complete,
+                                           const float framesPerSecond) {
+       Capture& cap = *pCap;
+-      const auto numTexExportsInProgress = m_exporter.getNumExportsInFlights();
+-      constexpr float kTimePerTexExport = 0.0050f; // Liberally decided by inspection, derived from timed out tests
+-      const float texExportTimeout = numTexExportsInProgress * kTimePerTexExport;
+-      m_exporter.waitForAllExportsToComplete(texExportTimeout);
++      try {
++      m_captureJobs->wait(std::chrono::seconds(120));
+       assert(pState->has<State::PreppingExport>());
+       const auto exportPrep = prepExport(cap, framesPerSecond);
+       pState->set<State::PreppingExport, false>();
+       pState->set<State::Exporting, true>();
+ 
+       Logger::info("[GameCapturer][" + cap.idStr + "] Begin USD export");
+-      const bool exportOk = lss::GameExporter::exportUsd(exportPrep);
++      std::string exportError;
++      const bool exportOk = lss::GameExporter::exportUsd(exportPrep, &exportError);
+       Logger::info("[GameCapturer][" + cap.idStr + "] End USD export");
+ 
+       if (!exportOk) {
+@@ -1130,6 +1170,12 @@ namespace dxvk {
+         return;
+       }
+ 
++      try {
++        lss::cleanupCaptureInputs(BASE_DIR, cap.idStr);
++      } catch (const std::exception& error) {
++        Logger::warn("[GameCapturer] Temporary readback cleanup: " + std::string(error.what()));
++      }
++
+       // Necessary step for being able to properly diff and check for regressions
+       const auto flattenCaptureEnvStr = env::getEnvVar("DXVK_CAPTURE_FLATTEN");
+       if (!flattenCaptureEnvStr.empty()) {
+@@ -1140,16 +1186,30 @@ namespace dxvk {
+       complete->stagePath = cap.instance.stagePath;
+       pState->set<State::Exporting, false>();
+       pState->set<State::Complete, true>();
++      } catch (const std::exception& error) {
++        Logger::err("[GameCapturer][" + cap.idStr + "] Capture failed: " + error.what());
++        complete->stageName = cap.instance.stageName;
++        complete->stagePath = cap.instance.stagePath;
++        pState->set<State::PreppingExport, false>();
++        pState->set<State::Exporting, false>();
++        pState->set<State::Failed, true>();
++      } catch (...) {
++        Logger::err("[GameCapturer] Unknown capture exception");
++        complete->stageName = cap.instance.stageName;
++        complete->stagePath = cap.instance.stagePath;
++        pState->set<State::PreppingExport, false>();
++        pState->set<State::Exporting, false>();
++        pState->set<State::Failed, true>();
++      }
+     };
+ 
+     m_state.set<State::PreppingExport, true>();
+     m_state.set<State::BeginExport, false>();
+-    std::thread(exportThreadTask,
+-                ctx,
++    m_exportThread = std::thread(exportThreadTask,
+                 std::move(m_pCap),
+                 &m_state,
+                 &m_completeCapture,
+-                static_cast<float>(m_options.fps)).detach();
++                static_cast<float>(m_options.fps));
+   }
+ 
+   lss::Export GameCapturer::prepExport(const Capture& cap,
+@@ -1164,11 +1224,15 @@ namespace dxvk {
+       exportPrep.camera = cap.camera;
+     }
+     // Prep global transform
+-    exportPrep.globalXform = pxr::GfMatrix4d{1.0};
+-    fork_hooks::captureCoordSystemSkip(exportPrep);
++    exportPrep.globalXform = exportPrep.camera.worldBasis();
+     if(exportPrep.meta.bCorrectBakedTransforms) {
+       exportPrep.globalXform.SetTranslateOnly(-exportPrep.stageOrigin);
+     }
++    const auto& global = exportPrep.globalXform;
++    const auto offset = global.ExtractTranslation();
++    Logger::info(str::format("[CaptureCoordinates] globalScale=(", global[0][0], ",", global[1][1],
++      ",", global[2][2], ") globalTranslation=(", offset[0], ",", offset[1], ",", offset[2],
++      ") globalDet=", global.GetDeterminant3()));
+     return exportPrep;
+   }
+ 
+@@ -1178,7 +1242,7 @@ namespace dxvk {
+     // Prep meta data
+     exportPrep.meta.windowTitle = window::getWindowTitle(cap.hwnd);
+     exportPrep.meta.exeName = env::getExeName();
+-    exportPrep.meta.iconPath = BASE_DIR + exportPrep.meta.exeName + "_icon.bmp";
++    exportPrep.meta.iconPath = captureReadbackDirectory(cap.idStr) + "icon.bmp";
+     exportPrep.meta.geometryHashRule = RtxOptions::geometryAssetHashRuleString();
+     exportPrep.meta.assetKeyDerivation = str::format(AssetResolver::kKeyDerivationVersion);
+     exportPrep.meta.metersPerUnit = metersPerUnit() > 0.f ? metersPerUnit() : RtxOptions::sceneScale();
+@@ -1200,7 +1264,7 @@ namespace dxvk {
+     exportPrep.baseExportPath = BASE_DIR;
+     exportPrep.bExportInstanceStage = cap.bCaptureInstances;
+     exportPrep.instanceStagePath = cap.instance.stagePath;
+-    exportPrep.bakedSkyProbePath = cap.bSkyProbeBaked ? (BASE_DIR + lss::commonDirName::texDir + getBakedSkyProbeName(cap.instance.stageName)) : "";
++    exportPrep.bakedSkyProbePath = cap.bSkyProbeBaked ? (captureReadbackDirectory(cap.idStr) + getBakedSkyProbeName(cap.instance.stageName)) : "";
+   }
+ 
+   void GameCapturer::prepExportMaterials(const Capture& cap,
+@@ -1214,8 +1278,10 @@ namespace dxvk {
+     OriginCalc stageOriginCalc;
+     for (auto& [hash, pMesh] : cap.meshes) {
+       std::unique_lock lock(pMesh->meshSync.mutex);
+-      pMesh->meshSync.cond.wait(lock,
+-        [pNumOutstanding = &pMesh->meshSync.numOutstanding] { return *pNumOutstanding == 0; });
++      if (!pMesh->meshSync.cond.wait_for(lock, std::chrono::seconds(120),
++        [pNumOutstanding = &pMesh->meshSync.numOutstanding] { return *pNumOutstanding == 0; })) {
++        throw std::runtime_error("Mesh preparation timed out: " + std::to_string(hash));
++      }
+       if (pMesh->lssData.numIndices == 0 && pMesh->lssData.numVertices == 0) {
+         continue;
+       }
+@@ -1266,11 +1332,10 @@ namespace dxvk {
+ 
+   void GameCapturer::flattenExport(const lss::Export& exportPrep) {
+     Logger::info("[GameCapturer][" + exportPrep.debugId + "] Flattening USD capture.");
+-    const auto pStage = pxr::UsdStage::Open(exportPrep.instanceStagePath);
+-    assert(pStage);
+-    const auto flattenedStagePath = buildStagePath("flattened.usd");
+-    const auto pFlattenedStage = pStage->Export(flattenedStagePath, true);
+-    assert(pFlattenedStage);
++    const auto name = std::filesystem::u8path(exportPrep.instanceStagePath).stem().u8string() + "_flattened.usd";
++    const auto destination = env::dedupeFilename(buildStagePath(name));
++    std::string error;
++    if (!lss::GameExporter::flattenUsd(exportPrep.instanceStagePath, destination, &error)) { throw std::runtime_error(error); }
+     Logger::info("[GameCapturer][" + exportPrep.debugId + "] USD capture flattened.");
+   }
+ 
+diff --git a/src/dxvk/rtx_render/rtx_game_capturer.h b/src/dxvk/rtx_render/rtx_game_capturer.h
+index ec98e4ee..f61b0040 100644
+--- a/src/dxvk/rtx_render/rtx_game_capturer.h
++++ b/src/dxvk/rtx_render/rtx_game_capturer.h
+@@ -85,6 +85,8 @@
+ #include <vector>
+ #include <unordered_map>
+ #include <mutex>
++#include <thread>
++#include "rtx_capture_jobs.h"
+ 
+ namespace dxvk 
+ {
+@@ -346,6 +348,8 @@ private:
+   // State
+   bool m_bTriggerCapture = false;
+   State m_state;
++  std::thread m_exportThread;
++  std::shared_ptr<CaptureJobs> m_captureJobs;
+ 
+   // Handles
+   DxvkDevice* const m_pDevice;
+diff --git a/src/dxvk/rtx_render/rtx_game_lights.cpp b/src/dxvk/rtx_render/rtx_game_lights.cpp
+index b224402b..5ffa26a8 100644
+--- a/src/dxvk/rtx_render/rtx_game_lights.cpp
++++ b/src/dxvk/rtx_render/rtx_game_lights.cpp
+@@ -31,6 +31,7 @@
+ #include "rtx_options.h"
+ #include "rtx_retained_scene.h"
+ #include "rtx_scene_manager.h"
++#include "rtx_utils.h"
+ #include "translator/rtx_translator_lifetime.h"
+ 
+ namespace dxvk {
+@@ -66,6 +67,10 @@ namespace dxvk {
+       const XXH64_hash_t key = XXH64(&position, sizeof(Vector3), assetHash);
+       const std::shared_ptr<const ReplacementBucket> bucket = m_scene.getAssetReplacer()->getReplacementsForLight(assetHash);
+       if (bucket == nullptr) {
++        if (Logger::logLevel() <= LogLevel::Debug) {
++          Logger::debug(str::format("[GameLight] hash=", hashToString(assetHash),
++            " position=", position.x, ",", position.y, ",", position.z, " state=unmatched (original submitted)"));
++        }
+         // A light that had a replacement (replacement lights toggled off) loses its replacement lights first.
+         const auto stale = m_entries.find(key);
+         if (stale != m_entries.end()) {
+@@ -77,6 +82,7 @@ namespace dxvk {
+         continue;
+       }
+ 
++      lightManager.suppressGameLight(assetHash);
+       const Matrix4 transform = LightUtils::getLightTransform(light);
+       auto [found, inserted] = m_entries.try_emplace(key);
+       Entry& entry = found->second;
+@@ -93,6 +99,7 @@ namespace dxvk {
+       const bool boundsNeeded = !entry.lightBounds.isValid();
+       AxisAlignedBoundingBox litBounds;
+       size_t slot = 0;
++      bool emits = false;
+       for (const AssetReplacement& replacement : bucket->replacements) {
+         if (replacement.type != AssetReplacement::eLight || !replacement.lightData.has_value()) {
+           continue;  // Meshes under lights are not supported.
+@@ -101,6 +108,7 @@ namespace dxvk {
+         // Merged before the bounds, since some replacements take type, position and radius from the game light.
+         replacementLight.merge(light);
+         RtLight rtReplacement = replacementLight.toRtLight();
++        emits |= rtReplacement.getColorAndIntensity().w > 0.f;
+         if (boundsNeeded) {
+           const Vector3 p = rtReplacement.getPosition();
+           const float radius = rtReplacement.getType() == RtLightType::Sphere ? rtReplacement.getSphereLight().getRadius() : 0.f;
+@@ -129,6 +137,10 @@ namespace dxvk {
+       }
+       entry.transform = transform;
+       entry.frameLastSeen = frame;
++      if (Logger::logLevel() <= LogLevel::Debug) {
++        Logger::debug(str::format("[GameLight] hash=", hashToString(assetHash),
++          " position=", position.x, ",", position.y, ",", position.z, " state=", emits ? "replaced" : "suppressed"));
++      }
+       m_stats.replaced++;
+     }
+   }
+diff --git a/src/dxvk/rtx_render/rtx_light_manager.cpp b/src/dxvk/rtx_render/rtx_light_manager.cpp
+index cf0fea68..1b3ef413 100644
+--- a/src/dxvk/rtx_render/rtx_light_manager.cpp
++++ b/src/dxvk/rtx_render/rtx_light_manager.cpp
+@@ -28,6 +28,7 @@
+ #include "rtx_fork_hooks.h"
+ #include "rtx_light_manager.h"
+ #include "rtx_context.h"
++#include "rtx_asset_replacer.h"
+ #include "rtx_options.h"
+ #include "rtx_utils.h"
+ 
+@@ -242,6 +243,7 @@ namespace dxvk {
+     ScopedCpuProfileZone();
+     // Ensure external light updates/removals are applied before we linearize and draw UI
+     fork_hooks::flushPendingLightMutations(*this);
++    resolveExternalLights(*device()->getCommon()->getSceneManager().getAssetReplacer());
+     // Note: Early outing in this function (via returns) should be done carefully (or not at all ideally) as it may skip important
+     // logic such as swapping the current/previous frame light buffer, updating light count information or allocating/updating the
+     // light buffer which may cause issues in some cases (or rather already has, which is why this warning exists).
+@@ -373,12 +375,8 @@ namespace dxvk {
+       m_linearizedLights.emplace_back(&pair.second);
+     }
+ 
+-    for (auto& handle : m_externalActiveLightList) {
+-      auto found = m_externalLights.find(handle);
+-      if (found != m_externalLights.end()) {
+-        m_linearizedLights.emplace_back(&found->second);
+-     }
+-    }
++    m_linearizedLights.insert(m_linearizedLights.end(),
++      m_resolvedExternalLights.begin(), m_resolvedExternalLights.end());
+ 
+     // Count the active light of each type
+ 
+@@ -713,6 +711,17 @@ namespace dxvk {
+     return addLight(rtLight, antiCullingType);
+   }
+ 
++  void LightManager::suppressGameLight(XXH64_hash_t hash) {
++    if (!m_lightDebugUILock.owns_lock()) {
++      m_lightDebugUILock.lock();
++    }
++    const auto found = m_lights.find(hash);
++    if (found != m_lights.end() && found->second.getInitialHash() == hash &&
++        found->second.getPrimInstanceOwner().getReplacementInstance() == nullptr) {
++      m_lights.erase(found);
++    }
++  }
++
+   void LightManager::addGameLight(const frontend::FixedFunctionLight::Type type, const RtLight& rtLight) {
+     switch (type) {
+     case frontend::FixedFunctionLight::Type::Directional:
+@@ -866,6 +875,76 @@ namespace dxvk {
+     fork_hooks::updateLightStaticSleep(light, newLight, m_device, externalId);
+   }
+ 
++  void LightManager::resolveExternalLights(AssetReplacer& replacer) {
++    m_resolvedExternalLights.clear();
++    for (const auto handle : m_externalActiveLightList) {
++      auto& source = m_externalLights.at(handle);
++      const bool supported = source.getType() == RtLightType::Sphere ||
++                             source.getType() == RtLightType::Distant;
++      const auto bucket = supported ? replacer.getReplacementsForLight(source.getInitialHash()) : nullptr;
++      auto previous = m_externalLightReplacements.find(handle);
++      const bool logDecision = Logger::logLevel() <= LogLevel::Debug;
++      if (!bucket) {
++        if (logDecision) {
++          const auto p = source.getPosition();
++          Logger::debug(str::format("[ExternalLight] hash=", hashToString(source.getInitialHash()),
++            " position=", p.x, ",", p.y, ",", p.z, " state=unmatched (original submitted)"));
++        }
++        if (previous != m_externalLightReplacements.end()) {
++          m_externalLightReplacements.erase(previous);
++        }
++        m_resolvedExternalLights.push_back(&source);
++        continue;
++      }
++
++      // A present bucket owns the source even when empty or all entries are dark.
++      source.setBufferIdx(kNewLightIdx);
++      auto& entry = m_externalLightReplacements[handle];
++      if (entry.bucket != bucket) {
++        entry.bucket = bucket;
++        entry.lights.clear();
++        entry.lights.reserve(bucket->replacements.size());
++      }
++      size_t slot = 0;
++      bool emits = false;
++      for (const auto& replacement : bucket->replacements) {
++        if (replacement.type != AssetReplacement::eLight || !replacement.lightData) {
++          continue;
++        }
++        auto data = *replacement.lightData;
++        data.merge(source);
++        auto light = data.toRtLight();
++        if (data.relativeTransform()) {
++          light.applyTransform(LightData::getSourceTransform(source));
++        }
++        light.isDynamic = source.isDynamic;
++        light.ignoreViewModel = source.ignoreViewModel;
++        if (slot == entry.lights.size()) {
++          entry.lights.push_back(light);
++        } else {
++          auto& existing = entry.lights[slot];
++          light.setStableIdentity(existing.getStableIdentity());
++          light.setBufferIdx(existing.getBufferIdx());
++          existing = light;
++        }
++        m_resolvedExternalLights.push_back(&entry.lights[slot++]);
++        emits |= logDecision && light.getColorAndIntensity().w > 0.f;
++      }
++      if (logDecision) {
++        const auto p = source.getPosition();
++        Logger::debug(str::format("[ExternalLight] hash=", hashToString(source.getInitialHash()),
++          " position=", p.x, ",", p.y, ",", p.z, " state=", emits ? "replaced" : "suppressed"));
++      }
++    }
++    for (auto it = m_externalLightReplacements.begin(); it != m_externalLightReplacements.end();) {
++      if (m_externalActiveLightList.count(it->first) == 0) {
++        it = m_externalLightReplacements.erase(it);
++      } else {
++        ++it;
++      }
++    }
++  }
++
+   void LightManager::addExternalLight(remixapi_LightHandle handle, const RtLight& rtlight) {
+     auto found = m_externalLights.find(handle);
+     if (found != m_externalLights.end()) {
+diff --git a/src/dxvk/rtx_render/rtx_light_manager.h b/src/dxvk/rtx_render/rtx_light_manager.h
+index 4f70bce4..2938b107 100644
+--- a/src/dxvk/rtx_render/rtx_light_manager.h
++++ b/src/dxvk/rtx_render/rtx_light_manager.h
+@@ -47,6 +47,8 @@ namespace dxvk {
+ class DxvkContext;
+ class DxvkDevice;
+ struct RtLight;
++struct ReplacementBucket;
++struct AssetReplacer;
+ struct LightManager;
+ 
+ // Forward declarations of fork_hooks functions that require friend access to
+@@ -143,6 +145,7 @@ public:
+   void prepareSceneData(Rc<DxvkContext> ctx, CameraManager const& cameraManager);
+ 
+   void addGameLight(frontend::FixedFunctionLight::Type type, const RtLight& light);
++  void suppressGameLight(XXH64_hash_t hash);
+   RtLight* addLight(const RtLight& light, const RtLightAntiCullingType antiCullingType);
+   RtLight* addLight(const RtLight& light, const SceneDraw& drawCallState, const RtLightAntiCullingType antiCullingType);
+ 
+@@ -179,6 +182,13 @@ private:
+   // lights provided from the application.
+   std::optional<RtLight> m_fallbackLight{};
+   std::unordered_map<remixapi_LightHandle, RtLight> m_externalLights;
++  struct ExternalLightReplacement {
++    std::shared_ptr<const ReplacementBucket> bucket;
++    std::vector<RtLight> lights;
++  };
++  std::unordered_map<remixapi_LightHandle, ExternalLightReplacement> m_externalLightReplacements;
++  std::vector<RtLight*> m_resolvedExternalLights;
++  void resolveExternalLights(AssetReplacer& replacer);
+   std::unordered_map<remixapi_LightHandle, DomeLight> m_externalDomeLights;
+   std::unordered_set<remixapi_LightHandle> m_externalActiveLightList;
+   remixapi_LightHandle m_externalActiveDomeLight = nullptr;
+diff --git a/src/dxvk/rtx_render/rtx_lights_data.cpp b/src/dxvk/rtx_render/rtx_lights_data.cpp
+index 5beaf8bd..a544dbc1 100644
+--- a/src/dxvk/rtx_render/rtx_lights_data.cpp
++++ b/src/dxvk/rtx_render/rtx_lights_data.cpp
+@@ -28,6 +28,8 @@
+ 
+ #include <remix/remix_c.h>
+ 
++#include "../../util/util_quat.h"
++
+ #include <regex>
+ #include <cassert>
+ 
+@@ -151,6 +153,56 @@ namespace dxvk {
+     }
+   }
+ 
++  Matrix4 LightData::getSourceTransform(const RtLight& light) {
++    const auto position = light.getPosition();
++    if (light.getType() == RtLightType::Sphere) {
++      const auto& shaping = light.getSphereLight().getShaping();
++      if (!shaping.getEnabled()) {
++        return Matrix4(position);
++      }
++      return Matrix4(getOrientation(Vector3(0.f, 0.f, -1.f), shaping.getDirection()), position);
++    }
++    if (light.getType() == RtLightType::Distant) {
++      return Matrix4(getOrientation(Vector3(0.f, 0.f, -1.f), light.getDirection()), position);
++    }
++    return Matrix4(position);
++  }
++
++  void LightData::merge(const RtLight& light) {
++    // Sphere and distant are the analytic source types supported by legacy
++    // capture and by the map-light API bridge.
++    const bool isSphere = light.getType() == RtLightType::Sphere;
++    const auto sourceType = isSphere ? Sphere : Distant;
++    LightData input(sourceType);
++    const Vector4 colorAndIntensity = light.getColorAndIntensity();
++    input.m_Color = Vector3(colorAndIntensity.x, colorAndIntensity.y, colorAndIntensity.z);
++    input.m_Intensity = colorAndIntensity.w;
++    input.m_VolumetricRadianceScale = light.getVolumetricRadianceScale();
++    if (!relativeTransform()) {
++      const auto transform = getSourceTransform(light);
++      input.m_position = light.getPosition();
++      input.m_xAxis = Vector3(transform[0][0], transform[0][1], transform[0][2]);
++      input.m_yAxis = Vector3(transform[1][0], transform[1][1], transform[1][2]);
++      input.m_zAxis = -Vector3(transform[2][0], transform[2][1], transform[2][2]);
++    }
++    if (isSphere) {
++      const auto& sphere = light.getSphereLight();
++      input.m_Radius = sphere.getRadius();
++      const auto& shaping = sphere.getShaping();
++      if (shaping.getEnabled()) {
++        input.m_ConeAngleRadians = std::acos(std::clamp(shaping.getCosConeAngle(), -1.f, 1.f));
++        input.m_ConeSoftness = shaping.getConeSoftness();
++        input.m_Focus = shaping.getFocusExponent();
++      }
++    } else {
++      input.m_AngleRadians = light.getDistantLight().getHalfAngle() * 2.f;
++    }
++    if (m_lightType == Unknown) {
++      m_lightType = sourceType;
++    }
++    merge(input);
++  }
++
+   // Note: This can only be called after LightData::deserialize has been called due to relying on deserialized values.
+   bool LightData::isShapingEnabled() const {
+     return m_ConeAngleRadians != (180.f * kDegreesToRadians) || m_ConeSoftness != 0.0f || m_Focus != 0.0f;
+diff --git a/src/dxvk/rtx_render/rtx_lights_data.h b/src/dxvk/rtx_render/rtx_lights_data.h
+index 1c2796bb..1bfca967 100644
+--- a/src/dxvk/rtx_render/rtx_lights_data.h
++++ b/src/dxvk/rtx_render/rtx_lights_data.h
+@@ -65,6 +65,8 @@ namespace dxvk {
+     RtLight toRtLight() const;
+ 
+     void merge(const frontend::FixedFunctionLight& light);
++    void merge(const RtLight& light);
++    static Matrix4 getSourceTransform(const RtLight& light);
+ 
+     static bool isSupportedUsdLight(const pxr::UsdPrim& lightPrim);
+ 
+diff --git a/src/dxvk/rtx_render/rtx_mod_usd.cpp b/src/dxvk/rtx_render/rtx_mod_usd.cpp
+index 22af8299..28fe89b5 100644
+--- a/src/dxvk/rtx_render/rtx_mod_usd.cpp
++++ b/src/dxvk/rtx_render/rtx_mod_usd.cpp
+@@ -2083,7 +2083,7 @@ bool UsdMod::Impl::processUSD(const Rc<DxvkContext>& context, AssetReplacements&
+ 
+   pxr::UsdPrim lights = stage->GetPrimAtPath(pxr::SdfPath("/RootNode/lights"));
+   if (lights.IsValid()) {
+-    const auto children = lights.GetFilteredChildren(pxr::UsdPrimIsActive);
++    const auto children = lights.GetAllChildren();
+     std::uint32_t currentLightCount{ 0U };
+ 
+     for (pxr::UsdPrim child : children) {
+@@ -2098,7 +2098,10 @@ bool UsdMod::Impl::processUSD(const Rc<DxvkContext>& context, AssetReplacements&
+         continue;
+       }
+ 
+-      if (hash != 0) {
++      if (hash != 0 && !child.IsActive()) {
++        // An explicitly disabled root has a hash but no emitting replacements.
++        target.set<AssetReplacement::eLight>(hash, {});
++      } else if (hash != 0) {
+         std::vector<AssetReplacement> replacementVec;
+         Args args = {context, xformCache, child, replacementVec};
+         args.target = &target;
+diff --git a/src/lssusd/capture_texture.h b/src/lssusd/capture_texture.h
+new file mode 100644
+index 00000000..36848f22
+--- /dev/null
++++ b/src/lssusd/capture_texture.h
+@@ -0,0 +1,41 @@
++#pragma once
++
++#include <cstdint>
++#include <filesystem>
++#include <fstream>
++#include <stdexcept>
++#include <string>
++
++namespace lss {
++inline std::filesystem::path captureInputDirectory(const std::string& base, const std::string& id) {
++  if (id.empty() || id.size() > 128 || id.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_") != std::string::npos) {
++    throw std::runtime_error("Invalid capture input directory ID");
++  }
++  return std::filesystem::u8path(base) / (".capture-input-" + id);
++}
++inline std::string captureTextureDirectory(const std::string& base, const std::string& id) {
++  return (captureInputDirectory(base, id) / "textures").u8string() + "/";
++}
++inline void cleanupCaptureInputs(const std::string& base, const std::string& id) {
++  const auto inputs = captureInputDirectory(base, id);
++  const auto root = std::filesystem::weakly_canonical(std::filesystem::u8path(base));
++  const auto resolved = std::filesystem::weakly_canonical(inputs);
++  if (std::filesystem::is_symlink(inputs) || resolved.parent_path() != root || resolved.filename() != inputs.filename()) {
++    throw std::runtime_error("Capture input cleanup escaped its root");
++  }
++  std::filesystem::remove_all(inputs);
++}
++// Untextured draws use a neutral texture. Missing requested textures still fail.
++inline void writeCaptureWhiteTexture(const std::string& path) {
++  uint32_t dds[33]{};
++  dds[0] = 0x20534444; dds[1] = 124; dds[2] = 0x100f;
++  dds[3] = dds[4] = 1; dds[5] = 4;
++  dds[19] = 32; dds[20] = 0x41; dds[22] = 32;
++  dds[23] = 0xff0000; dds[24] = 0xff00; dds[25] = 0xff; dds[26] = 0xff000000;
++  dds[27] = 0x1000; dds[32] = 0xffffffff;
++  std::ofstream file(std::filesystem::u8path(path), std::ios::binary);
++  file.write(reinterpret_cast<const char*>(dds), sizeof(dds));
++  file.close();
++  if (!file) { throw std::runtime_error("Cannot write untextured capture material: " + path); }
++}
++}
+diff --git a/src/lssusd/capture_validation.cpp b/src/lssusd/capture_validation.cpp
+new file mode 100644
+index 00000000..09d32396
+--- /dev/null
++++ b/src/lssusd/capture_validation.cpp
+@@ -0,0 +1,299 @@
++#include "capture_validation.h"
++#include "game_exporter.h"
++#include "../util/log/log.h"
++#include <pxr/usd/usd/primRange.h>
++#include <pxr/usd/usdGeom/mesh.h>
++#include <pxr/usd/usdLux/lightAPI.h>
++#include <pxr/usd/usdSkel/skeleton.h>
++#include <cmath>
++#include <filesystem>
++#include <stdexcept>
++#include <unordered_set>
++
++namespace lss {
++namespace {
++void check(bool valid, const std::string& context) {
++  if (!valid) { throw std::runtime_error(context); }
++}
++template<class T> bool finite(const T& value) { return std::isfinite(double(value)); }
++template<class T, size_t N> bool finiteVector(const T& value) {
++  for (size_t i = 0; i < N; ++i) { if (!finite(value[i])) { return false; } }
++  return true;
++}
++bool finiteMatrix(const pxr::GfMatrix4d& m) {
++  for (size_t i = 0; i < 4; ++i) {
++    for (size_t j = 0; j < 4; ++j) { if (!finite(m[i][j])) { return false; } }
++  }
++  return true;
++}
++void samples(const SampledXforms& xforms, const std::string& context) {
++  check(!xforms.empty(), context + ": no transforms");
++  for (const auto& x : xforms) {
++    check(finite(x.time) && finiteMatrix(x.xform), context + ": invalid transform sample");
++  }
++}
++void name(const std::string& value, const std::string& context) {
++  check(pxr::SdfPath::IsValidIdentifier("asset_" + value), context + ": invalid name " + value);
++}
++void span(float first, float last, const std::string& context) {
++  check(finite(first) && finite(last) && first >= 0 && last >= first, context + ": invalid time span");
++}
++template<class T> void finiteArray(const pxr::VtArray<T>& values, const std::string& context) {
++  for (const auto& value : values) { check(finite(value), context + ": non-finite array"); }
++}
++}
++
++void checkCaptureDiagnostics(pxr::TfErrorMark& diagnostics, const std::string& phase) {
++  if (!diagnostics.IsClean()) {
++    std::string message = phase;
++    for (const auto& error : diagnostics) { message += "\n" + error.GetCommentary(); }
++
++    diagnostics.Clear();
++    throw std::runtime_error(message);
++  }
++}
++
++void repairCaptureNormals(Export& data) {
++  for (auto& [id, mesh] : data.meshes) {
++    for (auto& [time, normals] : mesh.buffers.normalBufs) {
++      size_t invalid = 0;
++      for (const auto& n : normals) { if (!finiteVector<pxr::GfVec3f,3>(n)) { ++invalid; } }
++      if (!invalid) { continue; }
++      const auto context = "Mesh " + std::to_string(id) + " (" + mesh.meshName + ")";
++      check(finite(time), context + ": invalid normal sample time");
++      check(normals.size() == mesh.numVertices && !mesh.buffers.positionBufs.empty() && !mesh.buffers.idxBufs.empty(), context + ": cannot reconstruct normals without complete geometry");
++      auto positionsAt = mesh.buffers.positionBufs.upper_bound(time);
++      if (positionsAt != mesh.buffers.positionBufs.begin()) { --positionsAt; }
++      auto indicesAt = mesh.buffers.idxBufs.upper_bound(time);
++      if (indicesAt != mesh.buffers.idxBufs.begin()) { --indicesAt; }
++      const auto& positions = positionsAt->second;
++      const auto& indices = indicesAt->second;
++      check(positions.size() == normals.size() && indices.size() % 3 == 0, context + ": cannot reconstruct invalid normal topology");
++      for (const auto& p : positions) { check(finiteVector<pxr::GfVec3f,3>(p), context + ": cannot reconstruct normals from non-finite positions"); }
++      std::vector<pxr::GfVec3d> sums(positions.size(), pxr::GfVec3d(0));
++      std::vector<pxr::GfVec3d> incident(positions.size(), pxr::GfVec3d(0));
++      std::vector<bool> used(positions.size(), false);
++      pxr::GfVec3d sourceFallback(0);
++      for (const auto& n : normals) {
++        if (!finiteVector<pxr::GfVec3f,3>(n)) { continue; }
++        const pxr::GfVec3d candidate(n);
++        const auto length = candidate.GetLength();
++        if (finite(length) && length > 0) { sourceFallback = candidate / length; break; }
++      }
++      for (size_t i = 0; i < indices.size(); i += 3) {
++        const auto a = indices[i], b = indices[i+1], c = indices[i+2];
++        check(a >= 0 && b >= 0 && c >= 0 && size_t(a) < positions.size() && size_t(b) < positions.size() && size_t(c) < positions.size(), context + ": index out of range during normal reconstruction");
++        const auto face = pxr::GfCross(pxr::GfVec3d(positions[b]) - pxr::GfVec3d(positions[a]), pxr::GfVec3d(positions[c]) - pxr::GfVec3d(positions[a]));
++        sums[a] += face; sums[b] += face; sums[c] += face;
++        if (finite(face.GetLength()) && face.GetLength() > 0) {
++          incident[a] = incident[b] = incident[c] = face;
++        }
++        used[a] = used[b] = used[c] = true;
++      }
++      for (size_t i = 0; i < normals.size(); ++i) {
++        if (finiteVector<pxr::GfVec3f,3>(normals[i])) { continue; }
++        if (!used[i] && data.meta.bReduceMeshBuffers) { normals[i] = pxr::GfVec3f(0); continue; }
++        auto replacement = sums[i];
++        if (replacement.GetLength() == 0) { replacement = incident[i]; }
++        // A vertex touching only zero-area faces has no geometric normal.
++        // Reuse a finite authored normal without changing any visible face.
++        if (replacement.GetLength() == 0) { replacement = sourceFallback; }
++        const auto length = replacement.GetLength();
++        check(finite(length) && length > 0, context + ": cannot reconstruct normal on degenerate geometry");
++        normals[i] = pxr::GfVec3f(replacement / length);
++      }
++      dxvk::Logger::warn("[GameExporter][" + data.debugId + "] " + context + ": recovered " + std::to_string(invalid) + " non-finite normals from geometry/finite authored normals");
++    }
++  }
++}
++
++void validateCaptureInput(const Export& data) {
++  check(!data.instanceStagePath.empty(), "Missing capture output path");
++  check(data.meta.numFramesCaptured > 0 && finite(data.meta.timeCodesPerSecond) && data.meta.timeCodesPerSecond > 0,
++        "Invalid capture timing");
++  check(finite(data.meta.metersPerUnit) && data.meta.metersPerUnit > 0, "Invalid capture scale");
++  check(finite(data.meta.startTimeCode) && finite(data.meta.endTimeCode) && data.meta.endTimeCode >= data.meta.startTimeCode,
++        "Invalid capture time range");
++  check(finiteMatrix(data.globalXform), "Invalid capture global transform");
++  for (const auto& [id, material] : data.materials) { name(material.matName, "Material " + std::to_string(id)); }
++  for (const auto& [id, mesh] : data.meshes) {
++    const auto context = "Mesh " + std::to_string(id) + " (" + mesh.meshName + ")";
++    name(mesh.meshName, context);
++    check(mesh.numVertices > 0 && mesh.numIndices > 0 && mesh.numIndices % 3 == 0, context + ": invalid triangle counts");
++    check(!mesh.buffers.positionBufs.empty() && !mesh.buffers.idxBufs.empty(), context + ": missing geometry buffers");
++    for (const auto& [time, positions] : mesh.buffers.positionBufs) {
++      check(finite(time) && positions.size() == mesh.numVertices, context + ": invalid position count");
++      for (const auto& p : positions) { check(finiteVector<pxr::GfVec3f,3>(p), context + ": invalid position"); }
++    }
++    for (const auto& [time, indices] : mesh.buffers.idxBufs) {
++      check(finite(time) && indices.size() == mesh.numIndices, context + ": invalid index count");
++      for (auto index : indices) { check(index >= 0 && uint32_t(index) < mesh.numVertices, context + ": index out of range"); }
++    }
++    for (const auto& [time, normals] : mesh.buffers.normalBufs) {
++      check(normals.size() == mesh.numVertices, context + ": invalid normal count");
++      for (const auto& n : normals) { check(finiteVector<pxr::GfVec3f,3>(n), context + ": invalid normal"); }
++    }
++    for (const auto& [time, uv] : mesh.buffers.texcoordBufs) {
++      check(uv.size() == mesh.numVertices, context + ": invalid texcoord count");
++      for (const auto& v : uv) { check(finiteVector<pxr::GfVec2f,2>(v), context + ": invalid texcoord"); }
++    }
++    for (const auto& [time, colors] : mesh.buffers.colorBufs) {
++      check(colors.size() == 1 || colors.size() == mesh.numVertices, context + ": invalid color count");
++      for (const auto& c : colors) { check(finiteVector<pxr::GfVec4f,4>(c), context + ": invalid color"); }
++    }
++    check(mesh.matId == kInvalidId || data.materials.count(mesh.matId), context + ": missing material");
++    if (mesh.numBones) {
++      check(mesh.bonesPerVertex > 0 && mesh.bonesPerVertex <= mesh.numBones, context + ": invalid bone stride");
++      const auto count = size_t(mesh.numVertices) * mesh.bonesPerVertex;
++      for (const auto& [time, weights] : mesh.buffers.blendWeightBufs) {
++        check(weights.size() == count, context + ": invalid weight count"); finiteArray(weights, context);
++        for (auto weight : weights) { check(weight >= 0, context + ": negative weight"); }
++      }
++      for (const auto& [time, indices] : mesh.buffers.blendIndicesBufs) {
++        check(indices.size() == count, context + ": invalid joint-index count");
++        for (auto i : indices) { check(i >= 0 && uint32_t(i) < mesh.numBones, context + ": joint index out of range"); }
++      }
++    }
++  }
++  for (const auto& [id, instance] : data.instances) {
++    const auto context = "Instance " + std::to_string(id) + " (" + instance.instanceName + ")";
++    name(instance.instanceName, context); samples(instance.xforms, context); span(instance.firstTime, instance.finalTime, context);
++    check(data.meshes.count(instance.meshId), context + ": missing mesh");
++    check(instance.matId == kInvalidId || data.materials.count(instance.matId), context + ": missing material");
++    const auto bones = data.meshes.at(instance.meshId).numBones;
++    for (const auto& pose : instance.boneXForms) {
++      check(pose.xforms.size() == bones, context + ": invalid pose size");
++      for (const auto& matrix : pose.xforms) { check(finiteMatrix(matrix), context + ": invalid pose matrix"); }
++    }
++  }
++  if (!data.camera.xforms.empty()) {
++    samples(data.camera.xforms, "Camera");
++    check(finite(data.camera.fov) && data.camera.fov > 0 && data.camera.fov < 3.141593f &&
++          finite(data.camera.aspectRatio) && data.camera.aspectRatio > 0 && finite(data.camera.nearPlane) &&
++          finite(data.camera.farPlane) && data.camera.nearPlane > 0 && data.camera.farPlane > data.camera.nearPlane,
++          "Invalid capture camera");
++  }
++  for (const auto& [id, light] : data.sphereLights) {
++    const auto context = "Light " + std::to_string(id) + " (" + light.lightName + ")";
++    check(int(light.kind) >= 0 && int(light.kind) <= int(AreaLightKind::Cylinder), context + ": invalid light type");
++    name(light.lightName, context); samples(light.xforms, context); span(light.firstTime, light.finalTime, context);
++    check(finite(light.intensity) && light.intensity >= 0 && finite(light.radius) && light.radius >= 0 &&
++          finite(light.width) && light.width > 0 && finite(light.height) && light.height > 0, context + ": invalid dimensions/intensity");
++    for (float c : light.color) { check(finite(c) && c >= 0, context + ": invalid color"); }
++    check(finite(light.coneAngleDegrees) && finite(light.coneSoftness) && finite(light.focusExponent), context + ": invalid shaping");
++  }
++  for (const auto& [id, light] : data.distantLights) {
++    const auto context = "Distant light " + std::to_string(id);
++    name(light.lightName, context); span(light.firstTime, light.finalTime, context);
++    check(finite(light.intensity) && light.intensity >= 0 && finite(light.angleDegrees) && light.angleDegrees >= 0 &&
++          finiteVector<pxr::GfVec3f,3>(light.direction) && light.direction.GetLengthSq() > 0, context + ": invalid parameters");
++    for (float c : light.color) { check(finite(c) && c >= 0, context + ": invalid color"); }
++  }
++}
++
++bool GameExporter::validateUsd(const std::string& path, std::string* error) {
++  try {
++    pxr::TfErrorMark diagnostics;
++    auto stage = pxr::UsdStage::Open(path);
++    check(bool(stage), "Cannot reopen capture: " + path);
++    check(stage->GetCompositionErrors().empty(), "Capture has composition errors: " + path);
++    check(bool(stage->GetDefaultPrim()), "Capture has no default prim: " + path);
++    for (auto prim : stage->Traverse()) {
++      const auto context = path + ": " + prim.GetPath().GetString();
++      if (prim.IsA<pxr::UsdGeomMesh>()) {
++        auto mesh = pxr::UsdGeomMesh(prim);
++        std::vector<double> times;
++        mesh.GetPointsAttr().GetTimeSamples(&times);
++        if (times.empty()) { times.push_back(0); }
++        for (double time : times) {
++          pxr::VtVec3fArray points; pxr::VtIntArray indices, counts;
++          check(mesh.GetPointsAttr().Get(&points, time) && mesh.GetFaceVertexIndicesAttr().Get(&indices, time) &&
++                mesh.GetFaceVertexCountsAttr().Get(&counts, time), context + ": unreadable topology");
++          size_t total = 0;
++          for (auto count : counts) { check(count >= 3, context + ": invalid face"); total += count; }
++          check(total == indices.size(), context + ": inconsistent topology");
++          for (auto i : indices) { check(i >= 0 && size_t(i) < points.size(), context + ": index out of range"); }
++          for (const auto& p : points) { check(finiteVector<pxr::GfVec3f,3>(p), context + ": non-finite point"); }
++        }
++      }
++      if (prim.IsA<pxr::UsdSkelSkeleton>()) {
++        auto skeleton = pxr::UsdSkelSkeleton(prim);
++        pxr::VtTokenArray joints; pxr::VtMatrix4dArray bind, rest;
++        check(skeleton.GetJointsAttr().Get(&joints) && skeleton.GetBindTransformsAttr().Get(&bind) &&
++              skeleton.GetRestTransformsAttr().Get(&rest) && !joints.empty() && joints.size() == bind.size() &&
++              bind.size() == rest.size(), context + ": inconsistent skeleton");
++      }
++      for (auto attr : prim.GetAttributes()) {
++        std::vector<double> times; attr.GetTimeSamples(&times);
++        std::vector<pxr::UsdTimeCode> codes{pxr::UsdTimeCode::Default()};
++        for (auto time : times) { codes.emplace_back(time); }
++        for (auto code : codes) {
++          pxr::VtValue value;
++          if (!attr.Get(&value, code) || value.IsEmpty()) { continue; }
++          if (value.IsHolding<float>()) { check(finite(value.UncheckedGet<float>()), context + ": non-finite attribute " + attr.GetName().GetString()); }
++          if (value.IsHolding<double>()) { check(finite(value.UncheckedGet<double>()), context + ": non-finite attribute"); }
++          if (value.IsHolding<pxr::GfVec3f>()) { check(finiteVector<pxr::GfVec3f,3>(value.UncheckedGet<pxr::GfVec3f>()), context + ": non-finite vector"); }
++          if (value.IsHolding<pxr::GfMatrix4d>()) { check(finiteMatrix(value.UncheckedGet<pxr::GfMatrix4d>()), context + ": non-finite matrix"); }
++          if (value.IsHolding<pxr::VtFloatArray>()) { finiteArray(value.UncheckedGet<pxr::VtFloatArray>(), context); }
++          if (value.IsHolding<pxr::VtVec3fArray>()) {
++            for (const auto& v : value.UncheckedGet<pxr::VtVec3fArray>()) { check(finiteVector<pxr::GfVec3f,3>(v), context + ": non-finite vector array " + attr.GetName().GetString()); }
++          }
++          if (value.IsHolding<pxr::VtMatrix4dArray>()) {
++            for (const auto& m : value.UncheckedGet<pxr::VtMatrix4dArray>()) { check(finiteMatrix(m), context + ": non-finite matrix array"); }
++          }
++          if (value.IsHolding<pxr::SdfAssetPath>()) {
++            const auto& asset = value.UncheckedGet<pxr::SdfAssetPath>();
++            check(asset.GetAssetPath().empty() || !asset.GetResolvedPath().empty(), context + ": unresolved asset " + asset.GetAssetPath());
++          }
++        }
++      }
++      for (auto rel : prim.GetRelationships()) {
++        if (rel.GetName() != pxr::TfToken("skel:skeleton") && rel.GetName() != pxr::TfToken("skel:animationSource")) { continue; }
++        if (!rel.HasAuthoredTargets()) { continue; }
++        pxr::SdfPathVector targets; check(rel.GetTargets(&targets), context + ": unreadable binding");
++        for (const auto& target : targets) { check(bool(stage->GetPrimAtPath(target)), context + ": missing binding target " + target.GetString()); }
++      }
++    }
++    checkCaptureDiagnostics(diagnostics, "validate scene " + path);
++    return true;
++  } catch (const std::exception& failure) {
++    if (error) { *error = failure.what(); }
++    return false;
++  }
++}
++
++void validateCaptureCounts(const std::string& path, const Export& data) {
++  auto stage = pxr::UsdStage::Open(path);
++  size_t lights = 0, instances = 0;
++  for (auto prim : stage->Traverse()) {
++    if (prim.HasAPI<pxr::UsdLuxLightAPI>() && prim.GetPath().HasPrefix(gRootLightsPath) && prim.GetName() != pxr::TfToken("SkyDome_Non_Replaceable")) { ++lights; }
++    if (prim.GetPath().GetParentPath() == gRootInstancesPath) { ++instances; }
++  }
++  check(lights == data.sphereLights.size() + data.distantLights.size(), "Capture light count mismatch");
++  check(instances == data.instances.size(), "Capture instance count mismatch");
++}
++
++bool GameExporter::flattenUsd(const std::string& source, const std::string& destination, std::string* error) {
++  auto final = std::filesystem::u8path(destination);
++  auto temporary = std::filesystem::u8path(destination + ".building.usd");
++  try {
++    check(!std::filesystem::exists(final) && !std::filesystem::exists(temporary), "Flatten destination already exists");
++    pxr::TfErrorMark diagnostics;
++    auto stage = pxr::UsdStage::Open(source);
++    check(bool(stage), "Cannot reopen capture for flattening");
++    check(stage->Export(temporary.u8string(), true), "Cannot write flattened capture");
++    checkCaptureDiagnostics(diagnostics, "flatten capture");
++    std::string validation;
++    check(validateUsd(temporary.u8string(), &validation), validation);
++    std::filesystem::rename(temporary, final);
++    return true;
++  } catch (const std::exception& failure) {
++    std::error_code ignored;
++    if (std::filesystem::exists(temporary, ignored)) {
++      std::filesystem::rename(temporary, std::filesystem::u8path(temporary.u8string() + ".failed"), ignored);
++    }
++    if (error) { *error = failure.what(); }
++    return false;
++  }
++}
++}
+diff --git a/src/lssusd/capture_validation.h b/src/lssusd/capture_validation.h
+new file mode 100644
+index 00000000..9318f02b
+--- /dev/null
++++ b/src/lssusd/capture_validation.h
+@@ -0,0 +1,11 @@
++#pragma once
++
++#include "game_exporter_types.h"
++#include <pxr/base/tf/errorMark.h>
++
++namespace lss {
++void checkCaptureDiagnostics(pxr::TfErrorMark& diagnostics, const std::string& phase);
++void validateCaptureInput(const Export& data);
++void repairCaptureNormals(Export& data);
++void validateCaptureCounts(const std::string& path, const Export& data);
++}
+diff --git a/src/lssusd/game_exporter.cpp b/src/lssusd/game_exporter.cpp
+index ef67f73a..b7b125c9 100644
+--- a/src/lssusd/game_exporter.cpp
++++ b/src/lssusd/game_exporter.cpp
+@@ -64,6 +64,11 @@
+ #include <pxr/base/gf/matrix4d.h>
+ #include <pxr/base/gf/rotation.h>
+ #include <pxr/base/tf/fileUtils.h>
++#include <pxr/base/tf/errorMark.h>
++#include <pxr/usd/usd/primRange.h>
++#include <pxr/usd/usdLux/rectLight.h>
++#include <pxr/usd/usdLux/diskLight.h>
++#include <pxr/usd/usdLux/cylinderLight.h>
+ #include <pxr/base/plug/registry.h>
+ #include <pxr/base/plug/plugin.h>
+ #include "usd_include_end.h"
+@@ -76,6 +81,8 @@
+ #include <iostream>
+ #include <limits>
+ #include <stdexcept>
++#include <chrono>
++#include "capture_validation.h"
+ 
+ // Embedded MDLs
+ #include <AperturePBR_Opacity.mdl.h>
+@@ -84,11 +91,10 @@
+ #include <AperturePBR_Normal.mdl.h>
+ #include <AperturePBR_SpriteSheet.mdl.h>
+ 
+-#ifndef NDEBUG
+-#define ASSERT_OR_EXECUTE(BODY) assert((BODY))
+-#else
+-#define ASSERT_OR_EXECUTE(BODY) (BODY)
+-#endif
++static void requireCapture(bool ok, const std::string& operation) {
++  if (!ok) { throw std::runtime_error(operation); }
++}
++#define ASSERT_OR_EXECUTE(BODY) requireCapture(bool(BODY), #BODY)
+ 
+ namespace {
+ pxr::VtMatrix4dArray sanitizeBoneXforms(const pxr::VtMatrix4dArray& xforms,
+@@ -185,12 +191,86 @@ static void throwCaptureError(const std::string& message) {
+   throw std::runtime_error(message);
+ }
+ 
+-bool GameExporter::exportUsd(const Export& exportData) {
+-  if(s_bMultiThreadSafety) {
+-    std::scoped_lock lock(s_mutex);
+-    return exportUsdInternal(exportData);
+-  } else {
+-    return exportUsdInternal(exportData);
++bool GameExporter::exportUsd(const Export& input, std::string* error ) {
++  std::unique_lock<std::mutex> lock(s_mutex, std::defer_lock);
++  if (s_bMultiThreadSafety) { lock.lock(); }
++  std::filesystem::path building, assets, temporary;
++  try {
++    Export prepared = input;
++    repairCaptureNormals(prepared);
++    validateCaptureInput(prepared);
++    auto final = std::filesystem::absolute(std::filesystem::u8path(input.instanceStagePath));
++    if (input.bExportInstanceStage) {
++      requireCapture(!std::filesystem::exists(final), "Capture destination already exists: " + final.u8string());
++    }
++    std::filesystem::create_directories(final.parent_path());
++    const auto ticket = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
++    assets = final.parent_path() / (final.stem().u8string() + ".assets-" + ticket);
++    building = std::filesystem::u8path(assets.u8string() + ".building");
++    requireCapture(std::filesystem::create_directory(building), "Cannot create private capture directory");
++    Export work = std::move(prepared);
++    work.baseExportPath = building.u8string();
++    work.instanceStagePath = (building / "scene.usd").u8string();
++    std::filesystem::create_directory(building / "textures");
++    auto copyAsset = [&](const std::string& source, const std::string& name) {
++      const auto from = std::filesystem::u8path(source);
++      requireCapture(std::filesystem::is_regular_file(from), "Missing capture dependency: " + source);
++      auto to = building / "textures" / std::filesystem::u8path(name);
++      std::filesystem::copy_file(from, to);
++      return to.u8string();
++    };
++    for (auto& [id, material] : work.materials) {
++      material.albedoTexPath = copyAsset(material.albedoTexPath, std::to_string(id) + ".dds");
++    }
++    if (!work.bakedSkyProbePath.empty()) { work.bakedSkyProbePath = copyAsset(work.bakedSkyProbePath, "sky.dds"); }
++    if (!work.meta.iconPath.empty() && std::filesystem::is_regular_file(std::filesystem::u8path(work.meta.iconPath))) {
++      work.meta.iconPath = copyAsset(work.meta.iconPath, "icon.bmp");
++    } else { work.meta.iconPath = (building / "textures/icon.bmp").u8string(); }
++    requireCapture(exportUsdInternal(work), "USD exporter failed");
++    std::string validation;
++    if (work.bExportInstanceStage) {
++      requireCapture(validateUsd(work.instanceStagePath, &validation), validation);
++      validateCaptureCounts(work.instanceStagePath, work);
++    }
++    std::filesystem::rename(building, assets);
++    building.clear();
++    if (work.bExportInstanceStage) {
++      temporary = final.parent_path() / ("." + final.stem().u8string() + ".building-" + ticket + ".usd");
++      {
++        auto wrapper = pxr::UsdStage::CreateNew(temporary.u8string());
++        requireCapture(bool(wrapper), "Cannot create capture publication layer");
++        wrapper->GetRootLayer()->SetSubLayerPaths({assets.filename().u8string() + "/scene.usd"});
++        auto root = wrapper->GetPrimAtPath(gRootNodePath);
++        requireCapture(bool(root), "Capture publication has no scene root");
++        wrapper->SetDefaultPrim(root);
++        // Stage metrics and the playback range are governed by the publication
++        // root layer. The scene sublayer supplies prims, not these settings.
++        setCommonStageMetaData(wrapper, work);
++        wrapper->SetStartTimeCode(work.meta.startTimeCode);
++        wrapper->SetEndTimeCode(work.meta.endTimeCode);
++        dxvk::Logger::info(dxvk::str::format("[CaptureCoordinates] USD root upAxis=",
++          pxr::UsdGeomGetStageUpAxis(wrapper).GetString()));
++        auto authored = pxr::UsdStage::Open((assets / "scene.usd").u8string());
++        requireCapture(bool(authored), "Cannot reopen capture scene");
++        auto metadata = authored->GetRootLayer()->GetCustomLayerData();
++        const auto icon = assets / "textures/icon.bmp";
++        metadata.SetValueAtPath("lightspeed_game_icon", pxr::VtValue(std::filesystem::is_regular_file(icon) ? assets.filename().u8string() + "/textures/icon.bmp" : std::string()));
++        wrapper->GetRootLayer()->SetCustomLayerData(metadata);
++        requireCapture(wrapper->GetRootLayer()->Save(), "Cannot save capture publication layer");
++      }
++      requireCapture(validateUsd(temporary.u8string(), &validation), validation);
++      std::filesystem::rename(temporary, final);
++      temporary.clear();
++    }
++    return true;
++  } catch (const std::exception& failure) {
++    const std::string message = "Capture " + input.debugId + ": " + failure.what();
++    if (error) { *error = message; }
++    dxvk::Logger::err(message);
++    std::error_code ignored;
++    if (!building.empty()) { std::filesystem::rename(building, std::filesystem::u8path(building.u8string() + ".failed"), ignored); }
++    if (!temporary.empty()) { std::filesystem::rename(temporary, std::filesystem::u8path(temporary.u8string() + ".failed"), ignored); }
++    return false;
+   }
+ }
+ 
+@@ -202,31 +282,48 @@ bool GameExporter::exportUsdInternal(const Export& exportData) {
+   dxvk::Logger::info("[GameExporter][" + exportData.debugId + "] Export start");
+ 
+   bool success = true;
++  const char* phase = "initialization";
+ 
+   try {
++    pxr::TfErrorMark diagnostics;
+     ExportContext ctx;
+     lss::GameExporter::createApertureMdls(exportData.baseExportPath);
+     ctx.instanceStage = (exportData.bExportInstanceStage) ? createInstanceStage(exportData) : pxr::UsdStageRefPtr();
+     ctx.extension = (exportData.bExportInstanceStage) ? getExtension(exportData.instanceStagePath) : lss::ext::usd;
++    phase = "exportMaterials";
+     exportMaterials(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
++    phase = "exportMeshes";
+     exportMeshes(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
++    phase = "exportSkeletons";
+     exportSkeletons(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
+     if (ctx.instanceStage) {
+-      exportCamera(exportData, ctx);
+-      exportSphereLights(exportData, ctx);
+-      exportDistantLights(exportData, ctx);
+-      exportInstances(exportData, ctx);
+-      exportSky(exportData, ctx);
+       setCommonStageMetaData(ctx.instanceStage, exportData);
++      phase = "exportCamera";
++    if (!exportData.camera.xforms.empty()) { exportCamera(exportData, ctx); }
++    checkCaptureDiagnostics(diagnostics, phase);
++      phase = "exportSphereLights";
++    exportSphereLights(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
++      phase = "exportDistantLights";
++    exportDistantLights(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
++      phase = "exportInstances";
++    exportInstances(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
++      phase = "exportSky";
++    exportSky(exportData, ctx);
++    checkCaptureDiagnostics(diagnostics, phase);
+       ctx.instanceStage->SetStartTimeCode(exportData.meta.startTimeCode);
+       ctx.instanceStage->SetEndTimeCode(exportData.meta.endTimeCode);
+-      ctx.instanceStage->Save();
++      requireCapture(ctx.instanceStage->GetRootLayer()->Save(), "Cannot save capture layer: " + ctx.instanceStage->GetRootLayer()->GetIdentifier());
+     }
+   } catch (const std::exception& err) {
+-    const auto message = dxvk::str::format("Capture failed:\n", err.what());
++    const auto message = dxvk::str::format("Capture failed during ", phase, ":\n", err.what());
+     dxvk::Logger::err(dxvk::str::format("[GameExporter][", exportData.debugId, "] ", message));
+-    dxvk::messageBox(message.c_str(), "RTX Remix - Capture Error", 0);
+-    success = false;
++    throwCaptureError(message);
+   }
+   dxvk::Logger::info("[GameExporter][" + exportData.debugId + "] Export end");
+ 
+@@ -234,7 +331,7 @@ bool GameExporter::exportUsdInternal(const Export& exportData) {
+ }
+ 
+ pxr::UsdStageRefPtr GameExporter::createInstanceStage(const Export& exportData) {
+-  assert(exportData.bExportInstanceStage);
++  requireCapture(bool(exportData.bExportInstanceStage), "Invalid capture object: exportData.bExportInstanceStage");
+   pxr::UsdStageRefPtr instanceStage = pxr::UsdStage::CreateNew(exportData.instanceStagePath);
+   if (!instanceStage) {
+     const auto message = dxvk::str::format(
+@@ -244,18 +341,18 @@ pxr::UsdStageRefPtr GameExporter::createInstanceStage(const Export& exportData)
+     throwCaptureError(message);
+   }
+   const auto rootPrim = instanceStage->DefinePrim(gRootNodePath);
+-  assert(rootPrim);
++  requireCapture(bool(rootPrim), "Invalid capture object: rootPrim");
+   instanceStage->SetDefaultPrim(rootPrim);
+   const auto rootLightsPrim = pxr::UsdGeomXform::Define(instanceStage,gRootLightsPath);
+-  assert(rootLightsPrim);
++  requireCapture(bool(rootLightsPrim), "Invalid capture object: rootLightsPrim");
+   const auto rootMeshesPrim = instanceStage->DefinePrim(gRootMeshesPath);
+-  assert(rootMeshesPrim);
++  requireCapture(bool(rootMeshesPrim), "Invalid capture object: rootMeshesPrim");
+   const auto rootMaterialsPrim = instanceStage->DefinePrim(gRootMaterialsPath);
+-  assert(rootMaterialsPrim);
++  requireCapture(bool(rootMaterialsPrim), "Invalid capture object: rootMaterialsPrim");
+   const auto rootInstancesPrim = pxr::UsdGeomXform::Define(instanceStage,gRootInstancesPath);
+-  assert(rootInstancesPrim);
++  requireCapture(bool(rootInstancesPrim), "Invalid capture object: rootInstancesPrim");
+   const auto rootCameraPrim = pxr::UsdGeomXform::Define(instanceStage, gRootLightCamera);
+-  assert(rootCameraPrim);
++  requireCapture(bool(rootCameraPrim), "Invalid capture object: rootCameraPrim");
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "] Creating instance stage");
+ 
+   // capture meta data
+@@ -263,7 +360,7 @@ pxr::UsdStageRefPtr GameExporter::createInstanceStage(const Export& exportData)
+   customLayerData.SetValueAtPath("lightspeed_layer_type", pxr::VtValue("capture"));
+   customLayerData.SetValueAtPath("lightspeed_game_name", pxr::VtValue(dxvk::str::sanitizeUtf8(exportData.meta.windowTitle)));
+   customLayerData.SetValueAtPath("lightspeed_exe_name", pxr::VtValue(dxvk::str::sanitizeUtf8(exportData.meta.exeName)));
+-  const auto relToCaptureIconPath = std::filesystem::relative(exportData.meta.iconPath, exportData.baseExportPath).string();
++  const auto relToCaptureIconPath = std::filesystem::relative(std::filesystem::u8path(exportData.meta.iconPath), std::filesystem::u8path(exportData.baseExportPath)).generic_u8string();
+   customLayerData.SetValueAtPath("lightspeed_game_icon", pxr::VtValue(dxvk::str::sanitizeUtf8(relToCaptureIconPath)));
+   customLayerData.SetValueAtPath("lightspeed_geometry_hash_rules", pxr::VtValue(dxvk::str::sanitizeUtf8(exportData.meta.geometryHashRule)));
+   if (!exportData.meta.assetKeyDerivation.empty()) {
+@@ -275,8 +372,9 @@ pxr::UsdStageRefPtr GameExporter::createInstanceStage(const Export& exportData)
+ }
+ 
+ void GameExporter::setCommonStageMetaData(pxr::UsdStageRefPtr stage, const Export& exportData) {
+-  stage->SetMetadata(pxr::TfToken("upAxis"), (exportData.meta.isZUp) ? pxr::TfToken("Z") : pxr::TfToken("Y"));
+-  stage->SetMetadata(pxr::TfToken("metersPerUnit"), exportData.meta.metersPerUnit);
++  requireCapture(pxr::UsdGeomSetStageUpAxis(stage, exportData.meta.isZUp ? pxr::UsdGeomTokens->z : pxr::UsdGeomTokens->y),
++    "Cannot author capture stage up axis");
++  requireCapture(pxr::UsdGeomSetStageMetersPerUnit(stage, exportData.meta.metersPerUnit), "Cannot author capture stage scale");
+   stage->SetTimeCodesPerSecond(exportData.meta.timeCodesPerSecond);
+ 
+   // Write rendering settings to USD.
+@@ -290,7 +388,7 @@ void GameExporter::setCommonStageMetaData(pxr::UsdStageRefPtr stage, const Expor
+     }
+     // Must be namespaced: Hydra only gathers namespaced attributes from a render settings
+     // prim into the namespacedSettings that HdRemixRenderSettings reads.
+-    settings.GetPrim().CreateAttribute(pxr::TfToken("remix:remix_config"), pxr::SdfValueTypeNames->StringArray).Set(configs);
++    ASSERT_OR_EXECUTE(settings.GetPrim().CreateAttribute(pxr::TfToken("remix:remix_config"), pxr::SdfValueTypeNames->StringArray).Set(configs));
+   }
+ }
+ 
+@@ -299,11 +397,13 @@ void GameExporter::createApertureMdls(const std::string& baseExportPath) {
+   dxvk::env::createDirectory(materialsDirPath);
+ 
+   auto writeFile = [](const std::string& path, const auto& data) {
+-    std::ofstream stream(path, std::ios_base::binary);
++    std::ofstream stream(std::filesystem::u8path(path), std::ios_base::binary);
+     if (stream.is_open()) {
+       stream.write(reinterpret_cast<const char*>(data), sizeof(data));
++      stream.close();
++      requireCapture(bool(stream), "Cannot write material definition: " + path);
+     } else {
+-      dxvk::Logger::info(dxvk::str::format("[GameExporter] Unable to create file: ", path));
++      throwCaptureError("Cannot create material definition: " + path);
+     }
+   };
+ 
+@@ -374,47 +474,48 @@ void GameExporter::exportMaterials(const Export& exportData, ExportContext& ctx)
+   
+   dxvk::env::createDirectory(matDirPath);
+   for(const auto& [matId, matData] : exportData.materials) {
++    try {
+     // Build material stage
+     const std::string matName = prefix::mat + matData.matName;
+     const std::string matStageName = matName + ctx.extension;
+     const std::string matStagePath = matDirPath + matStageName;
+     pxr::UsdStageRefPtr matStage = findOpenOrCreateStage(matStagePath, true);
+-    assert(matStage);
++    requireCapture(bool(matStage), "Invalid capture object: matStage");
+     setCommonStageMetaData(matStage, exportData);
+ 
+     // Add Looks + RootPrim prims
+     const auto looksSdfPath = gStageRootPath.AppendChild(gTokLooks);
+     const auto looksScopePrim = matStage->DefinePrim(looksSdfPath, gTokScope);
+-    assert(looksScopePrim);
++    requireCapture(bool(looksScopePrim), "Invalid capture object: looksScopePrim");
+     matStage->SetDefaultPrim(looksScopePrim);
+ 
+     // Create material prim
+     const auto matSdfPath = looksSdfPath.AppendElementString(matName);
+     const auto matSchema = pxr::UsdShadeMaterial::Define(matStage, matSdfPath);
+-    assert(matSchema);
++    requireCapture(bool(matSchema), "Invalid capture object: matSchema");
+     const auto matPrim = matSchema.GetPrim();
+-    assert(matPrim);
++    requireCapture(bool(matPrim), "Invalid capture object: matPrim");
+ 
+     // Create shader prim under material prim
+     static const pxr::TfToken kTokShader("Shader");
+     const auto shaderPath = matPrim.GetPath().AppendChild(kTokShader);
+     const auto shader = pxr::UsdShadeShader::Define(matStage, shaderPath);
+     const auto shaderPrim = shader.GetPrim();
+-    assert(shaderPrim);
++    requireCapture(bool(shaderPrim), "Invalid capture object: shaderPrim");
+ 
+     std::unordered_map<ShaderAttr::Enum, pxr::UsdAttribute> shaderAttrs;
+     for(const auto& [attrEnum, desc] : ShaderAttr::attrDescs) {
+       shaderAttrs[attrEnum] =
+         shaderPrim.CreateAttribute(desc.attrName, desc.typeName, desc.custom, desc.sdfVariability);
+       // Cannot assert. Attr "outputs:out" asserts false, but authoring + Setting works just fine.
+-      // assert(shaderAttrs[attrEnum]); 
++      // requireCapture(bool(shaderAttrs[attrEnum]), "Invalid capture object: shaderAttrs[attrEnum]"); 
+     }
+ 
+     // Create and connect material outputs to shader outputs
+     static const pxr::TfToken kTokOutputsMdlSurface("outputs:mdl:surface");
+     const auto outputsMdlSurfaceAttr =
+       matPrim.CreateAttribute(kTokOutputsMdlSurface, pxr::SdfValueTypeNames->Token, false, pxr::SdfVariabilityVarying);
+-    outputsMdlSurfaceAttr.AddConnection(shaderAttrs[ShaderAttr::OutputsOut].GetPath(), pxr::UsdListPositionFrontOfAppendList);
++    ASSERT_OR_EXECUTE(outputsMdlSurfaceAttr.AddConnection(shaderAttrs[ShaderAttr::OutputsOut].GetPath(), pxr::UsdListPositionFrontOfAppendList));
+ 
+     // Set shader "Kind"
+     static const pxr::TfToken kTokMaterial("Material");
+@@ -422,7 +523,7 @@ void GameExporter::exportMaterials(const Export& exportData, ExportContext& ctx)
+ 
+     // Create and set textures asset paths on material
+     const auto relToMaterialsTexPath =
+-      std::filesystem::relative(computeLocalPath(matData.albedoTexPath), fullMaterialBasePath).string();
++      std::filesystem::relative(std::filesystem::u8path(computeLocalPath(matData.albedoTexPath)), std::filesystem::u8path(fullMaterialBasePath)).generic_u8string();
+     ASSERT_OR_EXECUTE(shaderAttrs[ShaderAttr::DiffuseTex].Set(pxr::SdfAssetPath(relToMaterialsTexPath)));
+     shaderAttrs[ShaderAttr::DiffuseTex].SetColorSpace(pxr::TfToken("auto"));
+ 
+@@ -439,7 +540,7 @@ void GameExporter::exportMaterials(const Export& exportData, ExportContext& ctx)
+     ASSERT_OR_EXECUTE(shaderAttrs[ShaderAttr::WrapModeU].Set((uint32_t)lss::Mdl::WrapMode::vkToMdl(matData.sampler.addrModeU)));
+     ASSERT_OR_EXECUTE(shaderAttrs[ShaderAttr::WrapModeV].Set((uint32_t)lss::Mdl::WrapMode::vkToMdl(matData.sampler.addrModeV)));
+ 
+-    matStage->Save();
++    requireCapture(matStage->GetRootLayer()->Save(), "Cannot save capture layer: " + matStage->GetRootLayer()->GetIdentifier());
+     
+     // Cache material reference
+     Reference matLssReference;
+@@ -450,16 +551,20 @@ void GameExporter::exportMaterials(const Export& exportData, ExportContext& ctx)
+     if(ctx.instanceStage != nullptr) {
+       const auto matInstanceSdfPath = gRootMaterialsPath.AppendElementString(matName);
+       auto matInstanceSchema = pxr::UsdShadeMaterial::Define(ctx.instanceStage, matInstanceSdfPath);
+-      assert(matInstanceSchema);
++      requireCapture(bool(matInstanceSchema), "Invalid capture object: matInstanceSchema");
+       
+       const std::string relMeshStagePath = commonDirName::matDir + matName + ctx.extension;
+       auto matInstanceUsdReferences = matInstanceSchema.GetPrim().GetReferences();
+-      matInstanceUsdReferences.AddReference(relMeshStagePath, matSdfPath);
++      ASSERT_OR_EXECUTE(matInstanceUsdReferences.AddReference(relMeshStagePath, matSdfPath));
+       
+       matLssReference.instanceSdfPath = matInstanceSdfPath;
+     }
+ 
+     ctx.matReferences[matId] = matLssReference;
++  
++    } catch (const std::exception& error) {
++      throwCaptureError("Material " + std::to_string(matId) + " (" + matData.matName + ") at " + exportData.baseExportPath + ": " + error.what());
++    }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportMaterials] End");
+ }
+@@ -472,6 +577,7 @@ void GameExporter::exportSkeletons(const Export& exportData, ExportContext& ctx)
+   const std::string fullStagePath = computeLocalPath(dirPath);
+   dxvk::env::createDirectory(dirPath);
+   for (const auto& [meshId, mesh] : exportData.meshes) {
++    try {
+     if (mesh.numBones == 0) {
+       continue;
+     }
+@@ -480,7 +586,7 @@ void GameExporter::exportSkeletons(const Export& exportData, ExportContext& ctx)
+     const std::string name = prefix::skeleton + mesh.meshName;
+     const std::string stagePath = dirPath + name + ctx.extension;
+     pxr::UsdStageRefPtr stage = findOpenOrCreateStage(stagePath, true);
+-    assert(stage);
++    requireCapture(bool(stage), "Invalid capture object: stage");
+     setCommonStageMetaData(stage, exportData);
+ 
+     pxr::VtDictionary customLayerData = stage->GetRootLayer()->GetCustomLayerData();
+@@ -493,18 +599,18 @@ void GameExporter::exportSkeletons(const Export& exportData, ExportContext& ctx)
+     const auto defaultPrimPath = gStageRootPath.AppendElementString(name);
+     pxr::UsdSkelRoot skelRootSchema = pxr::UsdSkelRoot::Define(stage, defaultPrimPath);
+ 
+-    assert(skelRootSchema);
++    requireCapture(bool(skelRootSchema), "Invalid capture object: skelRootSchema");
+     stage->SetDefaultPrim(skelRootSchema.GetPrim());
+ 
+     // Build skeleton prim under above xform
+     const auto skeletonSdfPath = defaultPrimPath.AppendChild(gTokSkel);
+     auto skelSchema = pxr::UsdSkelSkeleton::Define(stage, skeletonSdfPath);
+-    assert(skelSchema);
++    requireCapture(bool(skelSchema), "Invalid capture object: skelSchema");
+ 
+ 
+     // Set bindTransforms attribute
+     auto bindTransformsAttr = skelSchema.CreateBindTransformsAttr();
+-    assert(bindTransformsAttr);
++    requireCapture(bool(bindTransformsAttr), "Invalid capture object: bindTransformsAttr");
+     ctx.skeletons[meshId] = generateSkeleton(mesh.numBones,
+                                              mesh.bonesPerVertex,
+                                              mesh.buffers.positionBufs.begin()->second,
+@@ -512,19 +618,19 @@ void GameExporter::exportSkeletons(const Export& exportData, ExportContext& ctx)
+                                              mesh.buffers.blendIndicesBufs.empty() ? nullptr : &mesh.buffers.blendIndicesBufs.begin()->second);
+     const Skeleton& skel = ctx.skeletons[meshId];
+     // pxr::VtMatrix4dArray identities(mesh.numBones, pxr::GfMatrix4d(1));
+-    bindTransformsAttr.Set(skel.bindPose);
++    ASSERT_OR_EXECUTE(bindTransformsAttr.Set(skel.bindPose));
+ 
+     // Set restTransforms attribute
+     auto restTransformsAttr = skelSchema.CreateRestTransformsAttr();
+-    assert(restTransformsAttr);
+-    restTransformsAttr.Set(skel.restPose);
++    requireCapture(bool(restTransformsAttr), "Invalid capture object: restTransformsAttr");
++    ASSERT_OR_EXECUTE(restTransformsAttr.Set(skel.restPose));
+ 
+     // Set joints attribute on both the skeleton and the pose
+     auto jointsAttr = skelSchema.CreateJointsAttr();
+-    assert(jointsAttr);
+-    jointsAttr.Set(skel.jointNames);
++    requireCapture(bool(jointsAttr), "Invalid capture object: jointsAttr");
++    ASSERT_OR_EXECUTE(jointsAttr.Set(skel.jointNames));
+ 
+-    stage->Save();
++    requireCapture(stage->GetRootLayer()->Save(), "Cannot save capture layer: " + stage->GetRootLayer()->GetIdentifier());
+ 
+     // Build meshSchema prim on instance stage
+     if (ctx.instanceStage != nullptr) {
+@@ -534,7 +640,11 @@ void GameExporter::exportSkeletons(const Export& exportData, ExportContext& ctx)
+ 
+       auto skelSchema = pxr::UsdSkelSkeleton::Define(ctx.instanceStage, skelInstancePath);
+       auto skelInstanceUsdReferences = skelSchema.GetPrim().GetReferences();
+-      skelInstanceUsdReferences.AddReference(relSkelStagePath, skeletonSdfPath);
++      ASSERT_OR_EXECUTE(skelInstanceUsdReferences.AddReference(relSkelStagePath, skeletonSdfPath));
++    }
++  
++    } catch (const std::exception& error) {
++      throwCaptureError("Skeleton " + std::to_string(meshId) + " (" + mesh.meshName + ") at " + exportData.baseExportPath + ": " + error.what());
+     }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportSkeletons] End");
+@@ -547,12 +657,11 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+   const std::string meshDirPath = exportData.baseExportPath + "/" + relMeshDirPath;
+   const std::string fullMeshStagePath = computeLocalPath(meshDirPath);
+   dxvk::env::createDirectory(meshDirPath);
+-  // Determine whether meshes need to be inverted
+-  const bool bInvX = (!exportData.camera.view.bInv) && (exportData.camera.proj.bInv || exportData.camera.isLHS());
+-  const bool bInvY = (!exportData.camera.view.bInv) && exportData.camera.proj.bInv;
++  const auto worldBasis = exportData.camera.worldBasis();
+   for(const auto& [meshId,mesh] : exportData.meshes) {
+-    assert(mesh.numVertices > 0);
+-    assert(mesh.numIndices > 0);
++    try {
++    requireCapture(bool(mesh.numVertices > 0), "Invalid capture object: mesh.numVertices > 0");
++    requireCapture(bool(mesh.numIndices > 0), "Invalid capture object: mesh.numIndices > 0");
+ 
+     const bool isSkeleton = mesh.numBones > 0;
+ 
+@@ -560,7 +669,7 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+     const std::string meshName = prefix::mesh + mesh.meshName;
+     const std::string meshStagePath = meshDirPath + meshName + ctx.extension;
+     pxr::UsdStageRefPtr meshStage = findOpenOrCreateStage(meshStagePath, true);
+-    assert(meshStage);
++    requireCapture(bool(meshStage), "Invalid capture object: meshStage");
+     setCommonStageMetaData(meshStage, exportData);
+ 
+     pxr::VtDictionary customLayerData = meshStage->GetRootLayer()->GetCustomLayerData();
+@@ -570,22 +679,15 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+     meshStage->GetRootLayer()->SetCustomLayerData(customLayerData);
+ 
+     pxr::SdfPath meshXformSdfPath;
+-    const bool visualCorrectionReqd = exportData.meta.bCorrectBakedTransforms || bInvX || bInvY;
++    const bool visualCorrectionReqd = exportData.meta.bCorrectBakedTransforms || worldBasis != identity;
+     if (visualCorrectionReqd) {
+       const auto correctionXformSdfPath = gStageRootPath.AppendElementString("visual_correction");
+       auto correctionXformSchema = pxr::UsdGeomXform::Define(meshStage, correctionXformSdfPath);
+       auto correctionXformOp = correctionXformSchema.AddTransformOp();
+-      assert(correctionXformOp);
+-      pxr::GfMatrix4d xform { 1.0 };
+-      const pxr::GfVec3d scale{ (bInvX) ? -1.0 : 1.0,
+-                                (bInvY) ? -1.0 : 1.0, 1.0};
+-      xform.SetScale(scale);
+-      const pxr::GfVec3d dOrigin{
+-        (bInvX) ? -mesh.origin[0] : mesh.origin[0],
+-        (bInvY) ? -mesh.origin[1] : mesh.origin[1],
+-        mesh.origin[2]};
+-      xform.SetTranslateOnly(-dOrigin);
+-      correctionXformOp.Set(xform);
++      requireCapture(bool(correctionXformOp), "Invalid capture object: correctionXformOp");
++      auto xform = worldBasis;
++      xform.SetTranslateOnly(-worldBasis.TransformDir(pxr::GfVec3d(mesh.origin)));
++      ASSERT_OR_EXECUTE(correctionXformOp.Set(xform));
+       meshXformSdfPath = correctionXformSdfPath.AppendElementString(meshName);
+     } else {
+       meshXformSdfPath = gStageRootPath.AppendElementString(meshName);
+@@ -598,48 +700,48 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+     } else {
+       meshXformSchema = pxr::UsdGeomXform::Define(meshStage, meshXformSdfPath);
+     }
+-    assert(meshXformSchema);
++    requireCapture(bool(meshXformSchema), "Invalid capture object: meshXformSchema");
+     meshStage->SetDefaultPrim(meshXformSchema.GetPrim());
+     auto meshXformVisibilityAttr = meshXformSchema.CreateVisibilityAttr();
+-    assert(meshXformVisibilityAttr);
+-    meshXformVisibilityAttr.Set(gVisibilityInherited);
++    requireCapture(bool(meshXformVisibilityAttr), "Invalid capture object: meshXformVisibilityAttr");
++    ASSERT_OR_EXECUTE(meshXformVisibilityAttr.Set(gVisibilityInherited));
+ 
+     // Build mesh geometry prim under above xform
+     const auto meshSchemaSdfPath = meshXformSdfPath.AppendChild(gTokMesh);
+     pxr::UsdGeomMesh meshSchema = pxr::UsdGeomMesh::Define(meshStage, meshSchemaSdfPath);
+     pxr::UsdGeomPrimvarsAPI primvarsAPI(meshSchema.GetPrim());
+ 
+-    assert(meshSchema);
++    requireCapture(bool(meshSchema), "Invalid capture object: meshSchema");
+     auto meshVisibilityAttr = meshSchema.CreateVisibilityAttr();
+-    assert(meshVisibilityAttr);
+-    meshVisibilityAttr.Set(gVisibilityInherited);
++    requireCapture(bool(meshVisibilityAttr), "Invalid capture object: meshVisibilityAttr");
++    ASSERT_OR_EXECUTE(meshVisibilityAttr.Set(gVisibilityInherited));
+ 
+     auto meshXformOp = meshSchema.AddTransformOp();
+-    assert(meshXformOp);
++    requireCapture(bool(meshXformOp), "Invalid capture object: meshXformOp");
+     pxr::GfMatrix4d xform { 1.0 };
+     xform = mesh.isLhs ? dxvk::swapBasis(xform) : xform;
+-    meshXformOp.Set(xform);
++    ASSERT_OR_EXECUTE(meshXformOp.Set(xform));
+ 
+     // Set double-sidedness attribute
+     auto doubleSidedAttr = meshSchema.CreateDoubleSidedAttr();
+-    assert(doubleSidedAttr);
+-    doubleSidedAttr.Set(mesh.isDoubleSided);
++    requireCapture(bool(doubleSidedAttr), "Invalid capture object: doubleSidedAttr");
++    ASSERT_OR_EXECUTE(doubleSidedAttr.Set(mesh.isDoubleSided));
+ 
+     // Set orientation attribute
+     auto orientationAttr = meshSchema.CreateOrientationAttr();
+-    assert(orientationAttr);
+-    orientationAttr.Set(pxr::VtValue(pxr::UsdGeomTokens->rightHanded));
++    requireCapture(bool(orientationAttr), "Invalid capture object: orientationAttr");
++    ASSERT_OR_EXECUTE(orientationAttr.Set(pxr::VtValue(pxr::UsdGeomTokens->rightHanded)));
+ 
+     // Create corresponding attribute arrays using above populated VtArrays
+     pxr::VtArray<int> faceVertexCounts;
+     faceVertexCounts.assign(mesh.numIndices / 3, 3);
+     auto faceVertexCountsAttr = meshSchema.CreateFaceVertexCountsAttr();
+-    assert(faceVertexCountsAttr);
+-    faceVertexCountsAttr.Set(faceVertexCounts);
++    requireCapture(bool(faceVertexCountsAttr), "Invalid capture object: faceVertexCountsAttr");
++    ASSERT_OR_EXECUTE(faceVertexCountsAttr.Set(faceVertexCounts));
+ 
+     for (auto& pair : mesh.categoryFlags) {
+       const auto attribute = meshSchema.GetPrim().CreateAttribute(pxr::TfToken(pair.first), pxr::SdfValueTypeNames->Bool, true, pxr::SdfVariabilityUniform);
+-      attribute.Set(pxr::VtValue(pair.second));
++      ASSERT_OR_EXECUTE(attribute.Set(pxr::VtValue(pair.second)));
+     }
+ 
+     // Indices
+@@ -647,50 +749,52 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+     ReducedIdxBufSet reducedIdxBufSet = reduce ? reduceIdxBufferSet(mesh.buffers.idxBufs) : ReducedIdxBufSet();
+     const BufSet<Index>& idxBufSet = reduce ? reducedIdxBufSet.bufSet : mesh.buffers.idxBufs;
+     auto indexAttr = meshSchema.CreateFaceVertexIndicesAttr();
+-    assert(indexAttr);
++    requireCapture(bool(indexAttr), "Invalid capture object: indexAttr");
+     exportBufferSet(idxBufSet, indexAttr);
+     // Vertices
+     const auto& posBufs = mesh.buffers.positionBufs;
+     auto pointsAttr = meshSchema.CreatePointsAttr();
+-    assert(pointsAttr);
++    requireCapture(bool(pointsAttr), "Invalid capture object: pointsAttr");
+     exportBufferSet(reduce ? reduceBufferSet(posBufs, reducedIdxBufSet) : posBufs, pointsAttr);
+     // Normals
+     auto normalsAttr = meshSchema.CreateNormalsAttr();
+-    assert(normalsAttr);
++    requireCapture(bool(normalsAttr), "Invalid capture object: normalsAttr");
+     exportBufferSet(reduce ? reduceBufferSet(mesh.buffers.normalBufs, reducedIdxBufSet) : mesh.buffers.normalBufs, normalsAttr);
+     // Set subdivision scheme to None (USD defaults to catmull clark)
+     auto subdivAttr = meshSchema.CreateSubdivisionSchemeAttr();
+-    assert(subdivAttr);
+-    subdivAttr.Set(pxr::UsdGeomTokens->none);
++    requireCapture(bool(subdivAttr), "Invalid capture object: subdivAttr");
++    ASSERT_OR_EXECUTE(subdivAttr.Set(pxr::UsdGeomTokens->none));
+     // Texture Coordinates
+     static const pxr::TfToken kTokSt("st");
+     auto stAttr = primvarsAPI.CreatePrimvar(kTokSt, pxr::SdfValueTypeNames->TexCoord2fArray, pxr::UsdGeomTokens->vertex);
+-    assert(stAttr);
++    requireCapture(bool(stAttr), "Invalid capture object: stAttr");
+     exportBufferSet(reduce ? reduceBufferSet(mesh.buffers.texcoordBufs, reducedIdxBufSet) : mesh.buffers.texcoordBufs, stAttr);
+ 
+     // Vertex Colors
+     if (mesh.buffers.colorBufs.size() > 0) {
+       auto displayColorPrimvar = meshSchema.CreateDisplayColorPrimvar(pxr::UsdGeomTokens->vertex);
+       auto displayOpacityPrimvar = meshSchema.CreateDisplayOpacityPrimvar(pxr::UsdGeomTokens->vertex);
+-      assert(displayColorPrimvar);
+-      assert(displayOpacityPrimvar);
++      requireCapture(bool(displayColorPrimvar), "Invalid capture object: displayColorPrimvar");
++      requireCapture(bool(displayOpacityPrimvar), "Invalid capture object: displayOpacityPrimvar");
+       if (mesh.buffers.colorBufs.cbegin()->second.size() == 1) {
+         // Constant Color
+-        displayColorPrimvar.SetInterpolation(pxr::UsdGeomTokens->constant);
+-        displayOpacityPrimvar.SetInterpolation(pxr::UsdGeomTokens->constant);
++        ASSERT_OR_EXECUTE(displayColorPrimvar.SetInterpolation(pxr::UsdGeomTokens->constant));
++        ASSERT_OR_EXECUTE(displayOpacityPrimvar.SetInterpolation(pxr::UsdGeomTokens->constant));
+       }
+-      exportColorOpacityBufferSet(reduce ? reduceBufferSet(mesh.buffers.colorBufs, reducedIdxBufSet) : mesh.buffers.colorBufs, displayColorPrimvar, displayOpacityPrimvar);
++      exportColorOpacityBufferSet(reduce && mesh.buffers.colorBufs.cbegin()->second.size() != 1 ? reduceBufferSet(mesh.buffers.colorBufs, reducedIdxBufSet) : mesh.buffers.colorBufs, displayColorPrimvar, displayOpacityPrimvar);
+     }
+     
+     if (isSkeleton) {
+       pxr::UsdSkelBindingAPI skelBind = pxr::UsdSkelBindingAPI::Apply(meshSchema.GetPrim());
+ 
+       auto jointWeightsAttr = skelBind.CreateJointWeightsPrimvar(0, mesh.bonesPerVertex);
+-      assert(jointWeightsAttr);
+-      exportBufferSet(reduce ? reduceBufferSet(mesh.buffers.blendWeightBufs, reducedIdxBufSet, mesh.bonesPerVertex) : mesh.buffers.blendWeightBufs, jointWeightsAttr);
++      requireCapture(bool(jointWeightsAttr), "Invalid capture object: jointWeightsAttr");
++      auto weights = mesh.buffers.blendWeightBufs;
++      if (weights.empty()) { weights[0] = pxr::VtArray<float>(size_t(mesh.numVertices) * mesh.bonesPerVertex, 1.f / mesh.bonesPerVertex); }
++      exportBufferSet(reduce ? reduceBufferSet(weights, reducedIdxBufSet, mesh.bonesPerVertex) : weights, jointWeightsAttr);
+ 
+       auto jointIndicesAttr = skelBind.CreateJointIndicesPrimvar(0, mesh.bonesPerVertex);
+-      assert(jointIndicesAttr);
++      requireCapture(bool(jointIndicesAttr), "Invalid capture object: jointIndicesAttr");
+       if (mesh.buffers.blendIndicesBufs.size() > 0) {
+         exportBufferSet(reduce ? reduceBufferSet(mesh.buffers.blendIndicesBufs, reducedIdxBufSet, mesh.bonesPerVertex) : mesh.buffers.blendIndicesBufs, jointIndicesAttr);
+       } else {
+@@ -701,26 +805,27 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+             defaultIndices[i * mesh.bonesPerVertex + j] = j;
+           }
+         }
+-        jointIndicesAttr.Set(defaultIndices);
++        BufSet<BlendIdx> defaults{{0.f, defaultIndices}};
++        exportBufferSet(reduce ? reduceBufferSet(defaults, reducedIdxBufSet, mesh.bonesPerVertex) : defaults, jointIndicesAttr);
+       }
+ 
+       auto skelRel = skelBind.CreateSkeletonRel();
+-      skelRel.AddTarget(meshXformSdfPath.AppendChild(gTokSkel));
++      ASSERT_OR_EXECUTE(skelRel.AddTarget(meshXformSdfPath.AppendChild(gTokSkel)));
+     }
+ 
+     const bool bHasMat = mesh.matId != kInvalidId;
+     const Reference& matLssReference = (bHasMat) ? ctx.matReferences[mesh.matId] : Reference();
+     if(bHasMat) {
+       const auto shaderMatSchema = pxr::UsdShadeMaterial::Define(meshStage, matLssReference.ogSdfPath);
+-      assert(shaderMatSchema);
++      requireCapture(bool(shaderMatSchema), "Invalid capture object: shaderMatSchema");
+       auto shaderMatUsdReferences = shaderMatSchema.GetPrim().GetReferences();
+       const std::string fullMatStagePath = computeLocalPath(matLssReference.stagePath);
+-      const std::string relMatRefStagePath = std::filesystem::relative(fullMatStagePath,fullMeshStagePath).string();
+-      shaderMatUsdReferences.AddReference(relMatRefStagePath, matLssReference.ogSdfPath);
+-      pxr::UsdShadeMaterialBindingAPI(meshXformSchema.GetPrim()).Bind(shaderMatSchema);
++      const std::string relMatRefStagePath = std::filesystem::relative(std::filesystem::u8path(fullMatStagePath),std::filesystem::u8path(fullMeshStagePath)).generic_u8string();
++      ASSERT_OR_EXECUTE(shaderMatUsdReferences.AddReference(relMatRefStagePath, matLssReference.ogSdfPath));
++      ASSERT_OR_EXECUTE(pxr::UsdShadeMaterialBindingAPI::Apply(meshXformSchema.GetPrim()).Bind(shaderMatSchema));
+     }
+ 
+-    meshStage->Save();
++    requireCapture(meshStage->GetRootLayer()->Save(), "Cannot save capture layer: " + meshStage->GetRootLayer()->GetIdentifier());
+     
+     // Cache material reference
+     Reference meshLssReference;
+@@ -736,26 +841,30 @@ void GameExporter::exportMeshes(const Export& exportData, ExportContext& ctx) {
+       } else {
+         meshInstanceXformSchema = pxr::UsdGeomXform::Define(ctx.instanceStage, meshInstanceXformSdfPath);
+       }
+-      assert(meshInstanceXformSchema);
++      requireCapture(bool(meshInstanceXformSchema), "Invalid capture object: meshInstanceXformSchema");
+ 
+       const std::string relMeshStagePath = relMeshDirPath + meshName + ctx.extension;
+       auto meshInstanceUsdReferences = meshInstanceXformSchema.GetPrim().GetReferences();
+-      meshInstanceUsdReferences.AddReference(relMeshStagePath, meshXformSdfPath);
++      ASSERT_OR_EXECUTE(meshInstanceUsdReferences.AddReference(relMeshStagePath, meshXformSdfPath));
+ 
+       auto meshInstanceXformVisibilityAttr = meshInstanceXformSchema.CreateVisibilityAttr();
+-      assert(meshInstanceXformVisibilityAttr);
+-      meshInstanceXformVisibilityAttr.Set(gVisibilityInvisible);
++      requireCapture(bool(meshInstanceXformVisibilityAttr), "Invalid capture object: meshInstanceXformVisibilityAttr");
++      ASSERT_OR_EXECUTE(meshInstanceXformVisibilityAttr.Set(gVisibilityInvisible));
+       
+       if(bHasMat) {
+         const auto shaderMatInstanceSchema = pxr::UsdShadeMaterial::Get(ctx.instanceStage, matLssReference.instanceSdfPath);
+-        assert(shaderMatInstanceSchema);
+-        pxr::UsdShadeMaterialBindingAPI(meshInstanceXformSchema.GetPrim()).Bind(shaderMatInstanceSchema);
++        requireCapture(bool(shaderMatInstanceSchema), "Invalid capture object: shaderMatInstanceSchema");
++        ASSERT_OR_EXECUTE(pxr::UsdShadeMaterialBindingAPI(meshInstanceXformSchema.GetPrim()).Bind(shaderMatInstanceSchema));
+       }
+ 
+       meshLssReference.instanceSdfPath = meshInstanceXformSdfPath;
+     }
+     
+     ctx.meshReferences[meshId] = meshLssReference;
++  
++    } catch (const std::exception& error) {
++      throwCaptureError("Mesh " + std::to_string(meshId) + " (" + mesh.meshName + ") at " + exportData.baseExportPath + ": " + error.what());
++    }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportMeshes] End");
+ }
+@@ -771,7 +880,7 @@ GameExporter::ReducedIdxBufSet GameExporter::reduceIdxBufferSet(const BufSet<Ind
+     }
+     for(const auto ogIdx : idxBuf) {
+       const auto redIdx = ogToRed[ogIdx];
+-      assert(redIdx <= ogIdx);
++      requireCapture(bool(redIdx <= ogIdx), "Invalid capture object: redIdx <= ogIdx");
+       reducedIdxBufSet.bufSet[timeCode].push_back(redIdx);
+       reducedIdxBufSet.redToOgSet[timeCode][redIdx] = ogIdx;
+     }
+@@ -786,32 +895,34 @@ BufSet<T> GameExporter::reduceBufferSet(const BufSet<T>& bufSet, const ReducedId
+     // There may not be a 1:1 mapping in timecodes b/w index buffers and other buffers
+     float idxBufTimeCode = -1.f;
+     if(reducedIdxBufSet.bufSet.size() > 1) {
+-      const auto iPair_timeCode_idxBuf = reducedIdxBufSet.bufSet.lower_bound(timeCode);
+-      assert(iPair_timeCode_idxBuf != reducedIdxBufSet.bufSet.cend());
++      auto iPair_timeCode_idxBuf = reducedIdxBufSet.bufSet.upper_bound(timeCode);
++      if (iPair_timeCode_idxBuf != reducedIdxBufSet.bufSet.begin()) { --iPair_timeCode_idxBuf; }
++      requireCapture(bool(iPair_timeCode_idxBuf != reducedIdxBufSet.bufSet.cend()), "Invalid capture object: iPair_timeCode_idxBuf != reducedIdxBufSet.bufSet.cend()");
+       const float idxTimeCode = iPair_timeCode_idxBuf->first;
+       idxBufTimeCode = iPair_timeCode_idxBuf->first;
+     } else {
+       idxBufTimeCode = reducedIdxBufSet.bufSet.cbegin()->first;
+     }
+-    assert(idxBufTimeCode >= 0.f);
++    requireCapture(bool(idxBufTimeCode >= 0.f), "Invalid capture object: idxBufTimeCode >= 0.f");
+ 
+     // Create a scratch space to assign values for new, reduce VtArray, in case there are holes in the indices
+     const auto& redIdxToOgIdx = reducedIdxBufSet.redToOgSet.at(idxBufTimeCode);
+     const int numIdxs = redIdxToOgIdx.size();
+     const size_t numElems = numIdxs * elemsPerIdx;
+-    T* const reducedBufScratch = new T[numElems];
++    std::vector<T> reducedBufScratch(numElems);
+     
+     // Init potential holes to 0
+-    memset(reducedBufScratch, 0, sizeof(T) * numElems);
++
+     for(const auto [redIndex,ogIndex] : redIdxToOgIdx) {
+       for (int elemNum = 0; elemNum < elemsPerIdx; ++elemNum) {
+         const auto ogIdx = (ogIndex * elemsPerIdx) + elemNum;
+         const auto redIdx = (redIndex * elemsPerIdx) + elemNum;
+-        assert(redIdx <= ogIdx);
++        requireCapture(bool(redIdx <= ogIdx), "Invalid capture object: redIdx <= ogIdx");
++        requireCapture(ogIdx < buf.size() && redIdx < reducedBufScratch.size(), "Capture reduction index out of range");
+         reducedBufScratch[redIdx] = buf[ogIdx];
+       }
+     }
+-    reducedBufSet[timeCode] = pxr::VtArray<T>(reducedBufScratch, reducedBufScratch + numElems);
++    reducedBufSet[timeCode] = pxr::VtArray<T>(reducedBufScratch.begin(), reducedBufScratch.end());
+   }
+   return reducedBufSet;
+ }
+@@ -819,11 +930,11 @@ BufSet<T> GameExporter::reduceBufferSet(const BufSet<T>& bufSet, const ReducedId
+ template<typename T>
+ void GameExporter::exportBufferSet(const BufSet<T>& bufSet, pxr::UsdAttribute attr) {
+   if(bufSet.size() == 1) {
+-    attr.Set(bufSet.cbegin()->second);
++    ASSERT_OR_EXECUTE(attr.Set(bufSet.cbegin()->second));
+   } else {
+     for(const auto& [timeCode, buf] : bufSet) {
+       const auto usdTimeCode = pxr::UsdTimeCode(timeCode);
+-      attr.Set(buf, usdTimeCode);
++      ASSERT_OR_EXECUTE(attr.Set(buf, usdTimeCode));
+     }
+   }
+ }
+@@ -837,71 +948,75 @@ void GameExporter::exportColorOpacityBufferSet(const BufSet<Color>& bufSet, pxr:
+       colorArray.emplace_back(pxr::GfVec3f(element[0], element[1], element[2]));
+       opacityArray.emplace_back(element[3]);
+     }
+-    color.Set(colorArray);
+-    opacity.Set(opacityArray);
++    ASSERT_OR_EXECUTE(color.Set(colorArray));
++    ASSERT_OR_EXECUTE(opacity.Set(opacityArray));
+   } else {
+     for (const auto& [timeCode, buf] : bufSet) {
++      colorArray.clear(); opacityArray.clear();
+       for (const Color& element : buf) {
+         colorArray.emplace_back(pxr::GfVec3f(element[0], element[1], element[2]));
+         opacityArray.emplace_back(element[3]);
+       }
+       const auto usdTimeCode = pxr::UsdTimeCode(timeCode);
+-      color.Set(colorArray, usdTimeCode);
+-      opacity.Set(opacityArray, usdTimeCode);
++      ASSERT_OR_EXECUTE(color.Set(colorArray, usdTimeCode));
++      ASSERT_OR_EXECUTE(opacity.Set(opacityArray, usdTimeCode));
+     }
+   }
+ }
+ 
+ void GameExporter::exportInstances(const Export& exportData, ExportContext& ctx) {
+-  assert(exportData.bExportInstanceStage);
++  requireCapture(bool(exportData.bExportInstanceStage), "Invalid capture object: exportData.bExportInstanceStage");
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportInstances] Begin");
+   if(exportData.meta.bCorrectBakedTransforms) {
+     auto rootInstancesXformSchema = pxr::UsdGeomXform::Get(ctx.instanceStage,gRootInstancesPath);
+-    assert(rootInstancesXformSchema);
++    requireCapture(bool(rootInstancesXformSchema), "Invalid capture object: rootInstancesXformSchema");
+ 
+     pxr::GfMatrix4d xform { 1.0 };
+     xform.SetTranslateOnly(-exportData.stageOrigin);
+ 
+     auto transformOp = rootInstancesXformSchema.AddTransformOp();
+-    assert(transformOp);
+-    transformOp.Set(xform);
++    requireCapture(bool(transformOp), "Invalid capture object: transformOp");
++    ASSERT_OR_EXECUTE(transformOp.Set(xform));
+   }
+   for(const auto& [instId,instanceData] : exportData.instances) {
++    try {
+     // Build base Xform prim for instance to reside in
+     auto instanceName = (instanceData.isSky ? "sky_" : "inst_") + std::string(instanceData.instanceName);
+     pxr::SdfPath instancePath = gRootInstancesPath.AppendElementString(instanceName);
+     pxr::UsdGeomXformable instanceXformSchema;
+ 
+-    const bool isSkeleton = !instanceData.boneXForms.empty();
++    // Pose data alone does not prove that the exported mesh has a skeleton.
++    const auto skeleton = ctx.skeletons.find(instanceData.meshId);
++    const bool isSkeleton = skeleton != ctx.skeletons.end();
+     if (isSkeleton) {
+       instanceXformSchema = pxr::UsdSkelRoot::Define(ctx.instanceStage, instancePath);
+     } else {
+       instanceXformSchema = pxr::UsdGeomXform::Define(ctx.instanceStage, instancePath);
+     }
+-    assert(instanceXformSchema);
++    requireCapture(bool(instanceXformSchema), "Invalid capture object: instanceXformSchema");
+ 
+     // Attach reference to mesh in question
+     const Reference& meshLssReference = ctx.meshReferences[instanceData.meshId];
+     auto instanceUsdReferences = instanceXformSchema.GetPrim().GetReferences();
+-    instanceUsdReferences.AddInternalReference(meshLssReference.instanceSdfPath);
++    ASSERT_OR_EXECUTE(instanceUsdReferences.AddInternalReference(meshLssReference.instanceSdfPath));
+     
+     // Set instanced mesh to now be visible
+     auto visibilityAttr = instanceXformSchema.CreateVisibilityAttr();
+-    assert(visibilityAttr);
+-    visibilityAttr.Set(gVisibilityInherited);
++    requireCapture(bool(visibilityAttr), "Invalid capture object: visibilityAttr");
++    ASSERT_OR_EXECUTE(visibilityAttr.Set(gVisibilityInherited));
+     
+     // Hide the original sky mesh(s) since it may block the sky dome light and other lights
+     // and cast unwanted shadows.
+     if (instanceData.isSky) {
+-      visibilityAttr.Set(gVisibilityInvisible);
++      ASSERT_OR_EXECUTE(visibilityAttr.Set(gVisibilityInvisible));
+     }
+ 
+     if(instanceData.matId != kInvalidId) {
+       // Bind material associated with above mesh
+       const Reference& matLssReference = ctx.matReferences[instanceData.matId];
+       const auto shaderMatSchema = pxr::UsdShadeMaterial::Get(ctx.instanceStage, matLssReference.instanceSdfPath);
+-      assert(shaderMatSchema);
+-      pxr::UsdShadeMaterialBindingAPI(instanceXformSchema.GetPrim()).Bind(shaderMatSchema);
++      requireCapture(bool(shaderMatSchema), "Invalid capture object: shaderMatSchema");
++      ASSERT_OR_EXECUTE(pxr::UsdShadeMaterialBindingAPI::Apply(instanceXformSchema.GetPrim()).Bind(shaderMatSchema));
+     }
+ 
+     if (isSkeleton) {
+@@ -909,28 +1024,39 @@ void GameExporter::exportInstances(const Export& exportData, ExportContext& ctx)
+       const auto skelPoseSdfPath = instancePath.AppendChild(gTokPose);
+       const auto skelSkelSdfPath = instancePath.AppendChild(gTokSkel);
+       auto skelAnimationSchema = pxr::UsdSkelAnimation::Define(ctx.instanceStage, skelPoseSdfPath);
+-      assert(skelAnimationSchema);
+-      const lss::Skeleton& skel = ctx.skeletons[instanceData.meshId];
++      requireCapture(bool(skelAnimationSchema), "Invalid capture object: skelAnimationSchema");
++      const lss::Skeleton& skel = skeleton->second;
+ 
+-      skelAnimationSchema.CreateJointsAttr().Set(skel.jointNames);
++      ASSERT_OR_EXECUTE(skelAnimationSchema.CreateJointsAttr().Set(skel.jointNames));
+ 
+       // set the rotations, scales, and translations attributes on the pose
+       for (auto sample : instanceData.boneXForms) {
+-        skelAnimationSchema.SetTransforms(
++        ASSERT_OR_EXECUTE(skelAnimationSchema.SetTransforms(
+             sanitizeBoneXforms(sample.xforms, skel.bindPose, exportData.meta),
+-            exportData.meta.numFramesCaptured == 1 ? pxr::UsdTimeCode::Default() : pxr::UsdTimeCode(sample.time));
++            exportData.meta.numFramesCaptured == 1 ? pxr::UsdTimeCode::Default() : pxr::UsdTimeCode(sample.time)));
+       }
+ 
+-      pxr::UsdPrim skelPrim = ctx.instanceStage->GetPrimAtPath(skelSkelSdfPath);
+-      pxr::UsdSkelBindingAPI skelBindingSchema = pxr::UsdSkelBindingAPI::Apply(skelPrim);
++      // Author an instance-local skeleton instead of requiring a composed child
++      // from an external reference to exist at this point in the export.
++      auto instanceSkeleton = pxr::UsdSkelSkeleton::Define(ctx.instanceStage, skelSkelSdfPath);
++      if (!instanceSkeleton) {
++        throwCaptureError("Cannot define skeleton for captured instance: " + instanceName);
++      }
++      ASSERT_OR_EXECUTE(instanceSkeleton.CreateBindTransformsAttr().Set(skel.bindPose));
++      ASSERT_OR_EXECUTE(instanceSkeleton.CreateRestTransformsAttr().Set(skel.restPose));
++      ASSERT_OR_EXECUTE(instanceSkeleton.CreateJointsAttr().Set(skel.jointNames));
++      if (instanceData.boneXForms.empty()) {
++        ASSERT_OR_EXECUTE(skelAnimationSchema.SetTransforms(skel.restPose));
++      }
++      pxr::UsdSkelBindingAPI skelBindingSchema = pxr::UsdSkelBindingAPI::Apply(instanceSkeleton.GetPrim());
+       auto animationSource = skelBindingSchema.CreateAnimationSourceRel();
+-      animationSource.SetTargets({skelPoseSdfPath});
++      ASSERT_OR_EXECUTE(animationSource.SetTargets({skelPoseSdfPath}));
+     } else {
+       const auto meshSchemaSdfPath = instancePath.AppendChild(gTokMesh);
+       pxr::UsdGeomMesh meshSchema = pxr::UsdGeomMesh::Define(ctx.instanceStage, meshSchemaSdfPath);
+       pxr::UsdGeomPrimvarsAPI primvarsAPI(meshSchema.GetPrim());
+ 
+-#define _SetDrawMetadata(name, type)  primvarsAPI.CreatePrimvar(pxr::TfToken("_remix_metadata:" #name), pxr::SdfValueTypeNames->type).Set(pxr::VtValue(instanceData.metadata.name))
++#define _SetDrawMetadata(name, type)  ASSERT_OR_EXECUTE(primvarsAPI.CreatePrimvar(pxr::TfToken("_remix_metadata:" #name), pxr::SdfValueTypeNames->type).Set(pxr::VtValue(instanceData.metadata.name)))
+       _SetDrawMetadata(alphaTestEnabled, Bool);
+       _SetDrawMetadata(alphaTestReferenceValue, UInt);
+       _SetDrawMetadata(alphaTestCompareOp, UInt);
+@@ -958,6 +1084,10 @@ void GameExporter::exportInstances(const Export& exportData, ExportContext& ctx)
+                          instanceData.firstTime, instanceData.finalTime, instanceData.xforms,
+                          exportData.meta, false);
+     setVisibilityTimeSpan(ctx.instanceStage, instancePath, instanceData.firstTime, instanceData.finalTime, exportData.meta.numFramesCaptured);
++  
++    } catch (const std::exception& error) {
++      throwCaptureError("Instance " + std::to_string(instId) + " (" + instanceData.instanceName + ") at " + exportData.baseExportPath + ": " + error.what());
++    }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportInstances] End");
+ }
+@@ -982,15 +1112,15 @@ void GameExporter::exportCamera(const Export& exportData, ExportContext& ctx) {
+ 
+   // Set horizontal aperture
+   auto horizontalAperture = geomCamera.CreateHorizontalApertureAttr();
+-  horizontalAperture.Set(simpleCam.GetHorizontalAperture());
++  ASSERT_OR_EXECUTE(horizontalAperture.Set(simpleCam.GetHorizontalAperture()));
+ 
+   // Set focal length
+   auto focalLength = geomCamera.CreateFocalLengthAttr();
+-  focalLength.Set(simpleCam.GetFocalLength());
++  ASSERT_OR_EXECUTE(focalLength.Set(simpleCam.GetFocalLength()));
+ 
+   // Set clipping range
+   auto clippingPlane = geomCamera.CreateClippingRangeAttr();
+-  clippingPlane.Set(pxr::GfVec2f(exportData.camera.nearPlane, exportData.camera.farPlane));
++  ASSERT_OR_EXECUTE(clippingPlane.Set(pxr::GfVec2f(exportData.camera.nearPlane, exportData.camera.farPlane)));
+ 
+   // Camera position needs to be adjusted if we're visually correcting baked transforms
+   pxr::GfMatrix4d commonXform{1.0};
+@@ -1016,61 +1146,86 @@ void GameExporter::exportCamera(const Export& exportData, ExportContext& ctx) {
+ void GameExporter::exportSphereLights(const Export& exportData, ExportContext& ctx) {
+   const std::string relLightDirPath = commonDirName::lightDir + "/";
+   const std::string lightDirPath = exportData.baseExportPath + "/" + relLightDirPath;
+-  const std::string fullLightStagePath = computeLocalPath(lightDirPath);
+-  auto rootLightsXformSchema = pxr::UsdGeomXform::Get(ctx.instanceStage,gRootLightsPath);
+-  assert(rootLightsXformSchema);
++  dxvk::env::createDirectory(lightDirPath);
++  auto rootLightsXformSchema = pxr::UsdGeomXform::Define(ctx.instanceStage, gRootLightsPath);
++  if (!rootLightsXformSchema) throwCaptureError("Cannot define capture lights root");
+   auto transformOp = rootLightsXformSchema.AddTransformOp();
+-  assert(transformOp);
+-  transformOp.Set(exportData.globalXform);
++  if (!transformOp) throwCaptureError("Cannot author capture lights transform");
++  ASSERT_OR_EXECUTE(transformOp.Set(exportData.globalXform));
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportSphereLights] Begin");
+   for(const auto& [id,sphereLightData] : exportData.sphereLights) {
+     // Build light stage
+     const std::string lightName = prefix::light + sphereLightData.lightName;
+     const std::string lightStagePath = lightDirPath + lightName + ctx.extension;
+-    pxr::UsdStageRefPtr lightStage = findOpenOrCreateStage(lightStagePath, true);
+-    assert(lightStage);
++    try {
++    // Asset layers may already be referenced by a live stage. Never Clear() a
++    // shared cached layer while holding prim handles into its composition.
++    pxr::UsdStageRefPtr lightStage = pxr::UsdStage::CreateInMemory();
++    if (!lightStage) throwCaptureError("Cannot create isolated light stage");
+     setCommonStageMetaData(lightStage, exportData);
+ 
+     // Build sphere light prim
+     const auto lightAssetSdfPath = gStageRootPath.AppendElementString(lightName);
+-    auto sphereLight = pxr::UsdLuxSphereLight::Define(lightStage, lightAssetSdfPath);
+-    assert(sphereLight);
++    pxr::UsdPrim lightPrim;
++    if (sphereLightData.kind == AreaLightKind::Rect) {
++      auto light = pxr::UsdLuxRectLight::Define(lightStage, lightAssetSdfPath);
++      requireCapture(bool(light), "Cannot define rectangle light");
++      ASSERT_OR_EXECUTE(light.CreateWidthAttr().Set(sphereLightData.width));
++      ASSERT_OR_EXECUTE(light.CreateHeightAttr().Set(sphereLightData.height));
++      lightPrim = light.GetPrim();
++    } else if (sphereLightData.kind == AreaLightKind::Disk) {
++      auto light = pxr::UsdLuxDiskLight::Define(lightStage, lightAssetSdfPath);
++      requireCapture(bool(light), "Cannot define disk light");
++      ASSERT_OR_EXECUTE(light.CreateRadiusAttr().Set(sphereLightData.radius));
++      lightPrim = light.GetPrim();
++    } else if (sphereLightData.kind == AreaLightKind::Cylinder) {
++      auto light = pxr::UsdLuxCylinderLight::Define(lightStage, lightAssetSdfPath);
++      requireCapture(bool(light), "Cannot define cylinder light");
++      ASSERT_OR_EXECUTE(light.CreateRadiusAttr().Set(sphereLightData.radius));
++      ASSERT_OR_EXECUTE(light.CreateLengthAttr().Set(sphereLightData.width));
++      lightPrim = light.GetPrim();
++    } else {
++      lightPrim = pxr::UsdLuxSphereLight::Define(lightStage, lightAssetSdfPath).GetPrim();
++    }
++    auto sphereLight = pxr::UsdLuxLightAPI(lightPrim);
++    if (!sphereLight) throwCaptureError("Cannot define sphere light at " + lightAssetSdfPath.GetString());
+     lightStage->SetDefaultPrim(sphereLight.GetPrim());
+ 
+     auto colorAttr = sphereLight.CreateColorAttr();
+-    assert(colorAttr);
+-    colorAttr.Set(pxr::GfVec3f(sphereLightData.color[0], sphereLightData.color[1], sphereLightData.color[2]));
++    if (!colorAttr) throwCaptureError("Cannot author colorAttr");
++    ASSERT_OR_EXECUTE(colorAttr.Set(pxr::GfVec3f(sphereLightData.color[0], sphereLightData.color[1], sphereLightData.color[2])));
+ 
+     auto intensityAttr = sphereLight.CreateIntensityAttr();
+-    assert(intensityAttr);
+-    intensityAttr.Set(sphereLightData.intensity);
++    if (!intensityAttr) throwCaptureError("Cannot author intensityAttr");
++    ASSERT_OR_EXECUTE(intensityAttr.Set(sphereLightData.intensity));
+ 
+-    auto radiusAttr = sphereLight.CreateRadiusAttr();
+-    assert(radiusAttr);
+-    radiusAttr.Set(sphereLightData.radius);
++    if (sphereLightData.kind == AreaLightKind::Sphere) {
++      ASSERT_OR_EXECUTE(pxr::UsdLuxSphereLight(lightPrim).CreateRadiusAttr().Set(sphereLightData.radius));
++    }
+ 
+-    auto shaping = pxr::UsdLuxShapingAPI(sphereLight.GetPrim());
++    auto shaping = pxr::UsdLuxShapingAPI::Apply(sphereLight.GetPrim());
++    if (!shaping) throwCaptureError("Cannot apply sphere light shaping API");
+ 
+     // Note: Remix uses a different default from USD, so 180 must be specified here.
+     auto coneAngleAttr = shaping.CreateShapingConeAngleAttr(pxr::VtValue(180.0f));
+-    assert(coneAngleAttr);
++    if (!coneAngleAttr) throwCaptureError("Cannot author coneAngleAttr");
+ 
+     auto coneSoftnessAttr = shaping.CreateShapingConeSoftnessAttr();
+-    assert(coneSoftnessAttr);
++    if (!coneSoftnessAttr) throwCaptureError("Cannot author coneSoftnessAttr");
+     
+     auto FocusExponentAttr = shaping.CreateShapingFocusAttr();
+-    assert(FocusExponentAttr);
++    if (!FocusExponentAttr) throwCaptureError("Cannot author FocusExponentAttr");
+ 
+     // Note: Set the shaping attribute values only if shaping is enabled. Shaping attributes must still
+     // be created though even if shaping is disabled to ensure proper exporting of all the required
+     // attributes on a captured light (as external programs expect this to be the case).
+     if (sphereLightData.shapingEnabled) {
+-      coneAngleAttr.Set(sphereLightData.coneAngleDegrees);
+-      coneSoftnessAttr.Set(sphereLightData.coneSoftness);
+-      FocusExponentAttr.Set(sphereLightData.focusExponent);
++      ASSERT_OR_EXECUTE(coneAngleAttr.Set(sphereLightData.coneAngleDegrees));
++      ASSERT_OR_EXECUTE(coneSoftnessAttr.Set(sphereLightData.coneSoftness));
++      ASSERT_OR_EXECUTE(FocusExponentAttr.Set(sphereLightData.focusExponent));
+     }
+ 
+-    shaping.Apply(sphereLight.GetPrim());
++
+ 
+     setTimeSampledXforms(lightStage, lightAssetSdfPath,
+                          sphereLightData.firstTime, sphereLightData.finalTime, sphereLightData.xforms,
+@@ -1080,7 +1235,9 @@ void GameExporter::exportSphereLights(const Export& exportData, ExportContext& c
+     setLightIntensityOnTimeSpan(lightAPI, sphereLightData.intensity, sphereLightData.firstTime, sphereLightData.finalTime, exportData.meta.numFramesCaptured);
+     lightAPI.Apply(sphereLight.GetPrim());
+ 
+-    lightStage->Save(); 
++    if (!lightStage->GetRootLayer()->Export(lightStagePath)) {
++      throwCaptureError("Cannot write sphere light asset");
++    }
+ 
+     // Cache light reference
+     Reference lightLssReference;
+@@ -1090,11 +1247,17 @@ void GameExporter::exportSphereLights(const Export& exportData, ExportContext& c
+     // Build sphere light prim on instance stage
+     if(ctx.instanceStage != nullptr) {
+       const pxr::SdfPath fullSphereLightPath = gRootLightsPath.AppendElementString(lightName);
+-      auto sphereLightInstance = pxr::UsdLuxSphereLight::Define(ctx.instanceStage, fullSphereLightPath);
++      auto sphereLightInstance = ctx.instanceStage->OverridePrim(fullSphereLightPath);
+ 
+       const std::string relLightStagePath = relLightDirPath + lightName + ctx.extension;
+-      auto lightInstanceUsdReferences = sphereLightInstance.GetPrim().GetReferences();
+-      lightInstanceUsdReferences.AddReference(relLightStagePath);
++      if (!sphereLightInstance) throwCaptureError("Cannot define instance sphere light");
++      auto lightInstanceUsdReferences = sphereLightInstance.GetReferences();
++      if (!lightInstanceUsdReferences.AddReference(relLightStagePath)) {
++        throwCaptureError("Cannot reference sphere light asset");
++      }
++    }
++    } catch (const std::exception& error) {
++      throwCaptureError("Sphere light " + lightName + " (" + lightStagePath + "): " + error.what());
+     }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportSphereLights] End");
+@@ -1103,22 +1266,23 @@ void GameExporter::exportSphereLights(const Export& exportData, ExportContext& c
+ void GameExporter::exportDistantLights(const Export& exportData, ExportContext& ctx) {
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportDistantLights] Begin");
+   for(const auto& [id,distantLightData] : exportData.distantLights) {
++    try {
+     // Build distant light prim
+     auto distantLightName = lss::prefix::light + std::string(distantLightData.lightName);
+     const pxr::SdfPath distantLightPath = gRootLightsPath.AppendElementString(distantLightName);
+     auto distantLightSchema = pxr::UsdLuxDistantLight::Define(ctx.instanceStage, distantLightPath);
+-    assert(distantLightSchema);
++    requireCapture(bool(distantLightSchema), "Invalid capture object: distantLightSchema");
+ 
+     auto colorAttr = distantLightSchema.CreateColorAttr();
+-    assert(colorAttr);
+-    colorAttr.Set(pxr::GfVec3f(distantLightData.color[0], distantLightData.color[1], distantLightData.color[2]));
++    requireCapture(bool(colorAttr), "Invalid capture object: colorAttr");
++    ASSERT_OR_EXECUTE(colorAttr.Set(pxr::GfVec3f(distantLightData.color[0], distantLightData.color[1], distantLightData.color[2])));
+     
+     auto intensityAttr = distantLightSchema.CreateIntensityAttr();
+-    assert(intensityAttr);
++    requireCapture(bool(intensityAttr), "Invalid capture object: intensityAttr");
+ 
+     auto angleAttr = distantLightSchema.CreateAngleAttr();
+-    assert(angleAttr);
+-    angleAttr.Set(distantLightData.angleDegrees);
++    requireCapture(bool(angleAttr), "Invalid capture object: angleAttr");
++    ASSERT_OR_EXECUTE(angleAttr.Set(distantLightData.angleDegrees));
+ 
+     pxr::GfRotation rotation = pxr::GfRotation(-pxr::GfVec3d::ZAxis(), distantLightData.direction);
+     pxr::GfMatrix4d usdXform(rotation, pxr::GfVec3f(0.f, 0.f, 0.f));
+@@ -1132,6 +1296,10 @@ void GameExporter::exportDistantLights(const Export& exportData, ExportContext&
+     pxr::UsdLuxLightAPI lightAPI(distantLightSchema.GetPrim());
+     setLightIntensityOnTimeSpan(lightAPI, distantLightData.intensity, distantLightData.firstTime, distantLightData.finalTime, exportData.meta.numFramesCaptured);
+     lightAPI.Apply(distantLightSchema.GetPrim());
++  
++    } catch (const std::exception& error) {
++      throwCaptureError("Distant light " + std::to_string(id) + " (" + distantLightData.lightName + ") at " + exportData.baseExportPath + ": " + error.what());
++    }
+   }
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportDistantLights] End");
+ }
+@@ -1145,29 +1313,29 @@ void GameExporter::exportSky(const Export& exportData, ExportContext& ctx) {
+ 
+   const pxr::SdfPath domeLightPath = gRootLightsPath.AppendElementString("SkyDome_Non_Replaceable");
+   auto domeLightSchema = pxr::UsdLuxDomeLight::Define(ctx.instanceStage, domeLightPath);
+-  assert(domeLightSchema);
++  requireCapture(bool(domeLightSchema), "Invalid capture object: domeLightSchema");
+ 
+   auto textureAttr = domeLightSchema.CreateTextureFileAttr();
+-  assert(textureAttr);
++  requireCapture(bool(textureAttr), "Invalid capture object: textureAttr");
+ 
+   const auto fullBasePath = computeLocalPath(exportData.baseExportPath);
+   const auto fullTexturePath = computeLocalPath(exportData.bakedSkyProbePath);
+-  const auto relToMaterialsTexPath = std::filesystem::relative(fullTexturePath, fullBasePath).string();
++  const auto relToMaterialsTexPath = std::filesystem::relative(std::filesystem::u8path(fullTexturePath), std::filesystem::u8path(fullBasePath)).generic_u8string();
+   const bool bSetSuccessful = textureAttr.Set(pxr::SdfAssetPath(relToMaterialsTexPath));
+-  assert(bSetSuccessful);
++  requireCapture(bool(bSetSuccessful), "Invalid capture object: bSetSuccessful");
+ 
+   auto formatAttr = domeLightSchema.CreateTextureFormatAttr();
+-  assert(formatAttr);
+-  formatAttr.Set(pxr::TfToken("latlong"));
++  requireCapture(bool(formatAttr), "Invalid capture object: formatAttr");
++  ASSERT_OR_EXECUTE(formatAttr.Set(pxr::TfToken("latlong")));
+ 
+   domeLightSchema.OrientToStageUpAxis();
+ 
+   auto domeLightXformOp = domeLightSchema.AddTransformOp();
+-  assert(domeLightXformOp);
++  requireCapture(bool(domeLightXformOp), "Invalid capture object: domeLightXformOp");
+   pxr::GfRotation rotation = pxr::GfRotation(pxr::GfVec3d::XAxis(), exportData.camera.proj.bInv ? pxr::GfVec3d::ZAxis() : pxr::GfVec3d::YAxis());
+   pxr::GfMatrix4d xform(rotation, pxr::GfVec3f(0.f, 0.f, 0.f));
+   xform[1][1] *= exportData.camera.view.bInv ? -1.0 : 1.0;
+-  domeLightXformOp.Set(xform);
++  ASSERT_OR_EXECUTE(domeLightXformOp.Set(xform));
+   domeLightSchema.SetResetXformStack(true);
+ 
+   dxvk::Logger::debug("[GameExporter][" + exportData.debugId + "][exportSky] End");
+@@ -1194,13 +1362,17 @@ void GameExporter::setTimeSampledXforms(const pxr::UsdStageRefPtr stage,
+                                         const Export::Meta& meta,
+                                         const bool changeBasis,
+                                         const pxr::GfMatrix4d& commonXform) {
+-  assert(stage);
+-  assert(sdfPath != pxr::SdfPath());
+-  assert(xforms.size() > 0);
++  requireCapture(bool(stage), "Invalid capture object: stage");
++  requireCapture(bool(sdfPath != pxr::SdfPath()), "Invalid capture object: sdfPath != pxr::SdfPath()");
++  requireCapture(bool(xforms.size() > 0), "Invalid capture object: xforms.size() > 0");
+ 
+   const bool isSingleFrame = meta.numFramesCaptured == 1;
+ 
+   auto geomXformable = pxr::UsdGeomXformable::Get(stage, sdfPath);
++  requireCapture(bool(geomXformable), "Missing transform prim: " + sdfPath.GetString());
++  auto xformOp = geomXformable.GetTransformOp();
++  if (!xformOp) { xformOp = geomXformable.AddTransformOp(); }
++  requireCapture(bool(xformOp), "Cannot create transform op: " + sdfPath.GetString());
+   for(const auto& sampledXform : xforms) {
+     const pxr::UsdTimeCode timeCode = isSingleFrame ? pxr::UsdTimeCode::Default() : pxr::UsdTimeCode(sampledXform.time);
+ 
+@@ -1209,8 +1381,7 @@ void GameExporter::setTimeSampledXforms(const pxr::UsdStageRefPtr stage,
+ 
+     xform = changeBasis ? dxvk::swapBasis(xform) : xform;
+ 
+-    auto xformOp = geomXformable.AddTransformOp();
+-    xformOp.Set(xform, timeCode);
++    ASSERT_OR_EXECUTE(xformOp.Set(xform, timeCode));
+   }
+ }
+ 
+@@ -1222,20 +1393,20 @@ void GameExporter::setVisibilityTimeSpan(const pxr::UsdStageRefPtr stage,
+   const bool isSingleFrame = numFramesCaptured == 1;
+   if (!isSingleFrame) {
+     auto geomImageSchema = pxr::UsdGeomImageable::Get(stage, sdfPath);
+-    assert(geomImageSchema);
++    requireCapture(bool(geomImageSchema), "Invalid capture object: geomImageSchema");
+     auto visibilityAttr = geomImageSchema.GetVisibilityAttr();
+     if(!visibilityAttr) {
+       visibilityAttr = geomImageSchema.CreateVisibilityAttr();
+     }
+-    assert(visibilityAttr);
++    requireCapture(bool(visibilityAttr), "Invalid capture object: visibilityAttr");
+     static const pxr::TfToken kTokVisInherited("inherited");
+     static const pxr::TfToken kTokVisInvisible("invisible");
+     if(firstTime != 0.0) {
+-      visibilityAttr.Set(kTokVisInvisible, pxr::UsdTimeCode(0.0));
++      ASSERT_OR_EXECUTE(visibilityAttr.Set(kTokVisInvisible, pxr::UsdTimeCode(0.0)));
+     }
+-    visibilityAttr.Set(kTokVisInherited, pxr::UsdTimeCode(firstTime));
+-    visibilityAttr.Set(kTokVisInherited, pxr::UsdTimeCode(finalTime));
+-    visibilityAttr.Set(kTokVisInvisible, pxr::UsdTimeCode(std::nextafter(finalTime, finalTime + 1.0)));
++    ASSERT_OR_EXECUTE(visibilityAttr.Set(kTokVisInherited, pxr::UsdTimeCode(firstTime)));
++    ASSERT_OR_EXECUTE(visibilityAttr.Set(kTokVisInherited, pxr::UsdTimeCode(finalTime)));
++    ASSERT_OR_EXECUTE(visibilityAttr.Set(kTokVisInvisible, pxr::UsdTimeCode(std::nextafter(finalTime, finalTime + 1.0))));
+   }
+ }
+ 
+@@ -1249,44 +1420,24 @@ void GameExporter::setLightIntensityOnTimeSpan(const pxr::UsdLuxLightAPI& luxLig
+   if(!intensityAttr) {
+     intensityAttr = luxLight.CreateIntensityAttr();
+   }
+-  assert(intensityAttr);
++  requireCapture(bool(intensityAttr), "Invalid capture object: intensityAttr");
+   if (isSingleFrame) {
+-    intensityAttr.Set(defaultLightIntensity);
++    ASSERT_OR_EXECUTE(intensityAttr.Set(defaultLightIntensity));
+   } else {
+     if(firstTime != 0.0) {
+-      intensityAttr.Set(0.f, pxr::UsdTimeCode(0.0));
++      ASSERT_OR_EXECUTE(intensityAttr.Set(0.f, pxr::UsdTimeCode(0.0)));
+     }
+-    intensityAttr.Set(defaultLightIntensity, pxr::UsdTimeCode(firstTime));
+-    intensityAttr.Set(defaultLightIntensity, pxr::UsdTimeCode(finalTime));
+-    intensityAttr.Set(0.f, pxr::UsdTimeCode(std::nextafter(finalTime, finalTime + 1.0)));
++    ASSERT_OR_EXECUTE(intensityAttr.Set(defaultLightIntensity, pxr::UsdTimeCode(firstTime)));
++    ASSERT_OR_EXECUTE(intensityAttr.Set(defaultLightIntensity, pxr::UsdTimeCode(finalTime)));
++    ASSERT_OR_EXECUTE(intensityAttr.Set(0.f, pxr::UsdTimeCode(std::nextafter(finalTime, finalTime + 1.0))));
+   }
+ }
+ 
+-pxr::UsdStageRefPtr GameExporter::findOpenOrCreateStage(const std::string path, const bool bClearIfExists) {
+-    const bool bLayerAlreadyExists = pxr::TfIsFile(path);
+-    pxr::SdfLayerRefPtr alreadyExistentLayer;
+-    if(bLayerAlreadyExists) {
+-      alreadyExistentLayer = pxr::SdfLayer::FindOrOpen(path);
+-      if (!alreadyExistentLayer) {
+-        const auto message = dxvk::str::format(
+-          "Failed to open capture layer:\n",
+-          path,
+-          "\n\nCheck that the folder exists and is writable, then try again.");
+-        throwCaptureError(message);
+-      }
+-      if(bClearIfExists) {
+-        alreadyExistentLayer->Clear();
+-      }
+-    }
+-    auto stage = (bLayerAlreadyExists) ? pxr::UsdStage::Open(alreadyExistentLayer) : pxr::UsdStage::CreateNew(path);
+-    if (!stage) {
+-      const auto message = dxvk::str::format(
+-        "Failed to create capture stage:\n",
+-        path,
+-        "\n\nCheck that the folder exists and is writable, then try again.");
+-      throwCaptureError(message);
+-    }
+-    return stage;
++pxr::UsdStageRefPtr GameExporter::findOpenOrCreateStage(const std::string path, const bool) {
++  requireCapture(!std::filesystem::exists(std::filesystem::u8path(path)), "Capture asset already exists: " + path);
++  auto stage = pxr::UsdStage::CreateNew(path);
++  requireCapture(bool(stage), "Cannot create capture asset: " + path);
++  return stage;
+ }
+ 
+ }
+diff --git a/src/lssusd/game_exporter.h b/src/lssusd/game_exporter.h
+index 4ffedb95..323c5bb4 100644
+--- a/src/lssusd/game_exporter.h
++++ b/src/lssusd/game_exporter.h
+@@ -41,7 +41,9 @@ public:
+   static void setMultiThreadSafety(const bool enable) {
+     s_bMultiThreadSafety = enable;
+   }
+-  static bool exportUsd(const Export& exportData);
++  static bool exportUsd(const Export& exportData, std::string* error = nullptr);
++  static bool validateUsd(const std::string& path, std::string* error = nullptr);
++  static bool flattenUsd(const std::string& source, const std::string& destination, std::string* error = nullptr);
+ private:
+   struct Reference {
+     std::string  stagePath;
+diff --git a/src/lssusd/game_exporter_types.h b/src/lssusd/game_exporter_types.h
+index 3ed3eefd..5a19c68f 100644
+--- a/src/lssusd/game_exporter_types.h
++++ b/src/lssusd/game_exporter_types.h
+@@ -85,9 +85,35 @@ struct Camera {
+   } view, proj;
+   // Do XOR here to check if we need to manually change basis for Projection * View matrix
+   inline bool isLHS() const { return view.isLHS() ^ proj.isLHS(); }
++
++  // The view basis and the projection's choice of forward axis describe
++  // world handedness together. A reflected view with +Z forward can be RHS.
++  pxr::GfMatrix4d worldBasis() const {
++    const bool invertX = !view.bInv && (proj.bInv || isLHS());
++    const bool invertY = !view.bInv && proj.bInv;
++    return pxr::GfMatrix4d(1.0).SetScale(pxr::GfVec3d(invertX ? -1.0 : 1.0, invertY ? -1.0 : 1.0, 1.0));
++  }
++
++  pxr::GfMatrix4d usdCameraTransform(pxr::GfVec3d position, pxr::GfVec3d direction, pxr::GfVec3d up) const {
++    const auto basis = worldBasis();
++    position = basis.Transform(position);
++    direction = basis.TransformDir(direction);
++    up = basis.TransformDir(view.bInv ? -up : up);
++    pxr::GfMatrix4d worldToView;
++    worldToView.SetLookAt(position, position + direction, up);
++    worldToView.Orthonormalize();
++    return worldToView.GetInverse();
++  }
++
++  bool reverseWinding(bool sourceFacingFlipped) const {
++    return sourceFacingFlipped ^ (worldBasis().GetDeterminant3() < 0.0);
++  }
+ };
+ 
++enum class AreaLightKind { Sphere, Rect, Disk, Cylinder };
+ struct SphereLight {
++  AreaLightKind kind = AreaLightKind::Sphere;
++  float width = 1.f, height = 1.f;
+   std::string   lightName;
+   float         color[3];
+   float         radius;
+diff --git a/src/lssusd/meson.build b/src/lssusd/meson.build
+index 1b87f7b0..72e3b26f 100644
+--- a/src/lssusd/meson.build
++++ b/src/lssusd/meson.build
+@@ -1,5 +1,6 @@
+ lssUsd_src = files([
+   'game_exporter.cpp',
++  'capture_validation.cpp',
+   'usd_mesh_importer.cpp',
+   'usd_mesh_importer.h',
+   'usd_mesh_samplers.h',
+diff --git a/tests/rtx/unit/test_hot_reload.cpp b/tests/rtx/unit/test_hot_reload.cpp
+index fded82f8..334e4c3c 100644
+--- a/tests/rtx/unit/test_hot_reload.cpp
++++ b/tests/rtx/unit/test_hot_reload.cpp
+@@ -30,11 +30,17 @@
+ 
+ #include "../../test_utils.h"
+ #include "rtx_render/rtx_asset_replacer.h"
++#include "../../../src/lssusd/game_exporter.h"
+ #include "rtx_render/rtx_mod_usd.h"
+ #include "rtx_render/graph/rtx_graph_types.h"
+ 
+ #include "../../../src/lssusd/usd_include_begin.h"
+ #include <pxr/usd/usd/stage.h>
++#include <pxr/usd/usd/primRange.h>
++#include <pxr/usd/usdGeom/camera.h>
++#include <pxr/usd/usdGeom/mesh.h>
++#include <pxr/usd/usdGeom/metrics.h>
++#include <pxr/usd/usdLux/sphereLight.h>
+ #include <pxr/usd/usd/notice.h>
+ #include <pxr/usd/usd/attribute.h>
+ #include <pxr/usd/sdf/path.h>
+@@ -730,6 +736,168 @@ static void testDeleteMeshPrimDirtiesHash() {
+ }
+ 
+ // ─── Test: adding a light prim dirties its light hash ────────────────────────
++static void testCaptureCoordinates() {
++  using pxr::GfMatrix4d;
++  using pxr::GfVec3d;
++  const auto check = [](bool condition, const char* message) {
++    if (!condition) {
++      throw DxvkError(message);
++    }
++  };
++  const GfMatrix4d identity(1.0);
++  const GfVec3d eye(11, 12, 13), forward(0, 1, 0), up(0, 0, 1), right(1, 0, 0);
++  lss::Camera camera;
++  camera.view.coord = lss::LHS;
++  camera.proj.coord = lss::LHS;
++  check(camera.worldBasis() == identity, "Xash's view reflection cancels its +Z projection convention");
++  const auto pose = camera.usdCameraTransform(eye, forward, up);
++  check(pose.ExtractTranslation() == eye && pose.TransformDir(GfVec3d(0, 0, -1)) == forward &&
++        pose.TransformDir(GfVec3d(0, 1, 0)) == up && pose.TransformDir(GfVec3d(1, 0, 0)) == right &&
++        pose.GetDeterminant3() == 1.0, "USD camera has the wrong pose or handedness");
++  camera.view.coord = lss::RHS;
++  check(camera.worldBasis().GetDeterminant3() == -1.0 && camera.reverseWinding(false),
++        "A left-handed world needs one reflection and one winding reversal");
++  camera.proj.bInv = true;
++  check(camera.worldBasis().GetDeterminant3() == 1.0 && !camera.reverseWinding(false),
++        "Two world-axis flips preserve handedness");
++  camera.proj.bInv = false;
++  camera.proj.coord = lss::RHS;
++  check(camera.worldBasis() == identity, "Ordinary RHS view/projection should preserve the world");
++
++  const auto folder = std::filesystem::temp_directory_path() /
++    ("remix-coordinate-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
++  std::filesystem::create_directory(folder);
++  struct Cleanup {
++    std::filesystem::path path;
++    ~Cleanup() { std::error_code ignored; std::filesystem::remove_all(path, ignored); }
++  } cleanup{folder};
++
++  for (bool zUp : {true, false}) {
++    lss::Export capture{};
++    capture.debugId = "test-capture-coordinates";
++    capture.bExportInstanceStage = true;
++    capture.instanceStagePath = (folder / (zUp ? "z-up.usd" : "y-up.usd")).u8string();
++    capture.meta.isZUp = zUp;
++    capture.meta.metersPerUnit = 0.0254;
++    capture.meta.timeCodesPerSecond = 24;
++    capture.meta.numFramesCaptured = 2;
++    capture.meta.endTimeCode = 1;
++    capture.camera = camera;
++    capture.camera.fov = 1.0f;
++    capture.camera.aspectRatio = 1.5f;
++    capture.camera.nearPlane = 1.0f;
++    capture.camera.farPlane = 1000.0f;
++    capture.camera.firstTime = 0.0f;
++    capture.camera.finalTime = 1.0f;
++    capture.camera.xforms.push_back({0, pose});
++    capture.camera.xforms.push_back({1, pose});
++    capture.globalXform = camera.worldBasis();
++    const GfVec3d objectPosition(3, 7, 0), lightPosition(13, 21, 34);
++    auto& mesh = capture.meshes[1];
++    mesh.meshName = "0000000000000001";
++    mesh.numVertices = mesh.numIndices = 3;
++    mesh.buffers.positionBufs[0] = {{0, 0, 0}, {4, 0, 0}, {1, 2, 0}};
++    mesh.buffers.normalBufs[0] = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
++    mesh.buffers.idxBufs[0] = {0, 1, 2};
++    auto& instance = capture.instances[2];
++    instance.instanceName = "0000000000000002";
++    instance.meshId = 1;
++    instance.firstTime = 0;
++    instance.finalTime = 1;
++    instance.xforms.push_back({0, GfMatrix4d(1.0).SetTranslate(objectPosition)});
++    auto& light = capture.sphereLights[3];
++    light.lightName = "0000000000000003";
++    light.color[0] = light.color[1] = light.color[2] = 1.0f;
++    light.intensity = light.radius = 1.0f;
++    light.firstTime = 0;
++    light.finalTime = 1;
++    light.xforms.push_back({0, GfMatrix4d(1.0).SetTranslate(lightPosition)});
++    std::string error;
++    const bool saved = lss::GameExporter::exportUsd(capture, &error);
++    if (!saved) {
++      throw DxvkError(error.c_str());
++    }
++    const auto stage = pxr::UsdStage::Open(capture.instanceStagePath);
++    check(bool(stage), "Could not reopen the public capture");
++    check(stage->HasAuthoredMetadata(pxr::TfToken("upAxis")) &&
++          pxr::UsdGeomGetStageUpAxis(stage) == (zUp ? pxr::UsdGeomTokens->z : pxr::UsdGeomTokens->y) &&
++          pxr::UsdGeomGetStageMetersPerUnit(stage) == capture.meta.metersPerUnit &&
++          stage->GetTimeCodesPerSecond() == 24 && stage->GetEndTimeCode() == 1,
++          "Public capture lost its stage metrics or playback range");
++    bool foundMesh = false, foundLight = false, foundCamera = false;
++    const pxr::UsdTimeCode sample(0);
++    for (const auto& prim : stage->Traverse()) {
++      const auto path = prim.GetPath().GetString();
++      if (prim.IsA<pxr::UsdGeomMesh>() && path.find("/instances/") != std::string::npos) {
++        const pxr::UsdGeomMesh usdMesh(prim);
++        const auto transform = usdMesh.ComputeLocalToWorldTransform(sample);
++        pxr::VtVec3fArray points, normals;
++        pxr::VtIntArray indices;
++        usdMesh.GetPointsAttr().Get(&points, sample);
++        usdMesh.GetNormalsAttr().Get(&normals, sample);
++        usdMesh.GetFaceVertexIndicesAttr().Get(&indices, sample);
++        check(points.size() == 3 && normals.size() == 3 && indices.size() == 3, "Missing triangle data");
++        const auto p0 = transform.Transform(GfVec3d(points[indices[0]]));
++        const auto p1 = transform.Transform(GfVec3d(points[indices[1]]));
++        const auto p2 = transform.Transform(GfVec3d(points[indices[2]]));
++        check(p0 == objectPosition && p1 == objectPosition + GfVec3d(4, 0, 0) &&
++              p2 == objectPosition + GfVec3d(1, 2, 0) &&
++              pxr::GfDot(pxr::GfCross(p1 - p0, p2 - p0), transform.TransformDir(GfVec3d(normals[0]))) > 0,
++              "Floor axes, instance position, normal or winding changed");
++        foundMesh = true;
++      } else if (prim.IsA<pxr::UsdLuxSphereLight>()) {
++        const pxr::UsdGeomXformable usdLight(prim);
++        check(usdLight.ComputeLocalToWorldTransform(sample).ExtractTranslation() == lightPosition,
++              "Light position changed");
++        foundLight = true;
++      } else if (prim.IsA<pxr::UsdGeomCamera>()) {
++        const pxr::UsdGeomCamera usdCamera(prim);
++        check(usdCamera.ComputeLocalToWorldTransform(sample) == pose, "Captured camera pose changed");
++        foundCamera = true;
++      }
++    }
++    check(foundMesh && foundLight && foundCamera, "The published capture is missing scene content");
++  }
++  Logger::info("testCaptureCoordinates passed");
++}
++
++static void testExternalLightOverride() {
++  const auto stage = pxr::UsdStage::CreateInMemory();
++  const auto prim = stage->OverridePrim(pxr::SdfPath("/RootNode/lights/light_0000000000ABCDEF"));
++  const auto intensity = prim.CreateAttribute(pxr::TfToken("inputs:intensity"), pxr::SdfValueTypeNames->Float);
++  const auto makeSource = [](float brightness) {
++    return RtLight(RtSphereLight(Vector3(12.f, 30.f, 45.f), Vector3(brightness, brightness * .5f, 0.f),
++      8.f, RtLightShaping(true, Vector3(1.f, 0.f, 0.f), .5f, .1f, 1.f), 1.f));
++  };
++  const auto source = makeSource(20.f);
++  const auto brighter = makeSource(80.f);
++  if (source.getInitialHash() != brighter.getInitialHash() ||
++      source.getInitialHash() != source.getSphereLight().getHash()) {
++    throw DxvkError("The captured sphere hash must survive API brightness updates");
++  }
++  for (const float authored : { 0.f, 3.f, 0.f }) {
++    intensity.Set(authored);
++    auto data = LightData::tryCreate(prim, nullptr, true, false);
++    if (!data) {
++      throw DxvkError("Could not load an untyped Toolkit light override");
++    }
++    data->merge(source);
++    const auto light = data->toRtLight();
++    const auto& sphere = light.getSphereLight();
++    const auto color = light.getColorAndIntensity();
++    if (color.w != authored || sphere.getRadius() != 8.f ||
++        length(light.getPosition() - source.getPosition()) > .001f ||
++        length(sphere.getShaping().getDirection() - Vector3(1.f, 0.f, 0.f)) > .001f ||
++        std::abs(sphere.getShaping().getCosConeAngle() - .5f) > .001f) {
++      throw DxvkError("External light override did not preserve its unedited geometry or honor intensity");
++    }
++  }
++  if (source.getColorAndIntensity().w != 20.f) {
++    throw DxvkError("A replacement modified the original API definition");
++  }
++  Logger::info("testExternalLightOverride passed");
++}
++
+ static void testAddLightPrimDirtiesHash() {
+   auto stage = pxr::UsdStage::CreateInMemory("test.usda");
+   stage->DefinePrim(pxr::SdfPath("/RootNode/lights"));
+@@ -1232,6 +1400,8 @@ int main() {
+     dxvk::testMaterialNestedUnderMeshIsClassified();
+     dxvk::testDeletedExternalMaterialIsClassified();
+     dxvk::testDeletedMaterialAncestorIsClassified();
++    dxvk::testCaptureCoordinates();
++    dxvk::testExternalLightOverride();
+     dxvk::testAddLightPrimDirtiesHash();
+     dxvk::testLegacySphereLightNaming();
+     dxvk::testEditGeomSubsetDirtiesMesh();

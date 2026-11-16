@@ -115,15 +115,8 @@ void CMp5::StopSuicide( void )
 	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flTimeWeaponIdle = gpGlobals->time + 1;
 }
 
-void CMp5::SendInitMessage( CBasePlayer *player )
+void CMp5::SendInitMessage( CBasePlayer * )
 {
-	if ( player )
-	{
-		bool bNotMapper = player->m_iNew16a_guess != 2 && player->m_iNew16a_guess != 3 && player->m_iNew16a_guess != 4;
-
-		if ( ( !g_pGameRules || !g_pGameRules->IsMapperMode_guess() ) && bNotMapper )
-			UTIL_Remove( this );
-	}
 }
 
 void CMp5::Spawn( )
@@ -188,6 +181,7 @@ void CMp5::Precache( void )
 	PRECACHE_MODEL( "models/weapons/mp5/v_mp5.mdl" );
 	PRECACHE_MODEL( "models/weapons/mp5/w_mp5.mdl" );
 	PRECACHE_MODEL( "models/null.mdl" );
+	UTIL_PrecacheOther("ammo_mp5");
 
 	if ( custom_v_model )
 		PRECACHE_MODEL( custom_v_model );
@@ -658,28 +652,40 @@ void CMp5::ItemPostFrame( void )
 }
 
 
+static char* Mp5AmmoModel()
+{
+	static char nativeModel[] = "models/ammo/ammo_mp5.mdl";
+	int length = 0;
+	if (auto data = LOAD_FILE_FOR_ME(nativeModel, &length))
+	{
+		FREE_FILE(data);
+		if (length > 0)
+			return nativeModel;
+	}
+	// Some shipped asset sets lack the MP5 pickup mesh.
+	static char fallbackModel[] = "models/ammo/ammo_tmp.mdl";
+	return fallbackModel;
+}
+
 class CMP5Ammo : public CBasePlayerAmmo
 {
 	void Spawn( void )
 	{
-		Precache( );
-		SET_MODEL( ENT( pev ), "models/ammo/ammo_mp5.mdl" );
+		char* model = Mp5AmmoModel();
+		PrecacheModelAndSound(model);
+		SET_MODEL(ENT(pev), model);
 		CBasePlayerAmmo::Spawn( );
 	}
-	void SendInitMessage( CBasePlayer *player )
+	void SendInitMessage( CBasePlayer * )
 	{
-		bool bNotMapper = player && player->m_iNew16a_guess != 2 && player->m_iNew16a_guess != 3 && player->m_iNew16a_guess != 4;
-
-		if ( ( !g_pGameRules || !g_pGameRules->IsMapperMode_guess() ) && bNotMapper )
-		{
-			CBaseEntity *pAmmo = CBaseEntity::Create( "ammo_glock", pev->origin, pev->angles, NULL );
-			if ( pAmmo )
-				UTIL_Remove( this );
-		}
 	}
 	void Precache( void )
 	{
-		PRECACHE_MODEL( "models/ammo/ammo_mp5.mdl" );
+		PrecacheModelAndSound(Mp5AmmoModel());
+	}
+	static void PrecacheModelAndSound(char* model)
+	{
+		PRECACHE_MODEL(model);
 		PRECACHE_SOUND( "weapons/item_get.wav" );
 	}
 	BOOL AddAmmo( CBaseEntity *pOther )

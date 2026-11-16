@@ -1,3 +1,4 @@
+#include "cofr_credits_timing.hpp"
 // ======================================
 // Cry of Fear credits, statistics and unlocks panel
 // (class names from the RTTI of client.dll, file name guessed)
@@ -58,7 +59,7 @@ CCredits::CCredits() : Panel( 0, 0, ScreenWidth, ScreenHeight )
 	for ( i = 1; i <= MAX_CREDIT_LINES_guess; i++ )
 	{
 		y = ScreenHeight;
-		m_pCreditLabel_guess[i] = new Label( " ", 0, y + 64 + i * 32, ScreenWidth, 32 );
+		m_pCreditLabel_guess[i] = new Label( " ", 0, y + 64 + i * cof::CreditLineHeight, ScreenWidth, 32 );
 		m_pCreditLabel_guess[i]->setParent( this );
 		m_pCreditLabel_guess[i]->setFont( m_pCreditsFont_guess );
 		m_pCreditLabel_guess[i]->setFgColor( 0, 0, 0, 255 );
@@ -71,7 +72,7 @@ CCredits::CCredits() : Panel( 0, 0, ScreenWidth, ScreenHeight )
 
 	for ( i = 1; i <= 14; i++ )
 	{
-		m_pStatLabel_guess[i] = new Label( " ", 0, y - 256 + i * 32, ScreenWidth, 32 );
+		m_pStatLabel_guess[i] = new Label( " ", 0, y - 256 + i * cof::CreditLineHeight, ScreenWidth, 32 );
 		m_pStatLabel_guess[i]->setParent( this );
 		m_pStatLabel_guess[i]->setFont( m_pCreditsFont_guess );
 		m_pStatLabel_guess[i]->setFgColor( 0, 0, 0, 255 );
@@ -426,7 +427,7 @@ int MsgCredits_guess( const char *pszName, int iSize, void *pbuf )
 	{
 		gViewPort->m_pCredits_guess->SetLine_guess( i, i );
 
-		int iOffset = i * 32;
+		int iOffset = i * cof::CreditLineHeight;
 		if ( gViewPort->m_pCredits_guess->m_bScrollUp_guess )
 			iOffset = -iOffset;
 
@@ -477,7 +478,7 @@ int MsgCredits_guess( const char *pszName, int iSize, void *pbuf )
 		gViewPort->m_pCredits_guess->m_bScrollUp_guess = false;
 
 		for ( i = 1; i <= MAX_CREDIT_LINES_guess; i++ )
-			gViewPort->m_pCredits_guess->m_pCreditLabel_guess[i]->setPos( 0, ScreenHeight + i * 32 );
+			gViewPort->m_pCredits_guess->m_pCreditLabel_guess[i]->setPos( 0, ScreenHeight + i * cof::CreditLineHeight );
 	}
 	else
 	{
@@ -1137,9 +1138,8 @@ void CCredits::solve()
 			m_flLastScrollTime = now;
 			if ( !std::isfinite(elapsed) || elapsed < 0.0f ) elapsed = 0.0f;
 			if ( elapsed > 0.1f ) elapsed = 0.1f;
-			const int speed = m_iScrollSpeed_guess > 0 ? m_iScrollSpeed_guess : 1;
-			const float pixelsPerSecond = cl_fastcredits->value ? 1200.0f :
-				ScreenHeight / (5.0f + 2.0f * speed);
+			const float pixelsPerSecond = cof::creditPixelsPerSecond(
+				m_iScrollSpeed_guess, cl_fastcredits->value != 0.f);
 			m_flScrollPixels += elapsed * pixelsPerSecond;
 			const int iStep = static_cast<int>(m_flScrollPixels);
 			m_flScrollPixels -= iStep;

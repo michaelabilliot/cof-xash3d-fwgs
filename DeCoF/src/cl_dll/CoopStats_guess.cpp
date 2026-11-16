@@ -518,6 +518,8 @@ int MsgBeatCoop_guess( const char *pszName, int iSize, void *pbuf )
 
 int MsgCoopStats_guess( const char *pszName, int iSize, void *pbuf )
 {
+	if ( !pbuf || iSize < 34 || !gViewPort )
+		return 0;
 	BEGIN_READ( pbuf, iSize );
 
 	if ( !gViewPort->m_pCoopStats_guess )
@@ -605,7 +607,8 @@ int MsgCoopStats_guess( const char *pszName, int iSize, void *pbuf )
 	if ( iVisible )
 		gViewPort->m_pCoopStats_guess->setVisible( true );
 
-	if ( iPlayer >= 1 && g_PlayerInfoList[iPlayer].name && strlen( g_PlayerInfoList[iPlayer].name ) >= 1 )
+	if ( iPlayer >= 1 && iPlayer <= MAX_COOP_PLAYERS_guess &&
+		g_PlayerInfoList[iPlayer].name && g_PlayerInfoList[iPlayer].name[0] )
 	{
 		if ( iDead )
 		{

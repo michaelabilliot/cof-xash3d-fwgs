@@ -58,6 +58,7 @@ extern "C" {
 #include "dx_map_light_api.h"
 #include "dx_map_light_route.h"
 #include "dx_map_sky.h"
+#include "dx_remix_auto_emissive.h"
 #include "dx_light_position.h"
 #include "dx_studio_fixture.h"
 #include "dx_cof_features.h"
@@ -459,6 +460,8 @@ static int g_skyTextures[DX_SKYBOX_SIDES] = {};
 convar_t dx_cof_player_shadow = { (char *)"dx_cof_player_shadow", (char *)"1", FCVAR_ARCHIVE };
 static convar_t dx_cof_pickup_outline = { (char *)"dx_cof_pickup_outline", (char *)"1", FCVAR_ARCHIVE };
 convar_t dx_remix = { (char *)"dx_remix", (char *)"0", 0 };
+static convar_t dx_remix_auto_emissive_cvar = {
+	(char *)"dx_remix_auto_emissive", (char *)dx_remix_auto_emissive::defaultValue, FCVAR_ARCHIVE };
 convar_t dx_remix_decal_cutout =
 { (char *)"dx_remix_decal_cutout", (char *)"1", 0 };
 convar_t dx_remix_decal_alpha_ref =
@@ -1038,6 +1041,7 @@ static void R_TextureZoomOutCmd( void ) { R_ShowTexturesSetZoom( dx_showtextures
 static void R_TextureZoomResetCmd( void ) { R_ShowTexturesSetZoom( 1.0f ); }
 
 static dx_map_light::Bridge g_mapEmitterBridge;
+static dx_remix_auto_emissive::Config g_remixAutoEmissive;
 static bool R_CofLanternModel(const cl_entity_s* ent,bool view) {
  return ent && ent->model && ent->model->type==mod_studio && !(ent->curstate.effects&EF_NODRAW) &&
   !Q_stricmp(ent->model->name,view?"models/weapons/lantern/v_lantern.mdl":"models/weapons/lantern/w_lantern.mdl");
@@ -2217,6 +2221,7 @@ static void R_RegisterContextCvars( void )
 		return;
 
 	gEngfuncs.Cvar_RegisterVariable( &dx_remix );
+	gEngfuncs.Cvar_RegisterVariable( &dx_remix_auto_emissive_cvar );
  gEngfuncs.Cvar_RegisterVariable( &dx_cof_player_shadow );
  gEngfuncs.Cvar_RegisterVariable( &dx_cof_pickup_outline );
 	DX_RagdollRegister();
@@ -3939,6 +3944,7 @@ static bool DX_ResetDevice( bool rebuildPresentParams, const char *reason )
 	if( FAILED( result ) )
 		return false;
 
+	g_remixAutoEmissive.invalidate();
 	if( g_dxLine ) g_dxLine->OnResetDevice( );
 	DX_InvalidateTextureBindCache( );
 	DX_RefreshFogCaps( );
@@ -4027,6 +4033,7 @@ static void R_Shutdown( void )
  R_LakeForestShutdown();
 	if(g_inventoryResetCallback)g_inventoryResetCallback();
 	g_mapSky.invalidate();
+	g_remixAutoEmissive.invalidate();
 	g_mapSkyRetryAt = 0;
 	R_ClearRemixMapLights();
 	DX_RagdollReset("renderer-shutdown");
@@ -4620,6 +4627,34 @@ static void R_CofUnstickShell( cl_entity_s *clent, int type )
 	VectorCopy( fixed, clent->latched.prevorigin );
 }
 
+void R_CofTraceStudio(const cl_entity_s* entity, const char* stage, int outcome)
+{
+	if (!entity || !entity->model || entity->model->type != mod_studio ||
+		entity->index < 1 || entity->index >= 8192)
+		return;
+	const cvar_t* trace = gEngfuncs.pfnGetCvarPointer("cofr_render_trace");
+	if (!trace || !trace->value)
+		return;
+	const char* model = entity->model->name;
+	if (!Q_stristr(model, "slower") && !Q_stristr(model, "faceless") && !Q_stristr(model, "psycho") &&
+		!Q_stristr(model, "runningcrazy") && !Q_stristr(model, "taller") &&
+		!Q_stristr(model, "suicider") && !Q_stristr(model, "sewmo") &&
+		!Q_stristr(model, "faster") && !Q_stristr(model, "children") && !Q_stristr(model, "nerd"))
+		return;
+	struct Sample { float time; int model, mode, alpha, outcome; };
+	static Sample samples[3][8192]{};
+	const int stageIndex = stage[0] == 'r' ? 0 : stage[0] == 'c' ? 1 : 2;
+	auto& sample = samples[stageIndex][entity->index];
+	const auto& state = entity->curstate;
+	const float now = gp_cl->time;
+	if (now >= sample.time && now - sample.time < 1.f && sample.model == state.modelindex &&
+		sample.mode == state.rendermode && sample.alpha == state.renderamt && sample.outcome == outcome)
+		return;
+	sample = {now, state.modelindex, state.rendermode, state.renderamt, outcome};
+	gEngfuncs.Con_Printf("COFR D3D9 entity=%d stage=%s outcome=%d model=%s mode=%d alpha=%d sequence=%d frame=%g\n",
+		entity->index, stage, outcome, model, state.rendermode, state.renderamt, state.sequence, state.frame);
+}
+
 static qboolean R_AddEntity( cl_entity_s *clent, int type )
 {
 	if( !clent || !clent->model )
@@ -4680,6 +4715,17 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 	const int effectiveRenderMode = modelType == mod_studio
 		? R_StudioRenderMode( clent )
 		: clent->curstate.rendermode;
+	R_CofTraceStudio(clent, "route", effectiveRenderMode);
+
+	// A spawn flicker sends explicit additive alpha zero for the hidden phase.
+	// Submitting its meshes lets the Remix bridge capture an invisible instance.
+	// Keep it out of both the frame and capture queues until it becomes visible.
+	if (modelType == mod_studio && clent->curstate.rendermode == kRenderTransAdd &&
+		clent->curstate.renderfx == kRenderFxNone && clent->curstate.renderamt == 0)
+	{
+		R_CofTraceStudio(clent, "draw", 0);
+		return false;
+	}
 
 	const bool nightmareHeadlight = R_CofClientPresent() && g_worldmodel &&
         !Q_stricmp(g_worldmodel->name,"maps/c_nightmare.bsp") && modelType==mod_sprite &&
@@ -4983,10 +5029,107 @@ static qboolean VID_ScreenShot( const char *filename, int shot_type )
 		return false;
 	}
 
-	const HRESULT result = D3DXSaveSurfaceToFile(
-		filename, D3DXIFF_PNG, backBuffer, nullptr, nullptr );
+	// Read back an unscaled surface in the actual backbuffer format. Resolve
+	// multisampling outside the scene and resize only after the readback.
+	D3DSURFACE_DESC desc = {};
+	IDirect3DSurface9 *resolved = nullptr;
+	IDirect3DSurface9 *readback = nullptr;
+	IDirect3DSurface9 *preview = nullptr;
+	ID3DXBuffer *encoded = nullptr;
+	const char *captureStep = "GetDesc";
+	HRESULT result = backBuffer->GetDesc( &desc );
+	if( SUCCEEDED( result ) && desc.Format == D3DFMT_UNKNOWN )
+		desc.Format = d3dpp.BackBufferFormat != D3DFMT_UNKNOWN ? d3dpp.BackBufferFormat : DX_BackBufferFormat( );
+	if( SUCCEEDED( result ) && ( !desc.Width || !desc.Height || desc.Format == D3DFMT_UNKNOWN ) )
+		result = D3DERR_INVALIDCALL;
+	const bool resumeScene = g_dxSceneActive;
+	if( SUCCEEDED( result ) && resumeScene )
+	{
+		captureStep = "EndScene";
+		result = device->EndScene( );
+		if( SUCCEEDED( result ) )
+			g_dxSceneActive = false;
+	}
+	if( SUCCEEDED( result ) && desc.MultiSampleType != D3DMULTISAMPLE_NONE )
+	{
+		captureStep = "CreateRenderTarget";
+		result = device->CreateRenderTarget( desc.Width, desc.Height, desc.Format,
+			D3DMULTISAMPLE_NONE, 0, FALSE, &resolved, nullptr );
+		if( SUCCEEDED( result ) )
+		{
+			captureStep = "StretchRect";
+			result = device->StretchRect( backBuffer, nullptr, resolved, nullptr, D3DTEXF_NONE );
+		}
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "CreateOffscreenPlainSurface";
+		result = device->CreateOffscreenPlainSurface( desc.Width, desc.Height, desc.Format,
+			D3DPOOL_SYSTEMMEM, &readback, nullptr );
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "GetRenderTargetData";
+		result = device->GetRenderTargetData( resolved ? resolved : backBuffer, readback );
+	}
+	if( resumeScene && !g_dxSceneActive )
+	{
+		const HRESULT resumed = device->BeginScene( );
+		g_dxSceneActive = SUCCEEDED( resumed );
+		if( SUCCEEDED( result ) && FAILED( resumed ) )
+		{
+			captureStep = "BeginScene";
+			result = resumed;
+		}
+	}
+	const bool miniShot = shot_type == VID_MINISHOT;
+	if( SUCCEEDED( result ) && miniShot )
+	{
+		captureStep = "create preview surface";
+		const UINT width = std::max( 1u, static_cast<UINT>(
+			( 200ull * desc.Width + desc.Height / 2 ) / desc.Height ) );
+		result = device->CreateOffscreenPlainSurface( width, 200, D3DFMT_X8R8G8B8,
+			D3DPOOL_SYSTEMMEM, &preview, nullptr );
+	}
+	if( SUCCEEDED( result ) && miniShot )
+	{
+		captureStep = "resize preview";
+		result = D3DXLoadSurfaceFromSurface( preview, nullptr, nullptr, readback,
+			nullptr, nullptr, D3DX_FILTER_TRIANGLE, 0 );
+	}
+	if( SUCCEEDED( result ) )
+	{
+		captureStep = "encode image";
+		result = D3DXSaveSurfaceToFileInMemory( &encoded, miniShot ? D3DXIFF_BMP : D3DXIFF_PNG,
+			miniShot ? preview : readback, nullptr, nullptr );
+	}
+	bool written = false;
+	if( SUCCEEDED( result ) && encoded )
+	{
+		auto *fs = gEngfuncs.fsapi;
+		if( shot_type == VID_SNAPSHOT )
+			fs->AllowDirectPaths( true );
+		if( file_t *file = fs->Open( filename, "wb", false ) )
+		{
+			written = fs->Write( file, encoded->GetBufferPointer( ),
+				encoded->GetBufferSize( ) ) == encoded->GetBufferSize( );
+			written = fs->Close( file ) == 0 && written;
+			if( !written )
+				fs->Delete( filename );
+		}
+		if( shot_type == VID_SNAPSHOT )
+			fs->AllowDirectPaths( false );
+	}
+	else if( FAILED( result ) )
+		gEngfuncs.Con_Printf( "D3D9: screenshot %s failed (0x%08lX, %ux%u format %d MSAA %d)\n",
+			captureStep, static_cast<unsigned long>( result ), desc.Width, desc.Height,
+			static_cast<int>( desc.Format ), static_cast<int>( desc.MultiSampleType ) );
+	if( encoded ) encoded->Release( );
+	if( preview ) preview->Release( );
+	if( readback ) readback->Release( );
+	if( resolved ) resolved->Release( );
 	backBuffer->Release( );
-	return SUCCEEDED( result );
+	return written;
 }
 
 static void R_CubemapFaceName( const char *base,
@@ -6358,7 +6501,9 @@ static void R_DrawOpaqueEntities( const D3DXMATRIX &identity, bool &worldIsIdent
 	for( int i = 0; i < g_opaqueStudioCount; ++i )
 	{
 		cl_entity_s *ent = g_opaqueStudioEntities[i];
-		if( !R_EntityMightBeVisible( ent ) )
+		const bool visible = R_EntityMightBeVisible(ent);
+		R_CofTraceStudio(ent, "cull", !visible);
+		if (!visible)
 			continue;
 		R_DrawStudioEntity( ent );
 		R_MarkWorldTransformDirty( worldIsIdentity );
@@ -6383,7 +6528,11 @@ static int R_BuildTranslucentList( const vec3_t viewOrigin )
 	for( int i = 0; i < g_translucentCandidateCount; ++i )
 	{
 		cl_entity_s *ent = g_translucentCandidates[i];
-		if( !ent || !ent->model || !R_EntityMightBeVisible( ent ) )
+		if (!ent || !ent->model)
+			continue;
+		const bool visible = R_EntityMightBeVisible(ent);
+		R_CofTraceStudio(ent, "cull", !visible);
+		if (!visible)
 			continue;
 
 		translucent_entity_t item;
@@ -7622,11 +7771,21 @@ static void R_ShowTextures( void )
 
 void R_BeginFrame( qboolean clear )
 {
+	static std::string submittedOccurrenceMap;
+	const std::string map = g_worldmodel ? g_worldmodel->name : "";
+	if( map != submittedOccurrenceMap && dx_remix.value != 0.0f &&
+		g_mapEmitterBridge.setConfig( "rtx.occurrenceMap", map.c_str() ) )
+		submittedOccurrenceMap = map;
 	DX_RagdollFrame();
 	R_ResetTriangleBatch();
 	if( !device )
 		return;
 	const auto skyConnection = ENGINE_GET_PARM( PARM_CONNSTATE );
+	const auto remixModule = dx_remix.value != 0.0f
+		? reinterpret_cast<uintptr_t>( GetModuleHandleA( "d3d9.dll" ) ) : 0;
+	const auto now = GetTickCount64();
+	g_remixAutoEmissive.update( remixModule, dx_remix_auto_emissive_cvar.value, now,
+		[]( const char *key, const char *value ) { return g_mapEmitterBridge.setConfig( key, value ); } );
 	const auto skyWorld = gp_cl ? gp_cl->models[1] : nullptr;
 	// Recover the authoritative active map even if a loading/disconnect frame
 	// cleared a previously submitted selection or no fresh BSP callback occurred.
@@ -7634,10 +7793,10 @@ void R_BeginFrame( qboolean clear )
 		g_mapSkyRetryAt = 0;
 	else if( skyConnection == ca_disconnected && !skyWorld )
 		g_mapSky.disconnected();
-	if( dx_remix.value != 0.0f && GetTickCount64() >= g_mapSkyRetryAt )
+	if( dx_remix.value != 0.0f && now >= g_mapSkyRetryAt )
 	{
-		g_mapSkyRetryAt = GetTickCount64() + 1000;
-		if( g_mapSky.update( reinterpret_cast<uintptr_t>( GetModuleHandleA("d3d9.dll") ),
+		g_mapSkyRetryAt = now + 1000;
+		if( g_mapSky.update( remixModule,
 			[]( const char* key, const char* value ) { return g_mapEmitterBridge.setConfig(key, value); } ) )
 			gEngfuncs.Con_Printf("D3D9: NUMOS sky %s -> %s\n",
 				g_mapSky.mapName().empty() ? "default" : g_mapSky.mapName().c_str(), g_mapSky.look());
@@ -7705,6 +7864,7 @@ void R_BeginFrame( qboolean clear )
 
 void R_RenderFrame( )
 {
+
 
 }
 

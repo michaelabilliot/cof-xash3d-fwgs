@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include "render_api.h"	// decallist_t
 #include "sound.h"		// S_GetDynamicSounds
 #include "ref_common.h" // decals
+#include "sv_save_tokens.h"
 
 /*
 ==============================================================================
@@ -636,27 +637,34 @@ DirectoryCopy
 put the HL1-HL3 files into .sav file
 =============
 */
-static void DirectoryCopy( const char *pPath, file_t *pFile )
+static qboolean DirectoryCopy( const char *pPath, file_t *pFile, int expectedCount )
 {
-	search_t	*t;
+	search_t *t = FS_Search( pPath, true, true );
+	if( !t )
+		return expectedCount == 0;
 
-	t = FS_Search( pPath, true, true );
-	if( !t ) return; // nothing to copy ?
-
-	for( int i = 0; i < t->numfilenames; i++ )
+	qboolean written = t->numfilenames == expectedCount;
+	for( int i = 0; written && i < t->numfilenames; i++ )
 	{
-		char	szName[MAX_OSPATH];
-		file_t	*pCopy = FS_Open( t->filenames[i], "rb", true );
-		int	fileSize = FS_FileLength( pCopy );
+		char szName[MAX_OSPATH] = { 0 };
+		file_t *pCopy = FS_Open( t->filenames[i], "rb", true );
+		if( !pCopy )
+		{
+			written = false;
+			break;
+		}
+		const fs_offset_t length = FS_FileLength( pCopy );
+		const int fileSize = (int)length;
 
-		memset( szName, 0, sizeof( szName )); // clearing the string to prevent garbage in output file
 		Q_strncpy( szName, COM_FileWithoutPath( t->filenames[i] ), sizeof( szName ));
-		FS_Write( pFile, szName, MAX_OSPATH );
-		FS_Write( pFile, &fileSize, sizeof( int ));
-		FS_FileCopy( pFile, pCopy, fileSize );
+		written = fileSize >= 0 && length == fileSize &&
+			FS_Write( pFile, szName, sizeof( szName )) == sizeof( szName ) &&
+			FS_Write( pFile, &fileSize, sizeof( fileSize )) == sizeof( fileSize ) &&
+			FS_FileCopy( pFile, pCopy, fileSize );
 		FS_Close( pCopy );
 	}
 	Mem_Free( t );
+	return written;
 }
 
 /*
@@ -782,22 +790,17 @@ write the stringtable into file
 static char *StoreHashTable( SAVERESTOREDATA *pSaveData )
 {
 	char	*pTokenData = pSaveData->pCurrentData;
+	if( pSaveData->size < 0 || pSaveData->size > pSaveData->bufferSize ||
+		pTokenData != pSaveData->pBaseData + pSaveData->size )
+		return NULL;
 
-	// Write entity string token table
-	if( pSaveData->pTokens )
-	{
-		for( int i = 0; i < pSaveData->tokenCount; i++ )
-		{
-			const char *pszToken = pSaveData->pTokens[i] ? pSaveData->pTokens[i] : "";
+	size_t bytes = 0;
+	if( pSaveData->pTokens && !SV_EncodeSaveTokens( pTokenData,
+		pSaveData->bufferSize - pSaveData->size, pSaveData->pTokens, pSaveData->tokenCount, &bytes ))
+		return NULL;
 
-			// just copy the token byte-by-byte
-			while( *pszToken )
-				*pSaveData->pCurrentData++ = *pszToken++;
-			*pSaveData->pCurrentData++ = 0; // Write the term
-		}
-	}
-
-	pSaveData->tokenSize = pSaveData->pCurrentData - pTokenData;
+	pSaveData->pCurrentData += bytes;
+	pSaveData->tokenSize = bytes;
 
 	return pTokenData;
 }
@@ -1244,6 +1247,11 @@ static qboolean SaveClientState( SAVERESTOREDATA *pSaveData, const char *level, 
 
 	// Write entity string token table
 	pTokenData = StoreHashTable( pSaveData );
+	if( !pTokenData )
+	{
+		Con_Printf( S_ERROR "%s: save token table exceeds buffer\n", __func__ );
+		return false;
+	}
 
 	Q_snprintf( name, sizeof( name ), DEFAULT_SAVE_DIRECTORY "%s.HL2", level );
 
@@ -1564,6 +1572,12 @@ static SAVERESTOREDATA *SaveGameState( int changelevel )
 
 	// Write entity string token table
 	pTokenData = StoreHashTable( pSaveData );
+	if( !pTokenData )
+	{
+		Con_Printf( S_ERROR "%s: save token table exceeds buffer\n", __func__ );
+		SaveFinish( pSaveData );
+		return NULL;
+	}
 
 	// output to disk
 	if(( pFile = FS_Open( name, "wb", true )) == NULL )
@@ -1718,6 +1732,12 @@ static qboolean SaveGameSlot( const char *pSaveName, const char *pSaveComment )
 
 	// Write entity string token table
 	pTokenData = StoreHashTable( pSaveData );
+	if( !pTokenData )
+	{
+		Con_Printf( S_ERROR "%s: save token table exceeds buffer\n", __func__ );
+		SaveFinish( pSaveData );
+		return false;
+	}
 
 	Q_snprintf( name, sizeof( name ), DEFAULT_SAVE_DIRECTORY "%s.sav", pSaveName );
 	COM_FixSlashes( name );
@@ -1736,27 +1756,26 @@ static qboolean SaveGameSlot( const char *pSaveName, const char *pSaveComment )
 		return false;
 	}
 
-	// pending the preview image for savegame
-	Cbuf_AddTextf( "saveshot \"%s\"\n", pSaveName );
 	Con_Printf( "Saving game to %s...\n", name );
 
 	int version = SAVEGAME_VERSION;
 	int id = SAVEGAME_HEADER;
 
-	FS_Write( pFile, &id, sizeof( id ));
-	FS_Write( pFile, &version, sizeof( version ));
-	FS_Write( pFile, &pSaveData->size, sizeof( int )); // does not include token table
-
-	// write out the tokens first so we can load them before we load the entities
-	FS_Write( pFile, &pSaveData->tokenCount, sizeof( int ));
-	FS_Write( pFile, &pSaveData->tokenSize, sizeof( int ));
-	FS_Write( pFile, pTokenData, pSaveData->tokenSize );
-	FS_Write( pFile, pSaveData->pBaseData, pSaveData->size ); // header and globals
-
-	DirectoryCopy( hlPath, pFile );
+	const int header[] = { id, version, pSaveData->size, pSaveData->tokenCount, pSaveData->tokenSize };
+	const qboolean written = FS_Write( pFile, header, sizeof( header )) == sizeof( header ) &&
+		FS_Write( pFile, pTokenData, pSaveData->tokenSize ) == pSaveData->tokenSize &&
+		FS_Write( pFile, pSaveData->pBaseData, pSaveData->size ) == pSaveData->size &&
+		DirectoryCopy( hlPath, pFile, gameHeader.mapCount );
 	SaveFinish( pSaveData );
-	FS_Close( pFile );
+	const int closed = FS_Close( pFile );
+	if( !written || closed != 0 )
+	{
+		FS_Delete( name );
+		Con_Printf( S_ERROR "%s: incomplete write to %s\n", __func__, name );
+		return false;
+	}
 
+	Cbuf_AddTextf( "saveshot \"%s\"\n", pSaveName );
 	return true;
 }
 

@@ -482,6 +482,8 @@ cvar_t	*g_footsteps = NULL;
 
 // Register your console variables here
 // This gets called one time when the game is initialied
+static cvar_t cofrNotargetCommand = {"cofr_notarget_command", "1", 0};
+
 void GameDLLInit( void )
 {
 	SteamAPI_Init();
@@ -491,6 +493,7 @@ void GameDLLInit( void )
 	g_psv_aim = CVAR_GET_POINTER( "sv_aim" );
 	g_footsteps = CVAR_GET_POINTER( "mp_footsteps" );
 
+	CVAR_REGISTER (&cofrNotargetCommand);
 	CVAR_REGISTER (&displaysoundlist);
 	CVAR_REGISTER (&teamplay);
 	CVAR_REGISTER (&fraglimit);

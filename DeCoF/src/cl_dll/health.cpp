@@ -112,7 +112,8 @@ int CHudHealth::VidInit(void)
 
 int CHudHealth:: MsgFunc_Health(const char *pszName,  int iSize, void *pbuf )
 {
-	// TODO: update local health data
+	if( !pbuf || iSize != 3 )
+		return 0;
 	BEGIN_READ( pbuf, iSize );
 	int x = READ_BYTE();
 	int iPlayer_guess = READ_BYTE();
@@ -126,7 +127,7 @@ int CHudHealth:: MsgFunc_Health(const char *pszName,  int iSize, void *pbuf )
 
 	if ( bCoop_guess )
 	{
-		if ( iLocalIndex < 0 || iLocalIndex > gEngfuncs.GetMaxClients() )
+		if ( iPlayer_guess < 1 || iPlayer_guess > MAX_PLAYERS || iPlayer_guess > gEngfuncs.GetMaxClients() )
 			return 0;
 
 		m_iCoopHealth_guess[iPlayer_guess] = x;
@@ -178,39 +179,19 @@ int CHudHealth:: MsgFunc_Damage(const char *pszName,  int iSize, void *pbuf )
 
 int CHudHealth:: MsgFunc_AdLib(const char *pszName,  int iSize, void *pbuf )
 {
+	if( !pbuf || iSize != 4 )
+		return 0;
 	BEGIN_READ( pbuf, iSize );
 
 	float flTime_guess = READ_COORD();
 	int iPlayer_guess = READ_BYTE();
 	int iState_guess = READ_BYTE();
 
-	cl_entity_t *pLocal = gEngfuncs.GetLocalPlayer();
-	if ( !pLocal )
+	if ( iPlayer_guess < 1 || iPlayer_guess > MAX_PLAYERS || iPlayer_guess > gEngfuncs.GetMaxClients() )
 		return 0;
 
-	int iLocalIndex = pLocal->index;
-	if ( iLocalIndex < 0 || iLocalIndex > gEngfuncs.GetMaxClients() )
-		return 0;
-
-	int iIndex_guess = iPlayer_guess - 1;
 	m_flAdLibTime_guess[iPlayer_guess - 1] = gEngfuncs.GetClientTime() + flTime_guess;
 	m_iAdLibState_guess[iPlayer_guess - 1] = iState_guess;
-
-	if ( gViewPort && gViewPort->m_pHUDControl_guess && iIndex_guess >= 0 && iIndex_guess <= 3 )
-	{
-		switch ( iState_guess )
-		{
-		case 0:
-			gViewPort->m_pHUDControl_guess->m_pFollowIconPanel_guess[iIndex_guess]->setImage( vgui_LoadTGA( "gfx/vgui/coop_follow_icon.tga" ) );
-			break;
-		case 1:
-			gViewPort->m_pHUDControl_guess->m_pFollowIconPanel_guess[iIndex_guess]->setImage( vgui_LoadTGA( "gfx/vgui/coop_health_icon.tga" ) );
-			break;
-		case 2:
-			gViewPort->m_pHUDControl_guess->m_pFollowIconPanel_guess[iIndex_guess]->setImage( vgui_LoadTGA( "gfx/vgui/coop_something_icon.tga" ) );
-			break;
-		}
-	}
 
 	return 1;
 }
@@ -218,17 +199,14 @@ int CHudHealth:: MsgFunc_AdLib(const char *pszName,  int iSize, void *pbuf )
 
 int CHudHealth:: MsgFunc_Syringe(const char *pszName,  int iSize, void *pbuf )
 {
+	if( !pbuf || iSize != 2 )
+		return 0;
 	BEGIN_READ( pbuf, iSize );
 
 	int iPlayer_guess = READ_BYTE();
 	int iState_guess = READ_BYTE();
 
-	cl_entity_t *pLocal = gEngfuncs.GetLocalPlayer();
-	if ( !pLocal )
-		return 0;
-
-	int iLocalIndex = pLocal->index;
-	if ( iLocalIndex < 0 || iLocalIndex > gEngfuncs.GetMaxClients() )
+	if ( iPlayer_guess < 1 || iPlayer_guess > MAX_PLAYERS || iPlayer_guess > gEngfuncs.GetMaxClients() )
 		return 0;
 
 	m_bSyringe_guess[iPlayer_guess - 1] = iState_guess != 0;

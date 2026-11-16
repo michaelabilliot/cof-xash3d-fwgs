@@ -1,6 +1,7 @@
 #pragma once
 class CBasePlayer;
 void CoFR_ServerWorldPrecache();
+void CoFR_ApplyNotarget(CBasePlayer* player);
 void CoFR_ServerFrame(CBasePlayer* player);
 bool CoFR_ServerCommand(CBasePlayer* player);
 bool CoFR_AuthorizedGrant();

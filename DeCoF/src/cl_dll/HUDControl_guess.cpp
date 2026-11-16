@@ -1,4 +1,5 @@
 #include "cofr_legacy.h"
+#include "../game_shared/cofr_coop_roster.hpp"
 // ======================================
 // Cry of Fear HUD panel
 // (class name from the RTTI of client.dll, file name guessed)
@@ -138,12 +139,16 @@ int MsgCameraZoom_guess( const char *pszName, int iSize, void *pbuf )
 
 int MsgHealthCap_guess( const char *pszName, int iSize, void *pbuf )
 {
-	if ( gViewPort->m_pHUDControl_guess )
-	{
-		BEGIN_READ( pbuf, iSize );
-		int iType = READ_BYTE();
- CoFR_HudCap(iType);
+	if (iSize != 1 || !pbuf)
+		return 0;
+	const int iType = *static_cast<unsigned char*>(pbuf);
+	if (iType > 2)
+		return 0;
+	CoFR_HudCap(iType);
+	gEngfuncs.Con_DPrintf( "COFR HealthCap received state=%d custom=%d\n", iType, CoFR_CustomHudActive() );
 
+	if (gViewPort && gViewPort->m_pHUDControl_guess)
+	{
 		switch ( iType )
 		{
 		case 0:
@@ -238,15 +243,34 @@ int MsgControlHint_guess( const char *pszName, int iSize, void *pbuf )
 	return 1;
 }
 
+// Keep the recovered panel layout intact and map its four rows onto slots.
+static bool lobbyReady[MAX_PLAYERS + 1];
+static int playerBadge[MAX_PLAYERS + 1];
+static int rosterPage;
+static int followIconState[4] = {-1, -1, -1, -1};
+
+static int RosterPageCount()
+{
+	const int clients = gEngfuncs.GetMaxClients();
+	return clients <= MAX_PLAYERS ? cof::coopPageCount( clients ) : 1;
+}
+
+static void NextRosterPage()
+{
+	rosterPage = (rosterPage + 1) % RosterPageCount();
+	gEngfuncs.Con_Printf( "Co-op roster page %d/%d\n", rosterPage + 1, RosterPageCount() );
+}
+
 int MsgDevDonator_guess( const char *pszName, int iSize, void *pbuf )
 {
-	if ( gViewPort->m_pHUDControl_guess )
-	{
-		BEGIN_READ( pbuf, iSize );
-		int iPlayer = READ_BYTE();
-		gViewPort->m_pHUDControl_guess->m_iDevDonator_guess[iPlayer] = READ_BYTE();
-	}
-
+	if( iSize != 2 || !pbuf )
+		return 0;
+	BEGIN_READ( pbuf, iSize );
+	const int slot = READ_BYTE();
+	const int badge = READ_BYTE();
+	if( !cof::validCoopSlot( slot, MAX_PLAYERS ) )
+		return 0;
+	playerBadge[slot] = badge;
 	return 1;
 }
 
@@ -359,7 +383,9 @@ int MsgIntrodn_guess( const char *pszName, int iSize, void *pbuf )
 
 int MsgLobby_guess( const char *pszName, int iSize, void *pbuf )
 {
-	if ( gViewPort->m_pHUDControl_guess )
+	if ( iSize != 3 || !pbuf )
+		return 0;
+	if ( gViewPort && gViewPort->m_pHUDControl_guess )
 	{
 		BEGIN_READ( pbuf, iSize );
 		int iPlayer = READ_BYTE();
@@ -376,7 +402,7 @@ int MsgLobby_guess( const char *pszName, int iSize, void *pbuf )
 				gViewPort->m_pHUDControl_guess->m_pLobbyLabel_guess[i]->setVisible( false );
 			gViewPort->m_pHUDControl_guess->m_pLobbyBackground_guess->setVisible( false );
 		}
-		else
+		else if ( !gViewPort->m_pHUDControl_guess->m_bLobby_guess )
 		{
 			gViewPort->m_pHUDControl_guess->m_bLobby_guess = true;
 			gViewPort->m_pHUDControl_guess->m_pVoteLabel_guess->setVisible( true );
@@ -389,14 +415,8 @@ int MsgLobby_guess( const char *pszName, int iSize, void *pbuf )
 			gViewPort->m_pHUDControl_guess->m_pLobbyBackground_guess->setVisible( true );
 		}
 
-		int iIndex = iPlayer - 1;
-		if ( iIndex >= 0 && iIndex < 4 )
-		{
-			if ( iReady )
-				gViewPort->m_pHUDControl_guess->m_bPlayerReady_guess[iIndex] = true;
-			else
-				gViewPort->m_pHUDControl_guess->m_bPlayerReady_guess[iIndex] = false;
-		}
+		if ( cof::validCoopSlot( iPlayer, MAX_PLAYERS ) )
+			lobbyReady[iPlayer] = iReady != 0;
 	}
 
 	return 1;
@@ -745,6 +765,7 @@ void HUDControlInit_guess()
 	gEngfuncs.pfnHookUserMsg( "ControlHint", MsgControlHint_guess );
 	gEngfuncs.pfnHookUserMsg( "Timer", MsgTimerMode_guess );
 	gEngfuncs.pfnHookUserMsg( "Lobby", MsgLobby_guess );
+	gEngfuncs.pfnAddCommand( "coop_roster_next", NextRosterPage );
 	gEngfuncs.pfnHookUserMsg( "MPModel", MsgMPModel_guess );
 	gEngfuncs.pfnHookUserMsg( "HoldBreath", MsgHoldBreath_guess );
 	gEngfuncs.pfnHookUserMsg( "DevDonator", MsgDevDonator_guess );
@@ -1239,6 +1260,9 @@ void CHUDControl::Initialize()
 	m_pIntroduction_guess->setVisible( false );
 	m_pLobbyBackground_guess->setVisible( false );
 	m_bLobby_guess = false;
+	memset( lobbyReady, 0, sizeof( lobbyReady ) );
+	memset( playerBadge, 0, sizeof( playerBadge ) );
+	rosterPage = 0;
 
 	for ( i = 0; i <= MAX_PLAYERS; i++ )
 	{
@@ -1867,6 +1891,13 @@ void CHUDControl::solve()
 		}
 	}
 
+	const bool coopRoster = gEngfuncs.pfnGetLevelName() && strstr( gEngfuncs.pfnGetLevelName(), "cof_" );
+	const int pages = RosterPageCount();
+	if ( rosterPage >= pages )
+		rosterPage = 0;
+	if ( gViewPort && ( m_bLobby_guess || coopRoster ) )
+		gViewPort->GetAllPlayersInfo();
+
 	// lobby
 	if ( m_pLobbyLabel_guess[0] && m_bLobby_guess )
 	{
@@ -1876,20 +1907,29 @@ void CHUDControl::solve()
 			strcpy( szText, "Press Primary Attack to become ready/unready" );
 		m_pVoteLabel_guess->setText( szText );
 
+		if ( pages > 1 )
+		{
+			snprintf( szText, sizeof( szText ), "Page %d/%d | coop_roster_next | votekick name", rosterPage + 1, pages );
+			m_pVoteKickLabel_guess->setText( szText );
+		}
+		else
+			m_pVoteKickLabel_guess->setText( "Type votekick name in chat to votekick a player" );
+
 		for ( i = 0; i < 4; i++ )
 		{
-			if ( g_PlayerInfoList[i + 1].name && strlen( g_PlayerInfoList[i + 1].name ) >= 1 )
+			const int slot = cof::coopRosterSlot( rosterPage, i );
+			if ( g_PlayerInfoList[slot].name && strlen( g_PlayerInfoList[slot].name ) >= 1 )
 			{
 				char szReady[256];
-				if ( m_bPlayerReady_guess[i] )
+				if ( lobbyReady[slot] )
 				{
 					m_pLobbyLabel_guess[i]->setFgColor( 0, 128, 0, 0 );
-					sprintf( szReady, "%s - Ready", g_PlayerInfoList[i + 1].name );
+					snprintf( szReady, sizeof( szReady ), "%.32s - Ready", g_PlayerInfoList[slot].name );
 				}
 				else
 				{
 					m_pLobbyLabel_guess[i]->setFgColor( 128, 0, 0, 0 );
-					sprintf( szReady, "%s - Not ready", g_PlayerInfoList[i + 1].name );
+					snprintf( szReady, sizeof( szReady ), "%.32s - Not ready", g_PlayerInfoList[slot].name );
 				}
 				m_pLobbyLabel_guess[i]->setText( szReady );
 			}
@@ -1973,7 +2013,7 @@ void CHUDControl::solve()
 	}
 
 	// co-op player list
-	if ( gEngfuncs.pfnGetLevelName() && strstr( gEngfuncs.pfnGetLevelName(), "cof_" ) )
+	if ( coopRoster )
 	{
 		if ( m_iDeathAlpha_guess < 255 )
 			m_iDeathAlpha_guess += 5;
@@ -1994,13 +2034,25 @@ void CHUDControl::solve()
 
 		for ( i = 0; i < 4; i++ )
 		{
-			if ( g_PlayerInfoList[i + 1].name && strlen( g_PlayerInfoList[i + 1].name ) >= 1 )
+			const int slot = cof::coopRosterSlot( rosterPage, i );
+			if ( g_PlayerInfoList[slot].name && strlen( g_PlayerInfoList[slot].name ) >= 1 )
 			{
 				if ( !m_pPlayerLabel_guess[i]->isVisible() )
 					m_pPlayerLabel_guess[i]->setVisible( true );
 
-				if ( gHUD.m_Health.m_flAdLibTime_guess[i] > gEngfuncs.GetClientTime() )
+				if ( gHUD.m_Health.m_flAdLibTime_guess[slot - 1] > gEngfuncs.GetClientTime() )
 				{
+					const int state = gHUD.m_Health.m_iAdLibState_guess[slot - 1];
+					const char *const icons[] = {
+						"gfx/vgui/coop_follow_icon.tga",
+						"gfx/vgui/coop_health_icon.tga",
+						"gfx/vgui/coop_something_icon.tga"
+					};
+					if( state >= 0 && state < 3 && followIconState[i] != state )
+					{
+						m_pFollowIconPanel_guess[i]->setImage( vgui_LoadTGA( icons[state] ) );
+						followIconState[i] = state;
+					}
 					if ( !m_pFollowIconPanel_guess[i]->isVisible() )
 						m_pFollowIconPanel_guess[i]->setVisible( true );
 				}
@@ -2010,7 +2062,7 @@ void CHUDControl::solve()
 						m_pFollowIconPanel_guess[i]->setVisible( false );
 				}
 
-				if ( gHUD.m_Health.m_bSyringe_guess[i] )
+				if ( gHUD.m_Health.m_bSyringe_guess[slot - 1] )
 				{
 					if ( !m_pSyringeIconPanel_guess[i]->isVisible() )
 						m_pSyringeIconPanel_guess[i]->setVisible( true );
@@ -2022,7 +2074,7 @@ void CHUDControl::solve()
 				}
 
 				int w, h, w2, h2;
-				sprintf( szTime, "%s - Health %i - Ping %d", g_PlayerInfoList[i + 1].name, gHUD.m_Health.m_iCoopHealth_guess[i + 1], g_PlayerInfoList[i + 1].ping );
+				snprintf( szTime, sizeof( szTime ), "#%d %.24s - Health %i - Ping %d", slot, g_PlayerInfoList[slot].name, gHUD.m_Health.m_iCoopHealth_guess[slot], g_PlayerInfoList[slot].ping );
 				m_pPagerFont_guess->getTextSize( szTime, w, h );
 				m_pPlayerLabel_guess[i]->getSize( w2, h2 );
 				m_pPlayerLabel_guess[i]->getPos( x, y );
@@ -2033,9 +2085,9 @@ void CHUDControl::solve()
 				m_pFollowIconPanel_guess[i]->setPos( x - 28, y + 4 );
 				m_pSyringeIconPanel_guess[i]->setPos( x - 14, y + 4 );
 
-				if ( m_iDevDonator_guess[i + 1] == 1 )
+				if ( playerBadge[slot] == 1 )
 					m_pPlayerLabel_guess[i]->setFgColor( 117, 0, 0, 0 );
-				else if ( m_iDevDonator_guess[i + 1] == 2 )
+				else if ( playerBadge[slot] == 2 )
 					m_pPlayerLabel_guess[i]->setFgColor( 255, 211, 81, 0 );
 				else
 					m_pPlayerLabel_guess[i]->setFgColor( 255, 255, 255, 0 );
@@ -2062,7 +2114,7 @@ void CHUDControl::solve()
 				m_pLookingAtLabel_guess->setVisible( false );
 		}
 
-		if ( g_flLookingAt_guess != 0 && g_flLookingAt_guess <= 4 )
+		if ( g_flLookingAt_guess >= 1 && g_flLookingAt_guess <= gEngfuncs.GetMaxClients() && g_flLookingAt_guess <= MAX_PLAYERS )
 		{
 			char *pszName = g_PlayerInfoList[(int)g_flLookingAt_guess].name;
 			if ( pszName )
