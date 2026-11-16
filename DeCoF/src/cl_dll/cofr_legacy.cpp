@@ -198,8 +198,10 @@ void CoFR_PublishView(const float* origin,const float* angles){
  if(gViewPort&&gViewPort->m_pPadlock_guess&&gViewPort->m_pPadlock_guess->isVisible())packet.reasons|=DX_COF_PUZZLE;
  auto view=engine.GetViewModel();if(!view||!view->model)packet.reasons|=DX_COF_NO_VIEWMODEL;
  for(int i=0;i<3;++i)packet.origin[i]=origin[i];engine.pfnAngleVectors(angles,packet.direction,nullptr,nullptr);packet.eligibleFlags=DX_CofEligible(packet.rawFlags,packet.reasons);if(publish)publish(&packet);
+ // The wheelchair keeps its viewmodel: weapon_browning_wheelchair draws the
+ // chair-mounted Browning (v_wheelchair_browning.mdl) through it.
  const bool hideWeapons = (packet.reasons & (DX_COF_BOAT | DX_COF_ATTACHED |
-     DX_COF_WHEELCHAIR | DX_COF_PUZZLE | DX_COF_OTHER_VIEW)) ||
+     DX_COF_PUZZLE | DX_COF_OTHER_VIEW)) ||
      (gHUD.m_iHideHUDDisplay & HIDEHUD_WEAPONS);
  auto hidden=renderer<void(__cdecl*)(int)>("DX_SceneViewModelHiddenV1");
  if(hidden)hidden(hideWeapons ? 1 : 0);
