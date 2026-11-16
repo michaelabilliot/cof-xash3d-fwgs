@@ -4706,6 +4706,7 @@ static qboolean R_AddEntity( cl_entity_s *clent, int type )
 
 	if( ( clent->curstate.effects & ( EF_BRIGHTLIGHT | EF_DIMLIGHT | EF_LIGHT ) ) != 0 || R_CofLanternModel(clent,false) ||
   (cof_features::flareModel(clent->model->name,false)&&clent->curstate.renderfx==165) ||
+  (modelType==mod_studio&&clent->curstate.renderfx==68) ||
   g_cofPickups.contains(clent->index,clent->curstate.modelindex,R_CurrentRenderTime(0.f)) )
 	{
 		g_entityLightEmitters.push_back( clent );
@@ -6357,6 +6358,7 @@ static void R_CollectLanternLights() {
 }
 
 unsigned R_CofRawLightFlags();
+extern "C" __declspec(dllexport) int __cdecl DX_StudioCameraAttachmentsV3(cl_entity_s*,float,float*,int);
 static void R_CollectCofFlareLights() {
  if(!R_CofClientPresent()||!gp_cl||dx_dlights.value==0.f||dx_dlight_entities.value==0.f)return;
  const float now=R_CurrentRenderTime(0.f);
@@ -6386,6 +6388,20 @@ static void R_CollectCofFlareLights() {
  for(auto ent:g_entityLightEmitters)if(ent&&ent->model&&cof_features::flareModel(ent->model->name,false)&&
     ent->curstate.renderfx==165&&!(ent->curstate.effects&EF_NODRAW)) {
   float point[3]={ent->origin[0],ent->origin[1],ent->origin[2]+5.f};
+  R_AddDLight(point,220.f,255,8,3,now+.1f,ent->index);
+ }
+ // renderfx 68: a monster holding a burning flare at attachment 3 (Book Simon
+ // with the sledgehammer in c_ending4b, left hand). CoF's GL renderer lit it
+ // there.
+ for(auto ent:g_entityLightEmitters)if(ent&&ent->model&&ent->model->type==mod_studio&&
+    ent->curstate.renderfx==68&&!(ent->curstate.effects&EF_NODRAW)) {
+  // Pose the hand now: the engine resets ent->attachment to the origin every
+  // frame and the studio draw only fills it in after lights are collected.
+  float hand[12],point[3];const bool posed=DX_StudioCameraAttachmentsV3(ent,now,hand,4)!=0;
+  if(posed)VectorCopy(hand+9,point);else VectorCopy(ent->attachment[3],point);
+  vec3_t delta;VectorSubtract(point,ent->origin,delta);
+  const bool fallback=DotProduct(delta,delta)<1.f||DotProduct(delta,delta)>256.f*256.f;
+  if(fallback){VectorCopy(ent->origin,point);point[2]+=48.f;}
   R_AddDLight(point,220.f,255,8,3,now+.1f,ent->index);
  }
 }
