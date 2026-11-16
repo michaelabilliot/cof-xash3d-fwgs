@@ -91,6 +91,31 @@ inline bool sprintSequence(const char* label) {
  for(int i=0;i<32&&label[i];++i)lower[i]=static_cast<char>(label[i]>='A'&&label[i]<='Z'?label[i]+32:label[i]);
  return std::strstr(lower,"sprint")&&!std::strstr(lower,"from");
 }
+// Sprint from the player's real ground speed. CoF scales wishspeed by a
+// percentage of sv_maxspeed (walk sk_primary_speed 75, sprint
+// sk_sprint_speed 125), so only sprinting exceeds sv_maxspeed. Viewmodel
+// sprint sequences are unreliable: a predicting client can stay on
+// sprint_idle after the sprint ends until the next predicted animation.
+struct SprintDetector {
+ bool valid=false,sprinting=false;
+ float org[2]{},time=0.f,speed=0.f;
+ void reset(){*this=SprintDetector{};}
+ // origin: predicted player origin; maxspeed: sv_maxspeed.
+ bool update(const float* origin,float now,float maxspeed) {
+  if(!origin||!std::isfinite(origin[0])||!std::isfinite(origin[1])||!std::isfinite(now)){reset();return false;}
+  if(!(maxspeed>0.f)||!std::isfinite(maxspeed))maxspeed=300.f;
+  if(!valid||now<time||now-time>.5f){valid=true;sprinting=false;speed=0.f;org[0]=origin[0];org[1]=origin[1];time=now;return false;}
+  const float dt=now-time;
+  const float dx=origin[0]-org[0],dy=origin[1]-org[1],dist=std::sqrt(dx*dx+dy*dy);
+  if(dist>128.f){org[0]=origin[0];org[1]=origin[1];time=now;speed=0.f;sprinting=false;return false;} // teleport
+  if(dt<1.f/30.f)return sprinting;
+  org[0]=origin[0];org[1]=origin[1];time=now;
+  speed=dist/dt;
+  if(sprinting){if(speed<maxspeed*.95f)sprinting=false;}
+  else if(speed>maxspeed*1.05f)sprinting=true;
+  return sprinting;
+ }
+};
 // CoF melee viewmodels: v_switchblade(_doctor), v_nightstick, v_branch,
 // v_axe(_doctor), v_e3cc3_pickaxe, v_sledgehammer, v_sledgeshovel.
 inline bool meleeModel(const char* path) {

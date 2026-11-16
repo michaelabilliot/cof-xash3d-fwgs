@@ -6794,6 +6794,14 @@ void R_DrawEnts( const vec3_t view_origin )
 
 #include "dx_aim_deadzone.h"
 static aim_deadzone::State g_aimDeadzone;
+static aim_deadzone::SprintDetector g_aimSprint;
+// Sprinting from the predicted origin's ground speed against sv_maxspeed.
+static bool R_AimDeadzoneSprinting( void )
+{
+ if(!gp_cl)return false;
+ const auto movevars=reinterpret_cast<const movevars_t*>(ENGINE_GET_PARM(PARM_GET_MOVEVARS_PTR));
+ return g_aimSprint.update(gp_cl->simorg,static_cast<float>(gp_cl->time),movevars?movevars->maxspeed:300.f);
+}
 static struct { aim_deadzone::Input in; bool firstPerson=false; unsigned blockers=0; float aim[2]{},camera[2]{},origin[3]{},time=0.f; } g_aimDeadzoneLast;
 static void R_AimDeadzoneStatusCmd( void )
 {
@@ -6806,15 +6814,15 @@ static void R_AimDeadzoneStatusCmd( void )
  gEngfuncs.Con_Printf("  move: hooked=%d yaw=%.2f  crosshair offset=(%.1f %.1f)px\n",
   g_aimCreateMoveSlot&&*g_aimCreateMoveSlot==reinterpret_cast<void*>(&R_AimDeadzoneCreateMove)?1:0,g_aimMoveYaw,
   g_aimCrosshairOffset[0],g_aimCrosshairOffset[1]);
+ gEngfuncs.Con_Printf("  ground speed=%.0f sprinting=%d\n",g_aimSprint.speed,g_aimSprint.sprinting?1:0);
  gEngfuncs.Con_Printf("  viewmodel aim correction=(%.2f %.2f)\n",g_viewModelAimCorrection[0],g_viewModelAimCorrection[1]);
  if(auto vm=R_CurrentViewModel())
   gEngfuncs.Con_Printf("  viewmodel %s seq=%d angles=(%.2f %.2f %.2f) origin=(%.1f %.1f %.1f) cur=(%.2f %.2f)\n",
    vm->model?vm->model->name:"-",vm->curstate.sequence,vm->angles[0],vm->angles[1],vm->angles[2],
    vm->origin[0],vm->origin[1],vm->origin[2],vm->curstate.angles[0],vm->curstate.angles[1]);
 }
-// The viewmodel is posed in an iron-sight sequence (not the way out of one),
-// or (sprint=true) in a sprint sequence.
-static bool R_ViewModelInSights(bool sprint=false) {
+// The viewmodel is posed in an iron-sight sequence (not the way out of one).
+static bool R_ViewModelInSights() {
  auto ent=R_CurrentViewModel();
  if(!ent||!ent->model||ent->model->type!=mod_studio||(ent->curstate.effects&EF_NODRAW)||!gEngfuncs.Mod_Extradata)return false;
  auto hdr=static_cast<studiohdr_t*>(gEngfuncs.Mod_Extradata(mod_studio,ent->model));
@@ -6823,7 +6831,7 @@ static bool R_ViewModelInSights(bool sprint=false) {
     !R_StudioRangeValid(hdr,hdr->seqindex,size_t(hdr->numseq)*sizeof(mstudioseqdesc_t)))return false;
  const auto seqs=reinterpret_cast<const mstudioseqdesc_t*>(reinterpret_cast<const byte*>(hdr)+hdr->seqindex);
  char label[33]{};memcpy(label,seqs[seq].label,32);
- return sprint?aim_deadzone::sprintSequence(label):aim_deadzone::sightsSequence(label);
+ return aim_deadzone::sightsSequence(label);
 }
 // Rendered camera angles for this view. Only the local first-person view of
 // a live player lags; cubemaps, overviews, cutscene cameras and third person
@@ -6847,8 +6855,9 @@ static void R_AimDeadzoneCamera( const struct ref_viewpass_s *rvp, vec3_t camera
  in.snap=R_CofRifleScopeActive();
  // Sprinting zeroes sidemove in CoF pmove, so camera-relative movement needs
  // the camera on the aim while sprinting.
+ const bool sprinting=firstPerson&&R_AimDeadzoneSprinting();
  in.sights=(cl_aimdeadzone_ads.value==0.f&&R_ViewModelInSights())||
-  (cl_aimdeadzone_move.value!=0.f&&cl_aimdeadzone_sprint.value==0.f&&R_ViewModelInSights(true));
+  (cl_aimdeadzone_move.value!=0.f&&cl_aimdeadzone_sprint.value==0.f&&sprinting);
  if(cl_aimdeadzone_melee_exempt.value!=0.f) {
   const auto vm=R_CurrentViewModel();
   if(vm&&vm->model&&!(vm->curstate.effects&EF_NODRAW)&&aim_deadzone::meleeModel(vm->model->name))in.sights=true;
