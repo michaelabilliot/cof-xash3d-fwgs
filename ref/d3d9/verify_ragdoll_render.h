@@ -21,13 +21,13 @@ struct Buffer final : IDirect3DVertexBuffer9 {
     HRESULT STDMETHODCALLTYPE GetDesc(D3DVERTEXBUFFER_DESC*) override{return E_NOTIMPL;}
 };
 struct Device {
-    float constants[512][4]{};int draws=0;bool shaders=true;D3DXMATRIX world;
+    float constants[512][4]{};int draws=0;UINT startIndex=0;bool shaders=true;D3DXMATRIX world;
     Device(){D3DXMatrixIdentity(&world);}
     HRESULT GetTransform(D3DTRANSFORMSTATETYPE,D3DMATRIX *out){*out=world;return S_OK;}
     HRESULT SetStreamSource(UINT,IDirect3DVertexBuffer9*,UINT,UINT){return S_OK;}
     HRESULT SetVertexShaderConstantF(UINT start,const float *p,UINT count){require(start+count<=512,"GPU constant bounds");memcpy(constants[start],p,count*4*sizeof(float));return S_OK;}
     HRESULT SetIndices(IDirect3DIndexBuffer9*){return S_OK;}
-    HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE,INT,UINT,UINT,UINT,UINT){++draws;return S_OK;}
+    HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE,INT,UINT,UINT,UINT start,UINT){startIndex=start;++draws;return S_OK;}
     HRESULT SetVertexShader(IDirect3DVertexShader9*){return S_OK;}
     HRESULT SetVertexDeclaration(IDirect3DVertexDeclaration9*){return S_OK;}
     HRESULT SetFVF(DWORD){return S_OK;}
@@ -100,7 +100,7 @@ static void renderChecks(const studiohdr_t *hdr,const BoneMat34 *base,const Bone
         for(int j=0;j<model.numverts;++j) {studio_source_vertex_t source{};source.x=v[j][0];source.y=v[j][1];source.z=v[j][2];source.bone=bones[j];source.normalBone=bones[j];source.nz=1;batch.sources.push_back(source);}
     }
     require(!batch.sources.empty(),"production render fixture has native vertices");batch.vertexCount=static_cast<unsigned>(batch.sources.size());batch.primitiveCount=1;
-    batch.indexBuffer=reinterpret_cast<IDirect3DIndexBuffer9*>(1);
+    c.indexBuffer=reinterpret_cast<IDirect3DIndexBuffer9*>(1);batch.indexStart=3;
     Buffer buffer(batch.sources.size()*sizeof(studio_normal_lit_vertex_t));batch.vertexBuffer=&buffer;c.combinedVertexBuffer=&buffer;c.combinedVertexBufferMode=true;c.combinedVertexCount=batch.vertexCount;
     c.gpuSkinSourceVertexBuffer=&buffer;D3DXMATRIX world;D3DXMatrixIdentity(&world);float light[3]={0,0,-1};
     auto update=[&](const BoneMat34 *pose,bool procedural,float frame){return R_UpdateStudioVertices(c,ent.model,const_cast<studiohdr_t*>(hdr),&ent,12,frame,-1,0,0,0,0xffffffff,light,0,&world,false,pose,procedural);};
@@ -118,7 +118,7 @@ static void renderChecks(const studiohdr_t *hdr,const BoneMat34 *base,const Bone
     gpu=true;normals=false;probeUploadNormals=false;require(update(reacted,true,80),"production GPU palette handoff");
     require(R_DrawStudioSkinBatches(c,&ent),"production GPU draw submission");
     for(int b=0;b<hdr->numbones;++b) for(int r=0;r<3;++r) require(!memcmp(recordingDevice.constants[DX_STUDIO_GPU_SKIN_CONST_BONES+b*3+r],reacted[b][r],16),"actual SetVertexShaderConstantF rows match reaction palette");
-    require(recordingDevice.draws>0,"production draw emitted");
+    require(recordingDevice.draws>0 && recordingDevice.startIndex==batch.indexStart,"production draw uses the shared index-buffer offset");
     require(update(base,false,80) && R_DrawStudioSkinBatches(c,&ent),"GPU recovery submission");
     for(int b=0;b<hdr->numbones;++b) for(int r=0;r<3;++r) require(!memcmp(recordingDevice.constants[DX_STUDIO_GPU_SKIN_CONST_BONES+b*3+r],base[b][r],16),"submitted GPU recovery matches animation");
     gpu=false;dx_studio_update_budget.value=1;dx_studio_viewmodel_throttle.value=1;g_studioPoseUpdatesThisFrame=1;

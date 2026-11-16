@@ -361,7 +361,7 @@ convar_t dx_studio_gpu_smooth =
 { (char *)"dx_studio_gpu_smooth", (char *)"1", 0 };
 
 convar_t dx_studio_remix_vertex_blend =
-{ (char *)"dx_studio_remix_vertex_blend", (char *)"0", 0 };
+{ (char *)"dx_studio_remix_vertex_blend", (char *)"1", 0 };
 
 convar_t dx_studio_glowshell =
 { (char *)"dx_studio_glowshell", (char *)"1", 0 };
@@ -1007,6 +1007,7 @@ static constexpr UINT DX_SCRATCH_VB_DEFAULT_BYTES = 1024u * 1024u;
 static constexpr UINT DX_SCRATCH_IB_DEFAULT_BYTES = 256u * 1024u;
 static IDirect3DVertexBuffer9 *g_scratchVertexBuffer = nullptr;
 static IDirect3DIndexBuffer9 *g_scratchIndexBuffer = nullptr;
+static IDirect3DIndexBuffer9 *g_scratchQuadIndices = nullptr;
 static UINT g_scratchVertexBufferBytes = 0;
 static UINT g_scratchIndexBufferBytes = 0;
 static D3DFORMAT g_scratchIndexFormat = D3DFMT_INDEX32;
@@ -1040,6 +1041,12 @@ static UINT R_ScratchBufferSizeFor( UINT neededBytes, UINT defaultBytes )
 
 void R_FreeModelScratchBuffers( )
 {
+	if( g_scratchQuadIndices )
+	{
+		DX_ForgetGeometryResource( g_scratchQuadIndices );
+		g_scratchQuadIndices->Release( );
+		g_scratchQuadIndices = nullptr;
+	}
 	if( g_scratchVertexBuffer )
 	{
 		DX_ForgetGeometryResource( g_scratchVertexBuffer );
@@ -1212,6 +1219,62 @@ bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount,
 	DX_ProfileDraw( true, primitiveCount );
 	device->DrawIndexedPrimitive( type, 0, 0, vertexCount, startIndex, primitiveCount );
 	return true;
+}
+
+bool R_DrawScratchQuads( const void *vertices, UINT quadCount, UINT stride )
+{
+	DX_TriBatchBarrier( DX_TRI_FLUSH_INCOMPATIBLE );
+	if( !device || !vertices || !quadCount || quadCount > DX_SCRATCH_QUAD_LIMIT )
+		return false;
+
+	if( !g_scratchQuadIndices )
+	{
+		static_assert( DX_SCRATCH_QUAD_LIMIT * 4 <= 65536 );
+		static const auto indices = [] {
+			std::array<WORD, DX_SCRATCH_QUAD_LIMIT * 6> data{};
+			for( UINT quad = 0; quad < DX_SCRATCH_QUAD_LIMIT; ++quad )
+			{
+				const WORD first = static_cast<WORD>( quad * 4 );
+				WORD *out = data.data( ) + quad * 6;
+				out[0] = first;
+				out[1] = first + 1;
+				out[2] = first + 2;
+				out[3] = first;
+				out[4] = first + 2;
+				out[5] = first + 3;
+			}
+			return data;
+		}( );
+
+		IDirect3DIndexBuffer9 *buffer = nullptr;
+		if( SUCCEEDED( device->CreateIndexBuffer( sizeof( indices ), D3DUSAGE_WRITEONLY,
+			D3DFMT_INDEX16, D3DPOOL_MANAGED, &buffer, nullptr ) ) && buffer )
+		{
+			void *memory = nullptr;
+			if( SUCCEEDED( buffer->Lock( 0, 0, &memory, 0 ) ) )
+			{
+				if( memory )
+					memcpy( memory, indices.data( ), sizeof( indices ) );
+				if( SUCCEEDED( buffer->Unlock( ) ) && memory )
+					g_scratchQuadIndices = buffer;
+			}
+			if( !g_scratchQuadIndices )
+				buffer->Release( );
+		}
+		if( !g_scratchQuadIndices )
+			return R_DrawScratchIndexedPrimitive( D3DPT_TRIANGLELIST, quadCount * 4, quadCount * 2,
+				indices.data( ), D3DFMT_INDEX16, vertices, stride );
+	}
+
+	UINT bytes = 0, offset = 0;
+	if( !stride || !R_UIntMul( quadCount * 4, stride, bytes ) ||
+		!R_UploadScratchVertices( vertices, bytes, stride, offset ) )
+		return false;
+	if( FAILED( DX_SetStreamSourceCached( 0, g_scratchVertexBuffer, offset, stride ) ) ||
+		FAILED( DX_SetIndicesCached( g_scratchQuadIndices ) ) )
+		return false;
+	DX_ProfileDraw( true, quadCount * 2 );
+	return SUCCEEDED( device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0, quadCount * 4, 0, quadCount * 2 ) );
 }
 
 int g_studioPoseUpdatesThisFrame = 0;
@@ -4604,8 +4667,6 @@ bool R_UploadWaterBatch( world_water_batch_t &batch )
 	if( batch.vertexCount == 0 || batch.primitiveCount == 0 )
 		return false;
 
-	batch.dynamicVertices.resize( batch.sources.size( ) );
-
 	if( !batch.indexBuffer )
 	{
 		if( batch.indices.size( ) > static_cast<size_t>( DX_SCRATCH_MAX_BYTES / sizeof( DWORD ) ) )
@@ -4630,16 +4691,6 @@ bool R_UploadWaterBatch( world_water_batch_t &batch )
 		batch.indexBuffer->Unlock( );
 	}
 
-	if( !batch.vertexBuffer )
-	{
-		HRESULT result = device->CreateVertexBuffer(
-			batch.vertexCount * sizeof( brush_vertex_t ),
-			D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, BRUSH_FVF, D3DPOOL_DEFAULT,
-			&batch.vertexBuffer, nullptr );
-		if( FAILED( result ) || !batch.vertexBuffer )
-			return false;
-	}
-
 	return true;
 }
 
@@ -4652,6 +4703,46 @@ static float R_WaterTexturePeriod( const texture_t* texture )
 		!Q_stricmp( texture->name, "!sewage" ) )
 		return 1024.f;
 	return 64.f;
+}
+
+static IDirect3DVertexBuffer9 *R_RemixWaterVertices( world_water_batch_t &batch,
+	const texture_t *texture, const cl_entity_s *ent, bool rippleMode )
+{
+	const float period = R_WaterTexturePeriod( texture );
+	const D3DCOLOR color = R_WaterVertexColor( ent, 255, rippleMode );
+	if( batch.remixVertexBuffer )
+		return batch.remixTexturePeriod == period && batch.remixColor == color
+			? batch.remixVertexBuffer : nullptr;
+
+	UINT bytes = 0;
+	if( !R_UploadWaterBatch( batch ) ||
+		!R_UIntMul( batch.vertexCount, sizeof( brush_vertex_t ), bytes ) )
+		return nullptr;
+
+	IDirect3DVertexBuffer9 *buffer = nullptr;
+	if( FAILED( device->CreateVertexBuffer( bytes, D3DUSAGE_WRITEONLY,
+		BRUSH_FVF, D3DPOOL_MANAGED, &buffer, nullptr ) ) || !buffer )
+		return nullptr;
+
+	void *memory = nullptr;
+	if( SUCCEEDED( buffer->Lock( 0, 0, &memory, 0 ) ) )
+	{
+		auto *out = static_cast<brush_vertex_t *>( memory );
+		if( out )
+		{
+			for( const auto &source : batch.sources )
+				*out++ = { source.x, source.y, source.z, color, source.s / period, source.t / period };
+		}
+		if( SUCCEEDED( buffer->Unlock( ) ) && memory )
+		{
+			batch.remixVertexBuffer = buffer;
+			batch.remixTexturePeriod = period;
+			batch.remixColor = color;
+			return buffer;
+		}
+	}
+	buffer->Release( );
+	return nullptr;
 }
 
 static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
@@ -4680,6 +4771,7 @@ static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 	const int renderColorB = ent ? ent->curstate.rendercolor.b : 255;
 
 	if( batch.vertexCacheValid &&
+		batch.cachedTexturePeriod == waterTexturePeriod &&
 		fabsf( batch.cachedAnimTime - animTime ) < 0.00001f &&
 		fabsf( batch.cachedWaveScale - waveScale ) < 0.00001f &&
 		fabsf( batch.cachedWaveSpeed - speed ) < 0.00001f &&
@@ -4695,6 +4787,14 @@ static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 		return true;
 	}
 
+	if( !batch.vertexBuffer )
+	{
+		UINT bytes = 0;
+		if( !R_UIntMul( batch.vertexCount, sizeof( brush_vertex_t ), bytes ) ||
+			FAILED( device->CreateVertexBuffer( bytes, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
+				BRUSH_FVF, D3DPOOL_DEFAULT, &batch.vertexBuffer, nullptr ) ) || !batch.vertexBuffer )
+			return false;
+	}
 	void *vertexMemory = nullptr;
 	HRESULT result = batch.vertexBuffer->Lock( 0, 0, &vertexMemory, D3DLOCK_DISCARD );
 	if( FAILED( result ) || !vertexMemory )
@@ -4727,8 +4827,13 @@ static bool R_UpdateWaterBatchVertices( world_water_batch_t &batch,
 		vertex.v = warpedT / th;
 	}
 
-	batch.vertexBuffer->Unlock( );
+	if( FAILED( batch.vertexBuffer->Unlock( ) ) )
+	{
+		R_FreeWaterBatches( batch, false );
+		return false;
+	}
 	batch.vertexCacheValid = true;
+	batch.cachedTexturePeriod = waterTexturePeriod;
 	batch.cachedAnimTime = animTime;
 	batch.cachedWaveScale = waveScale;
 	batch.cachedWaveSpeed = speed;
@@ -4761,6 +4866,7 @@ void R_LoadMap( const model_t *mod )
 
 	R_FreeRippleCaches( true );
 	R_ReleaseGlowOcclusionQueries( );
+	R_ClearNativeWorldBatches( );
 	R_ClearStudioGpuCaches( );
 	R_ClearEntityCache( );
 	for( auto &cache : g_worldLightmapStorage )
@@ -5272,7 +5378,11 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 		IDirect3DTexture9 *rippleTexture = depthOnly || dx_remix.value != 0.0f ? nullptr : R_UpdateWaterRippleTexture( texture, time );
 		const bool usingRippleTexture = dx_remix.value == 0.0f && R_WaterRippleTextureEnabled( );
 
-		if( !R_UpdateWaterBatchVertices( batch, texture, ent, time, rippleMode ) )
+		IDirect3DVertexBuffer9 *vertices = dx_remix.value != 0.0f
+			? R_RemixWaterVertices( batch, texture, ent, rippleMode ) : nullptr;
+		if( !vertices && R_UpdateWaterBatchVertices( batch, texture, ent, time, rippleMode ) )
+			vertices = batch.vertexBuffer;
+		if( !vertices )
 		{
 			if( batch.dynamicVertices.size( ) != batch.sources.size( ) )
 				batch.dynamicVertices.resize( batch.sources.size( ) );
@@ -5309,7 +5419,7 @@ static void R_DrawWaterBrushModel( world_model_draw_t &model,
 		}
 
 		DX_SetRenderStateCached( D3DRS_CULLMODE, D3DCULL_NONE );
-		R_DrawWaterIndexed( batch );
+		R_DrawWaterIndexed( batch, vertices );
 	}
 
 	DX_SetRenderStateCached( D3DRS_COLORWRITEENABLE, 0x0000000F );

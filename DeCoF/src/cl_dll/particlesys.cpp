@@ -669,10 +669,27 @@ bool ParticleSystem::UpdateSystem( float frametime, /*vec3_t &right, vec3_t &up,
 	if ( m_iState_guess == 2 )
 		return false;
 
-	// PVS loss must not freeze already-created particles forever. Model identity
- // also prevents a reused network entity slot from inheriting an old effect.
- const bool lost=!source||!source->model||(!m_iViewModel_guess&&source->curstate.messagenum<messagenum)||
+	// Model identity prevents a reused network entity slot from inheriting an
+ // old effect, so a model change (or a vanished viewmodel / owner) ends it.
+ const bool missing=!source||!source->model;
+ const bool lost=(missing&&(m_iViewModel_guess||cofrOwnerModel))||
   (source&&cofrOwnerModel&&cofrOwnerModel!=source->curstate.modelindex);
+ // Out of the PVS, or not received yet: pause the emitter as stock CoF does so
+ // a persistent effect resumes when its owner comes back. Book Simon's flare in
+ // c_ending4b is sent once, just as he teleports in, and was otherwise killed.
+ // Particles already spawned keep aging and expire instead of hanging frozen.
+ if(!lost&&!m_iViewModel_guess&&(missing||source->curstate.messagenum<messagenum)){
+  if(m_iState_guess==1&&gEngfuncs.GetClientTime()>m_flDieTime_guess)return false;
+  const float step=frametime>0&&frametime<1?frametime:0;
+  for(particle *p=m_pActiveParticle,*last=NULL,*next;p;p=next){
+   next=p->nextpart;p->age+=step;
+   if(p!=m_pMainParticle&&p->age_death>=0&&p->age>p->age_death){
+    if(last)last->nextpart=next;else m_pActiveParticle=next;
+    p->nextpart=m_pFreeParticle;m_pFreeParticle=p;
+   }else last=p;
+  }
+  return true;
+ }
  if(lost){
   if(m_iState_guess!=1){m_iState_guess=1;m_flFadeStart_guess=gEngfuncs.GetClientTime();m_flFadeTime_guess=1;m_flDieTime_guess=m_flFadeStart_guess+iParticleFadeTime_guess;}
   const float step=frametime>0&&frametime<1?frametime:0;

@@ -307,15 +307,13 @@ static long _stdcall Sys_Crash( PEXCEPTION_POINTERS pInfo )
 		Sys_Warn( "Sys_Crash: call %p at address %p", pInfo->ExceptionRecord->ExceptionAddress, pInfo->ExceptionRecord->ExceptionCode );
 #endif
 
+		// A fault can leave renderer or Bridge locks held by this thread.
+		// Let Windows handle the fatal exception without running game shutdown.
+		if( host_developer.value <= 0 )
+			return EXCEPTION_CONTINUE_SEARCH;
+
 		if( host.type == HOST_NORMAL )
 			CL_Crashed(); // tell client about crash
-
-		if( host_developer.value <= 0 )
-		{
-			// no reason to call debugger in release build - just exit
-			Sys_Quit( "crashed" );
-			return EXCEPTION_CONTINUE_EXECUTION;
-		}
 
 		// all other states keep unchanged to let debugger find bug
 		Sys_DestroyConsole();

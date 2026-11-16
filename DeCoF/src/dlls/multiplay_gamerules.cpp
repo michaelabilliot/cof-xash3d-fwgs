@@ -32,6 +32,7 @@
 #include	"voice_gamemgr.h"
 #include	"hltv.h"
 #include	"shake.h"
+#include	"../game_shared/cofr_coop_roster.hpp"
 
 extern DLL_GLOBAL CGameRules	*g_pGameRules;
 extern DLL_GLOBAL BOOL	g_fGameOver;
@@ -1208,9 +1209,10 @@ BOOL CHalfLifeMultiplay :: ClientConnected( edict_t *pEntity, const char *pszNam
 	if ( SteamUserStats() )
 		SteamUserStats()->RequestCurrentStats();
 
-	if ( players >= 4 )
+	const int maxPlayers = gpGlobals->maxClients < cof::CoopMaxPlayers ? gpGlobals->maxClients : cof::CoopMaxPlayers;
+	if ( players >= maxPlayers )
 	{
-		strcpy( szRejectReason, "Server is full (4 players max)" );
+		snprintf( szRejectReason, 128, "Server is full (%d players max)", maxPlayers );
 		return FALSE;
 	}
 

@@ -346,12 +346,28 @@ void CGameMenu::ActionSignal( int cmd )
 		ReadCampaigns_guess();
 		m_pCampaignList_guess->validate();
 		break;
+#ifdef COFR_XASH_ABI
+	// GoldSrc intercepted "optionshack" in its ServerCmd export to open GameUI
+	// dialogs. Xash forwards it to the server, which ignores it, so open the
+	// equivalent mainui menus directly. The CoF multiplayer page holds both the
+	// direct-connect field and the host buttons.
+	case 4:
+	case 9:
+		gEngfuncs.pfnPlaySoundByName( "ui/3d_click.wav", 0.5 );
+		gEngfuncs.pfnClientCmd( "menu_multiplayer" );
+		break;
+	case 5:
+		gEngfuncs.pfnPlaySoundByName( "ui/3d_click.wav", 0.5 );
+		gEngfuncs.pfnClientCmd( "menu_options" );
+		break;
+#else
 	case 4:
 		gEngfuncs.pfnServerCmd( "optionshack 0" );
 		break;
 	case 5:
 		gEngfuncs.pfnServerCmd( "optionshack 2" );
 		break;
+#endif
 	case 6:
 		setVisible( false );
 		gViewPort->UpdateCursorState();
@@ -382,9 +398,11 @@ void CGameMenu::ActionSignal( int cmd )
 			gViewPort->UpdateCursorState();
 		}
 		break;
+#ifndef COFR_XASH_ABI
 	case 9:
 		gEngfuncs.pfnServerCmd( "optionshack 1" );
 		break;
+#endif
 	case 10:
 		setVisible( false );
 		gEngfuncs.pfnClientCmd( "quit" );

@@ -353,6 +353,12 @@ void R_FreeWaterBatches( world_water_batch_t &batch, bool releaseManagedIndex )
 		batch.vertexBuffer = nullptr;
 	}
 	batch.vertexCacheValid = false;
+	if( releaseManagedIndex && batch.remixVertexBuffer )
+	{
+		DX_ForgetGeometryResource( batch.remixVertexBuffer );
+		batch.remixVertexBuffer->Release( );
+		batch.remixVertexBuffer = nullptr;
+	}
 	if( releaseManagedIndex && batch.indexBuffer )
 	{
 		DX_ForgetGeometryResource( batch.indexBuffer );
@@ -2178,6 +2184,12 @@ static bool R_LoadLightmappedBrushModel( const model_t *mod,
 		world_material_batch_t &batch =
 			R_FindWorldBatch( out, surface->texinfo->texture, atlasIndex,
 				conveyorSurface, cellX, cellY, cellZ );
+		for( byte style : surface->styles )
+		{
+			if( style == 255 )
+				break;
+			batch.staticLightStyles &= style == 0;
+		}
 		R_AddSurfacePVSLeafs( batch.pvsLeafs, batch.pvsAlwaysVisible, surfaceLeafs, surfaceIndex );
 		R_ExpandWorldBatchBounds( batch, surfaceVertices, vertexCount );
 		const DWORD baseVertex = static_cast<DWORD>( batch.vertices.size( ) );
@@ -3011,8 +3023,13 @@ static int R_EmitRemixFlashlights( int maxLights )
 	return emitted;
 }
 
+// Only a contiguous prefix of point lights is submitted. Beam lines remain
+// raster-only, and any point lights past the slot limit still need the overlay.
+static size_t g_remixSubmittedPointLights = 0;
+
 void R_ApplyDLights( void )
 {
+	g_remixSubmittedPointLights = 0;
 	if( !device )
 		return;
 
@@ -3091,18 +3108,16 @@ void R_ApplyDLights( void )
 		light.Attenuation0 = 0.0f;
 		light.Attenuation1 = 1.0f / std::max( 1.0f, source.radius );
 		light.Attenuation2 = 1.0f / std::max( 1.0f, source.radius * source.radius );
-		if( captureAll )
-		{
-			if( FAILED( device->SetLight( emitted, &light ) ) ||
-				FAILED( device->LightEnable( emitted, TRUE ) ) )
-				break;
-		}
-		else
-		{
-			device->SetLight( emitted, &light );
-			device->LightEnable( emitted, TRUE );
-		}
+		// SetLight on an enabled slot also refreshes Remix's frame-local light list.
+		// Keep that submission, but avoid sending a second command for active slots.
+		BOOL enabled = FALSE;
+		const bool alreadyEnabled = emitted < g_dxFixedLightCount &&
+			SUCCEEDED( device->GetLightEnable( emitted, &enabled ) ) && enabled;
+		if( FAILED( device->SetLight( emitted, &light ) ) ||
+			( !alreadyEnabled && FAILED( device->LightEnable( emitted, TRUE ) ) ) )
+			break;
 		++emitted;
+		++g_remixSubmittedPointLights;
 	}
 
 	for( int i = emitted; i < g_dxFixedLightCount; ++i )
@@ -3192,7 +3207,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
 
 	const float forwardOffset = std::max( -16.0f,
 		std::min( 16.0f, dx_muzzleflash_forward_offset.value ) );
-	if( viewModel ) VectorMA( flash.origin, forwardOffset, g_vForward, flash.origin );
+	if( viewModel ) VectorMA( flash.origin, forwardOffset, g_vAimForward, flash.origin );
 
 	flash.textureId = R_FindMuzzleFlashTexture( spriteType );
 	flash.scale = scale;
@@ -3208,7 +3223,7 @@ void R_SpawnRendererMuzzleFlash( const cl_entity_s *ent,
  if(R_CofClientPresent()) {
   vec3_t smokeForward;
   if(!viewModel && ent)AngleVectors(ent->angles,smokeForward,nullptr,nullptr);
-  else VectorCopy(g_vForward,smokeForward);
+  else VectorCopy(g_vAimForward,smokeForward);
   R_CofGunSmokeShot(origin,smokeForward,flash.startTime);
  }
 
@@ -3551,6 +3566,183 @@ static void R_UpdateGlassPlanes( const world_material_batch_t &batch,
 	}
 }
 
+namespace {
+class NativeWorldBatches
+{
+public:
+	void begin( const world_model_draw_t &model, const std::vector<size_t> *visible, bool useLightmaps )
+	{
+		active = false;
+		++frame;
+		if( !visible || dx_remix.value == 0.0f || g_dxOverviewView ||
+			!FBitSet( g_currentViewFlags, RF_DRAW_WORLD ) ||
+			FBitSet( g_currentViewFlags, RF_DRAW_CUBEMAP | RF_DRAW_OVERVIEW | RF_ONLY_CLIENTDRAW ) )
+			return;
+
+		const HMODULE current = GetModuleHandleA( "d3d9.dll" );
+		if( current != module )
+		{
+			entries.clear( );
+			module = current;
+			command = module ? reinterpret_cast<Command>(
+				GetProcAddress( module, "remixapi_D3D9RetainedWorldV1" ) ) : nullptr;
+		}
+		if( !command )
+			return;
+		if( lightmaps != useLightmaps || entries.size( ) != model.batches.size( ) )
+		{
+			clear( );
+			lightmaps = useLightmaps;
+			entries.resize( model.batches.size( ) );
+		}
+		active = true;
+		anchor = static_cast<size_t>( -1 );
+		requests.clear( );
+		requestIndices.clear( );
+		for( const size_t index : *visible )
+		{
+			if( index >= entries.size( ) )
+				continue;
+			auto &entry = entries[index];
+			entry.shown = false;
+			const auto &batch = model.batches[index];
+			const auto *texture = batch.baseTexture;
+			if( !eligible( model, batch ) )
+				continue;
+			if( anchor == static_cast<size_t>( -1 ) )
+			{
+				// Keep a main-view draw to feed the current camera, depth
+				// convention and dirty D3D9 lights to Remix.
+				anchor = index;
+				continue;
+			}
+			const auto *base = g_Textures[texture->gl_texturenum].tex;
+			const auto *atlas = useLightmaps && batch.atlasIndex >= 0 &&
+				batch.atlasIndex < static_cast<int>( g_mapLightmaps.atlases.size( ) )
+				? g_mapLightmaps.atlases[batch.atlasIndex].texture : nullptr;
+			if( entry.base && ( entry.base != base || entry.atlas != atlas ) )
+			{
+				// The normal draw must observe a texture replacement before reuse.
+				clear( );
+				entries.resize( model.batches.size( ) );
+				return;
+			}
+			entry.base = base;
+			entry.atlas = atlas;
+			if( entry.ready || ( entry.pending && frame >= entry.queryFrame ) )
+			{
+				requests.push_back( entry.id );
+				requestIndices.push_back( index );
+			}
+		}
+		if( requests.empty( ) )
+			return;
+
+		const bool submitted = requests.size( ) <= 16384 &&
+			command( device, Submit, requests.data( ), static_cast<uint32_t>( requests.size( ) ) );
+		for( size_t i = 0; i < requests.size( ); ++i )
+		{
+			auto &entry = entries[requestIndices[i]];
+			entry.shown = submitted && requests[i] == entry.id;
+			entry.ready = entry.shown;
+			entry.pending = false;
+			entry.everReady |= entry.shown;
+			if( !submitted )
+				entry.attempted = false;
+		}
+	}
+
+	bool shown( size_t index ) const
+	{
+		return active && entries[index].shown;
+	}
+
+	bool learn( const world_model_draw_t &model, size_t index )
+	{
+		if( !active || index == anchor || !eligible( model, model.batches[index] ) )
+			return false;
+
+		auto &entry = entries[index];
+		if( entry.pending || entry.ready || ( entry.attempted && !entry.everReady ) || frame < entry.retryFrame )
+			return false;
+		entry.retryFrame = frame + 120;
+		if( !entry.id )
+			entry.id = nextId++;
+		entry.pending = command( device, Learn, &entry.id, 1 ) != FALSE;
+		entry.attempted = entry.pending;
+		entry.queryFrame = frame + 2;
+		return entry.pending;
+	}
+
+	void endLearn( bool opened )
+	{
+		if( opened )
+		{
+			// If D3D9 rejected this draw before capture, its tag must not
+			// reach the next draw.
+			uint32_t cancel = 0;
+			command( device, Learn, &cancel, 1 );
+		}
+	}
+
+	void clear( )
+	{
+		if( !entries.empty( ) && command && device && module == GetModuleHandleA( "d3d9.dll" ) )
+			command( device, Clear, nullptr, 0 );
+		entries.clear( );
+		active = false;
+	}
+
+private:
+	static bool eligible( const world_model_draw_t &model, const world_material_batch_t &batch )
+	{
+		const auto *texture = batch.baseTexture;
+		// Static world draws bind the original opaque state even for a masked
+		// texture name. Remix retains the captured material and its replacement.
+		// Entity cutouts, which set D3D alpha test, are outside this route.
+		return batch.primitiveCount && batch.staticLightStyles && !batch.conveyor &&
+			texture && !texture->anim_total && !texture->anim_next && !texture->alternate_anims &&
+			texture->gl_texturenum > 0 &&
+			texture->gl_texturenum <= g_texcount && g_Textures[texture->gl_texturenum].tex &&
+			( ( model.sharedVertexBuffer && model.sharedIndexBuffer ) ||
+			  ( batch.vertexBuffer && batch.indexBuffer ) );
+	}
+
+	using Command = BOOL (WINAPI *)( IDirect3DDevice9 *, uint32_t, uint32_t *, uint32_t );
+	enum : uint32_t { Learn, Submit, Clear };
+	struct Batch
+	{
+		const IDirect3DTexture9 *base = nullptr;
+		const IDirect3DTexture9 *atlas = nullptr;
+		uint32_t id = 0;
+		uint64_t retryFrame = 0;
+		uint64_t queryFrame = 0;
+		bool attempted = false;
+		bool everReady = false;
+		bool pending = false;
+		bool ready = false;
+		bool shown = false;
+	};
+	std::vector<Batch> entries;
+	std::vector<uint32_t> requests;
+	std::vector<size_t> requestIndices;
+	HMODULE module = nullptr;
+	Command command = nullptr;
+	uint32_t nextId = 1;
+	uint64_t frame = 0;
+	size_t anchor = 0;
+	bool lightmaps = false;
+	bool active = false;
+};
+
+NativeWorldBatches g_nativeWorld;
+}
+
+void R_ClearNativeWorldBatches( )
+{
+	g_nativeWorld.clear( );
+}
+
 void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 	const cl_entity_s *ent, float time )
 {
@@ -3604,13 +3796,14 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 
 	const std::vector<size_t> *cachedStaticBatches =
 		!ent ? R_GetVisibleWorldBatches( model ) : nullptr;
+	g_nativeWorld.begin( model, cachedStaticBatches, useLightmaps );
 	const size_t batchLoopCount = cachedStaticBatches
 		? cachedStaticBatches->size( ) : model.batches.size( );
 	for( size_t batchLoopIndex = 0; batchLoopIndex < batchLoopCount; ++batchLoopIndex )
 	{
 		const size_t batchIndex = cachedStaticBatches
 			? ( *cachedStaticBatches )[batchLoopIndex] : batchLoopIndex;
-		if( batchIndex >= model.batches.size( ) )
+		if( batchIndex >= model.batches.size( ) || g_nativeWorld.shown( batchIndex ) )
 			continue;
 
 		const world_material_batch_t &batch = model.batches[batchIndex];
@@ -3757,20 +3950,24 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		else if( useSharedGeometry )
 		{
 			bindGeometry( batch );
+			const bool learning = g_nativeWorld.learn( model, batchIndex );
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
 			DX_ProfileDraw( true, batch.primitiveCount );
 			device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,
 				static_cast<INT>( batch.sharedBaseVertex ), 0,
 				batch.vertexCount, batch.sharedStartIndex,
 				batch.primitiveCount );
+			g_nativeWorld.endLearn( learning );
 		}
 		else if( batch.vertexBuffer && batch.indexBuffer )
 		{
 			DX_ProfileEvent( DX_PROFILE_EVENT_WORLD_BATCH_DRAWN, 1 );
 			bindGeometry( batch );
+			const bool learning = g_nativeWorld.learn( model, batchIndex );
 			DX_ProfileDraw( true, batch.primitiveCount );
 			device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST, 0, 0,
 				batch.vertexCount, 0, batch.primitiveCount );
+			g_nativeWorld.endLearn( learning );
 		}
 		else if( !batch.vertices.empty( ) && !batch.indices.empty( ) )
 		{
@@ -3799,15 +3996,15 @@ void R_DrawLightmappedBrushModel( const world_model_draw_t &model,
 		R_RestoreEntityRenderMode( &entityState );
 }
 
-void R_DrawWaterIndexed( world_water_batch_t &batch )
+void R_DrawWaterIndexed( const world_water_batch_t &batch, IDirect3DVertexBuffer9 *vertices )
 {
 	if( batch.primitiveCount == 0 )
 		return;
 
-	if( batch.vertexBuffer && batch.indexBuffer )
+	if( vertices && batch.indexBuffer )
 	{
 		DX_ProfileEvent( DX_PROFILE_EVENT_WATER_BATCH_DRAWN, 1 );
-		DX_SetStreamSourceCached( 0, batch.vertexBuffer, 0, sizeof( brush_vertex_t ) );
+		DX_SetStreamSourceCached( 0, vertices, 0, sizeof( brush_vertex_t ) );
 		DX_SetIndicesCached( batch.indexBuffer );
 		DX_ProfileDraw( true, batch.primitiveCount );
 		DX_ProfileEvent( DX_PROFILE_EVENT_STUDIO_BATCH_DRAWN, 1 );

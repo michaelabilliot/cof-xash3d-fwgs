@@ -89,6 +89,12 @@ extern IDirect3DDevice9 *device;
 extern float g_frametime;
 extern bool g_dxOverviewView;
 extern vec3_t g_vRight, g_vUp, g_vForward, g_vOrigin, g_vAngles;
+// True aim (engine view angles). Equal to g_vAngles unless cl_aimdeadzone
+// lets the rendered camera lag behind the weapon.
+extern vec3_t g_vAimAngles, g_vAimForward, g_vAimRight, g_vAimUp;
+// Pitch/yaw added to the drawn viewmodel so its barrel, seen through the
+// r_viewmodel_fov projection, points at the true aim's world-projected spot.
+extern float g_viewModelAimCorrection[2];
 
 extern bool g_dxCullValid;
 extern vec3_t g_dxCullOrigin, g_dxCullForward, g_dxCullRight, g_dxCullUp;
@@ -148,6 +154,7 @@ struct world_material_batch_t;
 bool R_DrawNightmareX(const world_material_batch_t&,const cl_entity_s*,float);
 struct world_material_batch_t
 {
+	bool staticLightStyles = true;
 	texture_t *baseTexture = nullptr;
 
 	int atlasIndex = -1;
@@ -198,6 +205,9 @@ struct world_water_batch_t
 
 	IDirect3DVertexBuffer9 *vertexBuffer = nullptr;
 	IDirect3DIndexBuffer9 *indexBuffer = nullptr;
+	IDirect3DVertexBuffer9 *remixVertexBuffer = nullptr;
+	float remixTexturePeriod = 0.0f;
+	D3DCOLOR remixColor = 0;
 
 	std::vector<int> pvsLeafs;
 	bool pvsAlwaysVisible = false;
@@ -213,6 +223,7 @@ struct world_water_batch_t
 	bool boundsValid = false;
 
 	bool vertexCacheValid = false;
+	float cachedTexturePeriod = 0.0f;
 	float cachedAnimTime = -9999.0f;
 	float cachedWaveScale = -1.0f;
 	float cachedWaveSpeed = -1.0f;
@@ -507,8 +518,8 @@ struct studio_batch_t
 	std::vector<studio_source_vertex_t> sources;
 	std::vector<DWORD> indices;
 	IDirect3DVertexBuffer9 *vertexBuffer = nullptr;
-	IDirect3DIndexBuffer9 *indexBuffer = nullptr;
 
+	UINT indexStart = 0;
 	UINT vertexStart = 0;
 	UINT vertexCount = 0;
 	UINT primitiveCount = 0;
@@ -538,6 +549,7 @@ struct studio_cache_t
 	int hiddenArm = 0;
 	const studiohdr_t *topologyHeader = nullptr;
 	std::vector<studio_batch_t> batches;
+	IDirect3DIndexBuffer9 *indexBuffer = nullptr;
 	IDirect3DVertexBuffer9 *combinedVertexBuffer = nullptr;
 	UINT combinedVertexCount = 0;
 	bool combinedVertexBufferMode = false;
@@ -552,9 +564,8 @@ struct studio_cache_t
 	// as gpuSkinSourceVertexBuffer, and released with it.
 	mutable IDirect3DVertexBuffer9 *remixBlendVertexBuffer = nullptr;
 	mutable UINT remixBlendVertexCount = 0;
-	// Some vertex's normal follows another bone than its position. Vertex blending
-	// applies one matrix to both, so such a model keeps the vertex shader path.
-	mutable bool remixBlendSplitNormals = false;
+	// Vertex blending needs one bone for both position and normal and static UVs.
+	bool remixBlendCompatible = false;
 
 	bool topologyValid = false;
 	bool poseUploaded = false;
@@ -845,6 +856,7 @@ void R_InvalidateLightmapGammaLut( void );
 void R_ClearAOEdgeCache( void );
 void R_ClearDecals( );
 void R_ClearStudioGpuCaches( );
+void R_ClearNativeWorldBatches( );
 void R_ResetAudiReplacement( );
 void R_LakeReedsInit();
 void R_LakeReedsReset();
@@ -879,11 +891,13 @@ void R_DrawBrushWaterDepth( cl_entity_s *ent );
 void R_DrawLightmappedBrushModel( const world_model_draw_t &model, const cl_entity_s *ent, float time );
 bool R_DrawScratch( D3DPRIMITIVETYPE type, UINT primitiveCount, UINT vertexCount, const void *vertices, UINT stride );
 bool R_DrawScratchIndexedPrimitive( D3DPRIMITIVETYPE type, UINT vertexCount, UINT primitiveCount, const void *indices, D3DFORMAT indexFormat, const void *vertices, UINT stride );
+bool R_DrawScratchQuads( const void *vertices, UINT quadCount, UINT stride );
+constexpr UINT DX_SCRATCH_QUAD_LIMIT = 8192;
 bool R_DrawScratchPrimitive( D3DPRIMITIVETYPE type, UINT primitiveCount, UINT vertexCount, const void *vertices, UINT stride );
 void R_DrawSpriteImmediate( cl_entity_s *ent );
 void R_DrawStudioEntity( cl_entity_s *ent );
 void R_DrawStudioViewModel( cl_entity_s *ent, const vec3_t viewOrigin, const vec3_t viewAngles, const vec3_t viewForward, const vec3_t viewRight, const vec3_t viewUp, float forwardOffset, float rightOffset, float upOffset, bool mirror=false, bool muzzleEvents=true, int hiddenArm=0, bool clientEvents=true );
-void R_DrawWaterIndexed( world_water_batch_t &batch );
+void R_DrawWaterIndexed( const world_water_batch_t &batch, IDirect3DVertexBuffer9 *vertices );
 bool R_DrawWorldBrushes( model_t *mod );
 void R_DrawWorldWater( model_t *mod );
 void R_DrawWorldWaterDepth( model_t *mod );
