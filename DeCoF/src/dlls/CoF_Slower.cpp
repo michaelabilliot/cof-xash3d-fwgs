@@ -314,7 +314,7 @@ void CZombie :: Spawn()
 	}
 
 	int iScale_guess = CVAR_GET_FLOAT( "cof_monsterhumanscale" );
-	UTIL_SetSize( pev, Vector( -iScale_guess, -iScale_guess, 0 ), Vector( 8, 8, 72 ) );
+	UTIL_SetSize( pev, Vector( -iScale_guess, -iScale_guess, 0 ), Vector( iScale_guess, iScale_guess, 72 ) );
 
 	pev->solid			= SOLID_SLIDEBOX;
 	pev->movetype		= MOVETYPE_STEP;

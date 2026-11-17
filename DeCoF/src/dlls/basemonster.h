@@ -148,6 +148,10 @@ public:
 	virtual void Look ( int iDistance );// basic sight function for monsters
 	virtual void RunAI ( void );// core ai function!	
 	void Listen ( void );
+	BOOL CoFR_HearsThroughWorld ( class CSound *pSound, float hearingSensitivity );
+	BOOL CoFR_HearsEntity ( CBaseEntity *pEnemy );
+	BOOL CoFR_CanHunt ( void );
+	BOOL CoFR_ShouldHuntSound ( void );
 
 	virtual BOOL	IsAlive( void ) { return (pev->deadflag != DEAD_DEAD); }
 	virtual BOOL	ShouldFadeOnDeath( void );

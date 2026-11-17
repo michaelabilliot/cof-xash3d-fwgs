@@ -25,6 +25,7 @@ extern Schedule_t	slFail[];
 //=========================================================
 extern Schedule_t	slIdleStand[];
 extern Schedule_t	slIdleTrigger[];
+extern Schedule_t	slHuntSound[];
 extern Schedule_t	slIdleWalk[];
 
 //=========================================================

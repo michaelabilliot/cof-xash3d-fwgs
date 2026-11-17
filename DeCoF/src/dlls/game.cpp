@@ -483,6 +483,12 @@ cvar_t	*g_footsteps = NULL;
 // Register your console variables here
 // This gets called one time when the game is initialied
 static cvar_t cofrNotargetCommand = {"cofr_notarget_command", "1", 0};
+// Range multiplier for sounds a monster hears through world geometry
+// (1 = original Cry of Fear, which hears the player 1000 units through walls).
+cvar_t cofr_ai_occluded_hearing = {"cofr_ai_occluded_hearing", "0.25", FCVAR_SERVER};
+// 1: monsters walk to the player's noise and follow it after losing sight;
+// 0: original behaviour (they only turn to face it).
+cvar_t cofr_ai_hunt = {"cofr_ai_hunt", "1", FCVAR_SERVER};
 
 void GameDLLInit( void )
 {
@@ -494,6 +500,8 @@ void GameDLLInit( void )
 	g_footsteps = CVAR_GET_POINTER( "mp_footsteps" );
 
 	CVAR_REGISTER (&cofrNotargetCommand);
+	CVAR_REGISTER (&cofr_ai_occluded_hearing);
+	CVAR_REGISTER (&cofr_ai_hunt);
 	CVAR_REGISTER (&displaysoundlist);
 	CVAR_REGISTER (&teamplay);
 	CVAR_REGISTER (&fraglimit);

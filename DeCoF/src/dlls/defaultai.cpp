@@ -338,6 +338,42 @@ Schedule_t	slInvestigateSound[] =
 };
 
 //=========================================================
+// HuntSound - CoFR: move to the player's noise. Unlike
+// InvestigateSound it is not interrupted by hearing, because
+// the player emits a sound every frame and that interrupt
+// would restart the schedule before the monster takes a step.
+//=========================================================
+Task_t tlHuntSound[] =
+{
+	{ TASK_STOP_MOVING,				(float)0				},
+	{ TASK_GET_PATH_TO_BESTSOUND,	(float)0				},
+	{ TASK_FACE_IDEAL,				(float)0				},
+	{ TASK_RUN_PATH,				(float)0				},
+	{ TASK_WAIT_FOR_MOVEMENT,		(float)0				},
+	{ TASK_SET_ACTIVITY,			(float)ACT_IDLE			},
+	{ TASK_WAIT,					(float)1				},
+};
+
+Schedule_t	slHuntSound[] =
+{
+	{ 
+		tlHuntSound,
+		ARRAYSIZE ( tlHuntSound ), 
+		bits_COND_NEW_ENEMY			|
+		bits_COND_SEE_FEAR			|
+		bits_COND_LIGHT_DAMAGE		|
+		bits_COND_HEAVY_DAMAGE		|
+		bits_COND_PROVOKED,
+		
+		bits_SOUND_PLAYER			|
+		bits_SOUND_COMBAT			|
+		bits_SOUND_WORLD			|
+		bits_SOUND_DANGER,
+		"Hunt Sound"
+	},
+};
+
+//=========================================================
 // CombatIdle Schedule
 //=========================================================
 Task_t	tlCombatStand1[] =
@@ -1037,6 +1073,7 @@ Schedule_t *CBaseMonster::m_scheduleList[] =
 	slAlertSmallFlinch,
 	slAlertStand,
 	slInvestigateSound,
+	slHuntSound,
 	slCombatStand,
 	slCombatFace,
 	slStandoff,

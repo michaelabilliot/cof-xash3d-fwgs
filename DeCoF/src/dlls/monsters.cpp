@@ -252,6 +252,54 @@ void CBaseMonster :: BarnacleVictimReleased ( void )
 // Listen - monsters dig through the active sound list for
 // any sounds that may interest them. (smells, too!)
 //=========================================================
+// CoFR: a sound behind world geometry only carries cofr_ai_occluded_hearing
+// of its range. Called after the full-range check has passed.
+extern cvar_t cofr_ai_occluded_hearing;
+BOOL CBaseMonster :: CoFR_HearsThroughWorld ( CSound *pSound, float hearingSensitivity )
+{
+	float scale = cofr_ai_occluded_hearing.value;
+	if ( scale >= 1.0f || !pSound->FIsSound() )
+		return TRUE;
+
+	Vector vecEar = EarPosition();
+	if ( ( pSound->m_vecOrigin - vecEar ).Length() <= pSound->m_iVolume * hearingSensitivity * max( scale, 0.0f ) )
+		return TRUE;
+
+	TraceResult tr;
+	UTIL_TraceLine( vecEar, pSound->m_vecOrigin, ignore_monsters, ignore_glass, ENT( pev ), &tr );
+	return tr.flFraction == 1.0f && !tr.fStartSolid;
+}
+
+// CoFR: is pEnemy's client sound in this monster's audible list?
+BOOL CBaseMonster :: CoFR_HearsEntity ( CBaseEntity *pEnemy )
+{
+	if ( !pEnemy || !pEnemy->IsPlayer() )
+		return FALSE;
+
+	CSound *pClientSound = CSoundEnt::SoundPointerForIndex( CSoundEnt::ClientSoundIndex( pEnemy->edict() ) );
+	if ( !pClientSound || pClientSound->m_iVolume <= 0 )
+		return FALSE;
+
+	for ( int iSound = m_iAudibleList; iSound != SOUNDLIST_EMPTY; )
+	{
+		CSound *pSound = CSoundEnt::SoundPointerForIndex( iSound );
+		if ( !pSound )
+			break;
+		if ( pSound == pClientSound )
+			return TRUE;
+		iSound = pSound->m_iNextAudible;
+	}
+	return FALSE;
+}
+
+// CoFR: monsters that can walk a path to a noise.
+BOOL CBaseMonster :: CoFR_CanHunt ( void )
+{
+	return pev->movetype == MOVETYPE_STEP && m_pCine == NULL &&
+		!FClassnameIs( pev, "monster_slowerstuck" ) && !FClassnameIs( pev, "monster_spitter" ) &&
+		!FClassnameIs( pev, "monster_roofboss" ) && !FClassnameIs( pev, "monster_booksimon" );
+}
+
 void CBaseMonster :: Listen ( void )
 {
 	int		iSound;
@@ -284,7 +332,8 @@ void CBaseMonster :: Listen ( void )
 
 		if ( pCurrentSound	&& 
 			 ( pCurrentSound->m_iType & iMySounds )	&& 
-			 ( pCurrentSound->m_vecOrigin - EarPosition() ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity )
+			 ( pCurrentSound->m_vecOrigin - EarPosition() ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity &&
+			 CoFR_HearsThroughWorld( pCurrentSound, hearingSensitivity ) )
 
 		//if ( ( g_pSoundEnt->m_SoundPool[ iSound ].m_iType & iMySounds ) && ( g_pSoundEnt->m_SoundPool[ iSound ].m_vecOrigin - EarPosition()).Length () <= g_pSoundEnt->m_SoundPool[ iSound ].m_iVolume * hearingSensitivity ) 
 		{
@@ -1227,6 +1276,7 @@ BOOL CBaseMonster :: FCanCheckAttacks ( void )
 // gets and stores data and conditions pertaining to a monster's
 // enemy. Returns TRUE if Enemy LKP was updated.
 //=========================================================
+extern cvar_t cofr_ai_hunt;
 int CBaseMonster :: CheckEnemy ( CBaseEntity *pEnemy )
 {
 	float	flDistToEnemy;
@@ -1319,6 +1369,14 @@ int CBaseMonster :: CheckEnemy ( CBaseEntity *pEnemy )
 		// if the enemy is not occluded, and unseen, that means it is behind or beside the monster.
 		// if the enemy is near enough the monster, we go ahead and let the monster know where the
 		// enemy is. 
+		iUpdatedLKP = TRUE;
+		m_vecEnemyLKP = pEnemy->pev->origin;
+	}
+	else if ( cofr_ai_hunt.value != 0 && HasConditions( bits_COND_ENEMY_OCCLUDED ) && CoFR_CanHunt() && CoFR_HearsEntity( pEnemy ) )
+	{
+		// CoFR: out of sight but still audible (the range is already
+		// cut by cofr_ai_occluded_hearing), so follow the noise instead
+		// of waiting at the spot where the enemy was last seen.
 		iUpdatedLKP = TRUE;
 		m_vecEnemyLKP = pEnemy->pev->origin;
 	}
@@ -2857,7 +2915,11 @@ float CBaseMonster::ChangeYaw ( int yawSpeed )
 	ideal = pev->ideal_yaw;
 	if (current != ideal)
 	{
-		speed = (float)yawSpeed * gpGlobals->frametime * 10;
+		// Callers turn once per 0.1 s think, so the per-call step must not
+		// follow the frame time: the original "yawSpeed * frametime * 10" was
+		// tuned for GoldSrc's 100 fps cap and made monsters turn (and so notice
+		// and attack the player) proportionally slower at higher frame rates.
+		speed = (float)yawSpeed * 0.1f;
 		move = ideal - current;
 
 		if (ideal > current)

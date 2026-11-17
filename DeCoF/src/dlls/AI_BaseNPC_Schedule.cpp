@@ -1570,6 +1570,22 @@ Task_t	*CBaseMonster :: GetTask ( void )
 // monster's member function to get a pointer to a schedule
 // of the proper type.
 //=========================================================
+// CoFR: hunt only the player's own noise (other sounds keep the original
+// face-the-sound behaviour), and only when its source is out of sight.
+extern cvar_t cofr_ai_hunt;
+BOOL CBaseMonster :: CoFR_ShouldHuntSound ( void )
+{
+	if ( cofr_ai_hunt.value == 0 || !CoFR_CanHunt() )
+		return FALSE;
+
+	CSound *pSound = PBestSound();
+	if ( !pSound || !( pSound->m_iType & bits_SOUND_PLAYER ) )
+		return FALSE;
+
+	// already standing on it: nothing to walk to
+	return ( pSound->m_vecOrigin - pev->origin ).Length2D() > 64;
+}
+
 Schedule_t *CBaseMonster :: GetSchedule ( void )
 {
 	switch	( m_MonsterState )
@@ -1605,6 +1621,8 @@ Schedule_t *CBaseMonster :: GetSchedule ( void )
 			
 			if ( HasConditions ( bits_COND_HEAR_SOUND ) )
 			{
+				if ( CoFR_ShouldHuntSound() )
+					return slHuntSound;
 				return GetScheduleOfType( SCHED_ALERT_FACE );
 			}
 			else if ( FRouteClear() )
@@ -1657,6 +1675,8 @@ Schedule_t *CBaseMonster :: GetSchedule ( void )
 
 			else if ( HasConditions ( bits_COND_HEAR_SOUND ) )
 			{
+				if ( CoFR_ShouldHuntSound() )
+					return slHuntSound;
 				return GetScheduleOfType( SCHED_ALERT_FACE );
 			}
 			else
