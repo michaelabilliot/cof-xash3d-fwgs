@@ -164,6 +164,7 @@ int IsInDonatorGroup1_guess( void );	// Steam clan 0x29D6CA
 int IsInDonatorGroup2_guess( void );	// Steam clan 0x46AE0A
 
 void IrrKlangCreate_guess( void );
+void CoFR_SfxEngineInit( void );
 void IrrKlangSetFade_guess( float flParm1, float flParm2, float flParm3, float flParm4 );
 void IrrKlangStop_guess( float flFadeTime );
 
@@ -855,6 +856,7 @@ void CHud :: Init( void )
 	HOOK_MESSAGE( CustomFng );
 	HOOK_MESSAGE( CustomGlv );
 	HOOK_MESSAGE( PlaySFX );
+	CoFR_SfxEngineInit();
 
 	// TFFree CommandMenu
 	HOOK_COMMAND( "+commandmenu", OpenCommandMenu );

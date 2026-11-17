@@ -3,6 +3,7 @@
 #include "hud.h"
 #include "cl_util.h"
 #include "mp3.h"
+#include "event_api.h"
 
 #include <irrKlang.h>
 
@@ -178,8 +179,81 @@ void IrrKlangPlayMP3_guess( const char *pszFile )
 		g_pMP3_guess->PlayMP3( pszFile );
 }
 
+// CoFR: play the irrKlang sound effects (weapon fire and handling, PlaySFX
+// messages) through the engine mixer instead, so the engine's raytraced audio
+// (snd_rt) gives them reverb. cl_sfx_engine 0 restores irrKlang.
+#define COFR_SND_FORCE_LOOP	(1<<14)	// xash.dll: loop the whole sample (no cue points needed)
+#define COFR_SFX_LOOP_CHAN	8		// player channel of the automatic fire loop (type 1)
+
+static cvar_t	*g_pSfxEngine;
+static char		g_szSfxLoop[256];	// loop playing through the engine, empty if none
+
+void CoFR_SfxEngineInit( void )
+{
+	g_pSfxEngine = gEngfuncs.pfnRegisterVariable( "cl_sfx_engine", "1", FCVAR_ARCHIVE );
+	g_szSfxLoop[0] = 0;
+}
+
+static void CoFR_SfxEngineStopLoop( int iEnt )
+{
+	if ( g_szSfxLoop[0] )
+	{
+		gEngfuncs.pEventAPI->EV_StopSound( iEnt, COFR_SFX_LOOP_CHAN, g_szSfxLoop );
+		g_szSfxLoop[0] = 0;
+	}
+}
+
+static bool CoFR_SfxEnginePlay( const char *pszSample, int iType )
+{
+	if ( !g_pSfxEngine || g_pSfxEngine->value == 0 )
+		return false;
+
+	cl_entity_t *pPlayer = gEngfuncs.GetLocalPlayer();
+	if ( !pPlayer )
+		return false;
+
+	// same remap as CMP3::PlaySFX_guess: weapons/<folder>/<file> plays weapons_new/<file>
+	char szSample[256];
+	const char *pszSlash = strstr( pszSample, "weapons/" ) ? strpbrk( pszSample, "/\\" ) : NULL;
+	if ( pszSlash )
+		_snprintf( szSample, sizeof( szSample ), "weapons_new/%s", pszSlash + 1 );
+	else
+		_snprintf( szSample, sizeof( szSample ), "%s", pszSample );
+	szSample[sizeof( szSample ) - 1] = 0;
+
+	// irrKlang played them at a random speed of 0.9-1.1
+	int iPitch = gEngfuncs.pfnRandomLong( 90, 110 );
+
+	if ( iType == 1 )
+	{
+		CoFR_SfxEngineStopLoop( pPlayer->index );
+		strcpy( g_szSfxLoop, szSample );
+		gEngfuncs.pEventAPI->EV_PlaySound( pPlayer->index, pPlayer->origin, COFR_SFX_LOOP_CHAN, g_szSfxLoop, 1.0, ATTN_NORM, COFR_SND_FORCE_LOOP, iPitch );
+	}
+	else if ( iType == 2 )
+	{
+		CoFR_SfxEngineStopLoop( pPlayer->index );
+	}
+	else
+	{
+		gEngfuncs.pEventAPI->EV_PlaySound( pPlayer->index, pPlayer->origin, CHAN_AUTO, szSample, 1.0, ATTN_NORM, 0, iPitch );
+	}
+
+	return true;
+}
+
 void IrrKlangPlaySFX_guess( const char *pszFile, int iType, bool bFlag, vec3_t vecOrigin )
 {
+	// a loop started through irrKlang must still stop if the cvar was switched
+	if ( iType == 2 && g_pMP3_guess )
+		g_pMP3_guess->PlaySFX_guess( pszFile, iType, bFlag, vecOrigin );
+
+	if ( CoFR_SfxEnginePlay( pszFile, iType ) )
+		return;
+
+	if ( iType == 2 )
+		return;
+
 	if ( g_pMP3_guess )
 		g_pMP3_guess->PlaySFX_guess( pszFile, iType, bFlag, vecOrigin );
 }
