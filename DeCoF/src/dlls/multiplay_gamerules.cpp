@@ -2719,7 +2719,7 @@ void CHalfLifeMultiplay :: SendMOTDToClient( edict_t *client )
 //=========================================================
 // ClientUserInfoChanged - every player is forced to the
 // model of his slot (police1 to police4, or the ones the
-// map sets on worldspawn)
+// map sets on worldspawn); slots past 4 cycle through the same four
 //=========================================================
 void CHalfLifeMultiplay::ClientUserInfoChanged( CBasePlayer *pPlayer, char *infobuffer )
 {
@@ -2758,7 +2758,8 @@ void CHalfLifeMultiplay::ClientUserInfoChanged( CBasePlayer *pPlayer, char *info
 
 		if ( plr && plr == pPlayer )
 		{
-			switch ( i )
+			// Slots past 4 reuse the four models in order: 5 -> 1, 6 -> 2, ...
+			switch ( ( i - 1 ) % 4 + 1 )
 			{
 			case 1:
 				if ( !FStrEq( mdls, szPlayer1Model ) )
