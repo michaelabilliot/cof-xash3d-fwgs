@@ -233,9 +233,9 @@ qboolean Sound_LoadWAV( const char *name, const byte *buffer, fs_offset_t filesi
 	sound.width = GetLittleShort() / 8;
 	if( mpeg_stream ) sound.width = 2; // mp3 always 16bit
 
-	if( sound.width != 1 && sound.width != 2 )
+	if( sound.width < 1 || sound.width > 4 )
 	{
-		Con_DPrintf( S_ERROR "%s: only 8 and 16 bit WAV files supported (%s)\n", __func__, name );
+		Con_DPrintf( S_ERROR "%s: only 8, 16, 24 and 32 bit WAV files supported (%s)\n", __func__, name );
 		return false;
 	}
 
@@ -324,6 +324,39 @@ qboolean Sound_LoadWAV( const char *name, const byte *buffer, fs_offset_t filesi
 	sound.wav = Mem_Malloc( host.soundpool, sound.size );
 
 	memcpy( sound.wav, buffer + (iff_dataPtr - buffer), sound.size );
+
+	// 24 and 32 bit PCM (Cry of Fear's weapons_new sounds): keep the top 16 bits,
+	// and halve 88.2/96 kHz with a pair average so the later resample to the
+	// mixer rate does not alias
+	if( sound.width == 3 || sound.width == 4 )
+	{
+		const byte *src = sound.wav;
+		const int inwidth = sound.width;
+		const int count = sound.samples * sound.channels;
+		short *dst = (short *)sound.wav;
+
+		for( int i = 0; i < count; i++, src += inwidth )
+			dst[i] = (short)( src[inwidth - 2] | ( src[inwidth - 1] << 8 ));
+
+		sound.width = 2;
+
+		if(( sound.rate == 88200 || sound.rate == 96000 ) && !FBitSet( sound.flags, SOUND_LOOPED ))
+		{
+			const int ch = sound.channels;
+			const int halved = sound.samples / 2;
+
+			for( int i = 0; i < halved; i++ )
+			{
+				for( int c = 0; c < ch; c++ )
+					dst[i * ch + c] = (short)(( dst[( 2 * i ) * ch + c] + dst[( 2 * i + 1 ) * ch + c] ) / 2 );
+			}
+
+			sound.samples = halved;
+			sound.rate /= 2;
+		}
+
+		sound.size = sound.samples * sound.width * sound.channels;
+	}
 
 	// swap 16-bit samples from little endian to native
 	if( sound.width == 2 )

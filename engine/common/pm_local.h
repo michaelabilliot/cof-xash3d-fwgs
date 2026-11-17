@@ -87,4 +87,16 @@ msurface_t *PM_RecursiveSurfCheck( model_t *model, mnode_t *node, vec3_t p1, vec
 msurface_t *PM_TraceSurface( physent_t *pe, vec3_t start, vec3_t end );
 int PM_TestLineExt( playermove_t *pmove, physent_t *ents, int numents, const vec3_t start, const vec3_t end, int flags );
 
+typedef struct pm_soundspan_s
+{
+	float             frac_in;   // where the segment enters the solid
+	float             frac_out;  // where it leaves it
+	vec3_t            normal;    // entry plane normal, facing the segment start (zero if unknown)
+	struct msurface_s *surf;     // face hit on entry, may be NULL
+	int               contents;  // CONTENTS_SOLID or CONTENTS_SKY
+	int               entindex;  // physent index (0 is the world)
+} pm_soundspan_t;
+
+int PM_SoundTrace( playermove_t *pmove, const vec3_t start, const vec3_t end, pm_soundspan_t *spans, int maxspans, qboolean first_only, qboolean world_only );
+
 #endif//PM_LOCAL_H

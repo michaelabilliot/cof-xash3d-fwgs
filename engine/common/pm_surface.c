@@ -362,3 +362,244 @@ int PM_TestLineExt( playermove_t *pmove, physent_t *ents, int numents, const vec
 
 	return trace.contents;
 }
+
+/*
+===============================================================================
+
+SOUND RAY TRACING
+
+Walks the render BSP (hull 0) of the world and of solid brush entities and
+reports every solid span crossed by a segment, front to back, with the entry
+plane normal and the face that was hit (for its material). Used by the
+raytraced audio system (engine/client/sound/s_raytrace.c).
+
+===============================================================================
+*/
+typedef struct
+{
+	model_t          *mod;
+	pm_soundspan_t   *spans;
+	int              numspans;
+	int              maxspans;
+	int              entindex;
+	qboolean         first_only;
+	qboolean         startsolid; // still inside the solid the segment started in
+
+	// last plane crossed, for the span entered next
+	const mnode_t    *cross_node;
+	int              cross_side;
+	vec3_t           cross_point;
+} pm_soundtrace_t;
+
+static msurface_t *PM_SoundFaceAtPoint( model_t *mod, const mnode_t *node, const vec3_t point )
+{
+	int numsurfaces = node_numsurfaces( node, mod );
+	int firstsurface = node_firstsurface( node, mod );
+
+	for( int i = 0; i < numsurfaces; i++ )
+	{
+		msurface_t   *surf = &mod->surfaces[firstsurface + i];
+		mfacebevel_t *fb = surf->info ? surf->info->bevel : NULL;
+		vec3_t       delta;
+		int          j;
+
+		if( !fb ) continue;
+
+		VectorSubtract( point, fb->origin, delta );
+		if( DotProduct( delta, delta ) >= fb->radius )
+			continue;
+
+		for( j = 0; j < fb->numedges; j++ )
+		{
+			if( PlaneDiff( point, &fb->edges[j] ) > FRAC_EPSILON )
+				break;
+		}
+
+		if( j == fb->numedges )
+			return surf;
+	}
+
+	return NULL;
+}
+
+static qboolean PM_SoundTrace_r( pm_soundtrace_t *tr, mnode_t *node, float p1f, float p2f, const vec3_t p1, const vec3_t p2 )
+{
+loc0:
+	if( node->contents < 0 )
+	{
+		pm_soundspan_t *last;
+
+		if( node->contents != CONTENTS_SOLID && node->contents != CONTENTS_SKY )
+		{
+			tr->startsolid = false;
+			return true; // empty, water, slime, lava: sound passes
+		}
+
+		if( tr->startsolid )
+			return true; // still inside the solid we started in, ignore it
+
+		last = tr->numspans > 0 ? &tr->spans[tr->numspans - 1] : NULL;
+
+		// adjacent solid leaves form one wall
+		if( last && last->entindex == tr->entindex && last->contents == node->contents && last->frac_out >= p1f - 0.0001f )
+		{
+			last->frac_out = p2f;
+			return true;
+		}
+
+		if( tr->numspans >= tr->maxspans )
+			return false;
+
+		last = &tr->spans[tr->numspans++];
+		last->frac_in = p1f;
+		last->frac_out = p2f;
+		last->contents = node->contents;
+		last->entindex = tr->entindex;
+		last->surf = NULL;
+		VectorClear( last->normal );
+
+		if( tr->cross_node )
+		{
+			const mplane_t *plane = tr->cross_node->plane;
+
+			if( tr->cross_side ) VectorNegate( plane->normal, last->normal );
+			else VectorCopy( plane->normal, last->normal );
+
+			last->surf = PM_SoundFaceAtPoint( tr->mod, tr->cross_node, tr->cross_point );
+		}
+
+		return !tr->first_only;
+	}
+
+	float t1 = PlaneDiff( p1, node->plane );
+	float t2 = PlaneDiff( p2, node->plane );
+
+	if( t1 >= 0.0f && t2 >= 0.0f )
+	{
+		node = node_child( node, 0, tr->mod );
+		goto loc0;
+	}
+
+	if( t1 < 0.0f && t2 < 0.0f )
+	{
+		node = node_child( node, 1, tr->mod );
+		goto loc0;
+	}
+
+	int side = ( t1 < 0.0f );
+	float frac = t1 / ( t1 - t2 );
+	if( !( frac >= 0.0f )) frac = 0.0f; // also catches NaN
+	if( frac > 1.0f ) frac = 1.0f;
+
+	vec3_t mid;
+	VectorLerp( p1, frac, p2, mid );
+	float midf = p1f + ( p2f - p1f ) * frac;
+
+	if( !PM_SoundTrace_r( tr, node_child( node, side, tr->mod ), p1f, midf, p1, mid ))
+		return false;
+
+	tr->cross_node = node;
+	tr->cross_side = side;
+	VectorCopy( mid, tr->cross_point );
+
+	return PM_SoundTrace_r( tr, node_child( node, !side, tr->mod ), midf, p2f, mid, p2 );
+}
+
+static int PM_SoundSpanCompare( const void *a, const void *b )
+{
+	const pm_soundspan_t *sa = a, *sb = b;
+
+	if( sa->frac_in < sb->frac_in ) return -1;
+	if( sa->frac_in > sb->frac_in ) return 1;
+	return 0;
+}
+
+/*
+==================
+PM_SoundTrace
+
+collects solid spans along start->end from the world (physent 0) and
+solid brush entities, sorted front to back. In first_only mode only the
+nearest span is returned. Solid the segment starts in is ignored.
+==================
+*/
+int PM_SoundTrace( playermove_t *pmove, const vec3_t start, const vec3_t end, pm_soundspan_t *spans, int maxspans, qboolean first_only, qboolean world_only )
+{
+	pm_soundspan_t local[16];
+	int total = 0;
+
+	if( !pmove || maxspans <= 0 )
+		return 0;
+
+	for( int i = 0; i < pmove->numphysent; i++ )
+	{
+		physent_t *pe = &pmove->physents[i];
+		pm_soundtrace_t tr;
+		vec3_t start_l, end_l;
+		matrix4x4 matrix;
+		qboolean rotated;
+
+		if( i != 0 && world_only )
+			break;
+
+		if( !pe->model || pe->model->type != mod_brush || pe->solid != SOLID_BSP )
+			continue;
+
+		if( !pe->model->nodes || pe->model->hulls[0].firstclipnode < 0 )
+			continue;
+
+		rotated = !VectorIsNull( pe->angles ) ? true : false;
+
+		if( rotated )
+		{
+			Matrix4x4_CreateFromEntity( matrix, pe->angles, pe->origin, 1.0f );
+			Matrix4x4_VectorITransform( matrix, start, start_l );
+			Matrix4x4_VectorITransform( matrix, end, end_l );
+		}
+		else
+		{
+			VectorSubtract( start, pe->origin, start_l );
+			VectorSubtract( end, pe->origin, end_l );
+		}
+
+		memset( &tr, 0, sizeof( tr ));
+		tr.mod = pe->model;
+		tr.spans = local;
+		tr.maxspans = first_only ? 1 : ARRAYSIZE( local );
+		tr.entindex = i;
+		tr.first_only = first_only;
+		tr.startsolid = true;
+
+		PM_SoundTrace_r( &tr, &pe->model->nodes[pe->model->hulls[0].firstclipnode], 0.0f, 1.0f, start_l, end_l );
+
+		for( int j = 0; j < tr.numspans; j++ )
+		{
+			pm_soundspan_t *s = &local[j];
+
+			if( rotated && !VectorIsNull( s->normal ))
+			{
+				vec3_t n;
+				Matrix4x4_VectorRotate( matrix, s->normal, n );
+				VectorCopy( n, s->normal );
+			}
+
+			if( first_only )
+			{
+				if( total == 0 )
+				{
+					spans[0] = *s;
+					total = 1;
+				}
+				else if( s->frac_in < spans[0].frac_in )
+					spans[0] = *s;
+			}
+			else if( total < maxspans )
+				spans[total++] = *s;
+		}
+	}
+
+	if( total > 1 )
+		qsort( spans, total, sizeof( *spans ), PM_SoundSpanCompare );
+
+	return total;
+}

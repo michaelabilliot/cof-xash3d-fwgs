@@ -47,6 +47,11 @@ extern poolhandle_t sndpool;
 #define MAX_RAW_SAMPLES      16384
 #define SND_CLIP_DISTANCE    1000.0f
 
+// client-only start flag: loop the whole sample even when the wav has no cue
+// points (Cry of Fear's automatic weapon fire loops, formerly played by irrKlang)
+#define SND_FORCE_LOOP       (1<<14)
+#define FL_CHAN_FORCE_LOOP   BIT( 7 )
+
 extern int idsp_room;
 extern snd_globals_t snd;
 
@@ -97,6 +102,18 @@ void SX_Init( void );
 void SX_Free( void );
 void SX_RoomFX( portable_samplepair_t *paint, int num_samples );
 void SX_ClearState( void );
+
+// s_raytrace.c
+void SND_RT_Init( void );
+void SND_RT_Shutdown( void );
+void SND_RT_ClearState( void );
+qboolean SND_RT_Active( void );
+void SND_RT_ResetChannel( const channel_t *ch );
+void SND_RT_Frame( void );
+void SND_RT_DebugOverlay( void );
+void SND_RT_PrepareMix( void );
+void SND_RT_MixChannel( const channel_t *ch, const portable_samplepair_t *src, portable_samplepair_t *dst, int count );
+void SND_RT_RenderReverb( portable_samplepair_t *dst, int count, qboolean paused );
 
 qboolean S_Init( void );
 qboolean S_InitSoundAPI( void );

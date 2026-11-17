@@ -185,6 +185,7 @@ S_FreeChannel
 void S_FreeChannel( channel_t *ch )
 {
 	S_NotifyChannelUpdate( ch - snd.channels, NULL, -1 );
+	SND_RT_ResetChannel( ch );
 
 	// free the currently loaded word's audio cache before nuking the channel
 	if( ch->words )
@@ -288,6 +289,9 @@ static int SND_GetChannelTimeLeft( const channel_t *ch )
 
 	if( FBitSet( ch->flags, FL_CHAN_FINISHED ) || !ch->sfx || !ch->sfx->cache )
 		return 0;
+
+	if( FBitSet( ch->flags, FL_CHAN_FORCE_LOOP ))
+		return 0x7fffffff; // never steal a forced loop
 
 	if( ch->words ) // sentences are special, count all remaining words
 	{
@@ -663,6 +667,7 @@ void S_StartSound( const vec3_t pos, int ent, int chan, sound_t handle, float fv
 
 	// spatialize
 	memset( target_chan, 0, sizeof( *target_chan ));
+	SND_RT_ResetChannel( target_chan );
 
 	VectorCopy( pos, target_chan->origin );
 
@@ -674,6 +679,9 @@ void S_StartSound( const vec3_t pos, int ent, int chan, sound_t handle, float fv
 
 	if( FBitSet( flags, SND_LOCALSOUND ))
 		SetBits( target_chan->flags, FL_CHAN_LOCAL_SOUND );
+
+	if( FBitSet( flags, SND_FORCE_LOOP ))
+		SetBits( target_chan->flags, FL_CHAN_FORCE_LOOP );
 
 	target_chan->dist_mult = (attn / SND_CLIP_DISTANCE);
 	target_chan->master_vol = vol;
@@ -771,6 +779,7 @@ void S_RestoreSound( const vec3_t pos, int ent, int chan, sound_t handle, float 
 
 	// spatialize
 	memset( target_chan, 0, sizeof( *target_chan ));
+	SND_RT_ResetChannel( target_chan );
 
 	VectorCopy( pos, target_chan->origin );
 
@@ -782,6 +791,9 @@ void S_RestoreSound( const vec3_t pos, int ent, int chan, sound_t handle, float 
 
 	if( FBitSet( flags, SND_LOCALSOUND ))
 		SetBits( target_chan->flags, FL_CHAN_LOCAL_SOUND );
+
+	if( FBitSet( flags, SND_FORCE_LOOP ))
+		SetBits( target_chan->flags, FL_CHAN_FORCE_LOOP );
 
 	target_chan->dist_mult = (attn / SND_CLIP_DISTANCE);
 	target_chan->master_vol = vol;
@@ -954,6 +966,7 @@ void S_AmbientSound( const vec3_t pos, int ent, sound_t handle, float fvol, floa
 	ch->basePitch = pitch;
 
 	S_NotifyChannelUpdate( ch - snd.channels, ch, handle );
+	SND_RT_ResetChannel( ch );
 	SND_Spatialize( ch );
 }
 
@@ -1481,6 +1494,7 @@ void S_StopAllSounds( qboolean ambient )
 	}
 
 	SX_ClearState();
+	SND_RT_ClearState();
 
 	// clear all the channels
 	memset( snd.channels, 0, sizeof( snd.channels[0] ) * snd.max_channels );
@@ -1669,6 +1683,10 @@ void SND_UpdateSound( void )
 
 		Con_NXPrintf( &info, "room_type: %i (%s) ----(%i)---- painted: %i\n", idsp_room, Cvar_VariableString( "dsp_coeff_table" ), total, snd.paintedtime );
 	}
+
+	// raytraced acoustics for new and moving sounds
+	SND_RT_Frame();
+	SND_RT_DebugOverlay();
 
 	S_StreamBackgroundTrack ();
 
@@ -2027,6 +2045,7 @@ qboolean S_Init( void )
 	memset( snd.ambient_sfx, 0, sizeof( snd.ambient_sfx ));
 
 	SX_Init ();
+	SND_RT_Init ();
 	S_StopAllSounds ( true );
 	S_InitSounds ();
 	VOX_Init ();
@@ -2066,6 +2085,7 @@ void S_Shutdown( void )
 	S_FreeSounds ();
 	VOX_Shutdown ();
 	SX_Free ();
+	SND_RT_Shutdown ();
 
 	SNDDMA_Shutdown ();
 	Mem_FreePool( &sndpool );

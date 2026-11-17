@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #include "client.h"
 
 static portable_samplepair_t roombuffer[(PAINTBUFFER_SIZE+1)], paintbuffer[(PAINTBUFFER_SIZE+1)];
+static portable_samplepair_t chanbuffer[(PAINTBUFFER_SIZE+1)]; // one channel, for raytraced filtering
 
 #define S_MakeMixMono( x ) \
 	static void S_MixMono ## x( portable_samplepair_t *pbuf, const int *volume, const void *buf, int num_samples ) \
@@ -234,7 +235,15 @@ static int S_MixChannelToBuffer( portable_samplepair_t *pbuf, channel_t *chan, i
 
 		// no samples available, exit
 		if( !available )
+		{
+			// forced loop: wrap to the start of the sample and keep mixing
+			if( FBitSet( chan->flags, FL_CHAN_FORCE_LOOP ) && chan->sfx->cache->samples > 1 && chan->sample > 0 )
+			{
+				chan->sample = fmod( chan->sample, (double)chan->sfx->cache->samples );
+				continue;
+			}
 			break;
+		}
 
 		double sample_frac = chan->sample - floor( chan->sample );
 
@@ -319,6 +328,7 @@ static int S_MixNormalChannelsToRoombuffer( portable_samplepair_t *dst, int end 
 	const float pitch_mult = ( sys_timescale.value + 1 ) / 2;
 
 	int num_mixed_channels = 0;
+	const qboolean raytraced = SND_RT_Active();
 
 	if( num_samples <= 0 )
 		return num_mixed_channels;
@@ -395,16 +405,26 @@ static int S_MixNormalChannelsToRoombuffer( portable_samplepair_t *dst, int end 
 
 		num_mixed_channels++;
 
+		// raytraced audio filters every channel on its own before it joins the room
+		portable_samplepair_t *target = dst;
+		if( raytraced )
+		{
+			memset( chanbuffer, 0, ( num_samples + 1 ) * sizeof( portable_samplepair_t ));
+			target = chanbuffer;
+		}
+
 		if( ch->words )
 		{
-			VOX_MixChannelToBuffer( dst, ch, num_samples, out_rate, pitch );
+			VOX_MixChannelToBuffer( target, ch, num_samples, out_rate, pitch );
+			if( raytraced ) SND_RT_MixChannel( ch, chanbuffer, dst, num_samples );
 
 			if( FBitSet( ch->flags, FL_CHAN_SENTENCE_FINISHED ))
 				S_FreeChannel( ch );
 		}
 		else
 		{
-			S_MixChannelToBuffer( dst, ch, num_samples, out_rate, pitch, 0, 0 );
+			S_MixChannelToBuffer( target, ch, num_samples, out_rate, pitch, 0, 0 );
+			if( raytraced ) SND_RT_MixChannel( ch, chanbuffer, dst, num_samples );
 
 			if( FBitSet( ch->flags, FL_CHAN_FINISHED ))
 				S_FreeChannel( ch );
@@ -545,6 +565,10 @@ void S_ClearBuffers( int num_samples )
 void S_PaintChannels( int endtime )
 {
 	int gain = S_GetMasterVolume() * 256;
+	const qboolean raytraced = SND_RT_Active();
+
+	if( raytraced )
+		SND_RT_PrepareMix();
 
 	while( snd.paintedtime < endtime )
 	{
@@ -562,7 +586,9 @@ void S_PaintChannels( int endtime )
 		room_channels += S_MixRawChannels( end );
 
 		// now process DSP and mix result into paintbuffer
-		if( cls.key_dest != key_menu )
+		if( raytraced )
+			SND_RT_RenderReverb( roombuffer, num_samples, cls.key_dest == key_menu );
+		else if( cls.key_dest != key_menu )
 			SX_RoomFX( roombuffer, num_samples );
 
 		if( room_channels > 0 || cls.key_dest != key_menu )
